@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Ten Largest, Ranked by Return</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,52 +13,134 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="wrap">
-    <div class="eyebrow"><span class="dot"></span>U.S. Equity Market &middot; Live</div>
-    <h1>Ten Largest, Ranked&nbsp;by&nbsp;Return</h1>
-    <p class="sub">
-      The ten largest U.S.-traded companies by market capitalization, ordered by trailing price
-      return. Switch the window to see how the ranking shifts.
-    </p>
-    <div class="meta-row" id="meta-row">
-      <span>Universe: <b>top 10 by market cap</b>, NYSE/NASDAQ, funds &amp; multiple share classes excluded</span>
-      <span id="as-of">Loading&hellip;</span>
-      <span>Source: <b>Financial Modeling Prep</b></span>
-    </div>
+  <main class="app">
 
-    <div class="controls">
-      <span class="controls-label">Return window</span>
-      <div class="segmented" role="group" aria-label="Return window" id="segmented"></div>
-    </div>
-
-    <div class="board">
-      <div class="board-inner">
-        <div class="row head">
-          <span>#</span>
-          <span>Company</span>
-          <span class="num price">Price</span>
-          <span class="num cap">Mkt Cap</span>
-          <span>Return</span>
+    <!-- ───────────────────────── Ranks ───────────────────────── -->
+    <section class="panel" id="panel-ranks" data-panel="ranks">
+      <div class="wrap">
+        <div class="eyebrow"><span class="dot"></span>U.S. Equity Market &middot; Live</div>
+        <h1>Ten Largest, Ranked&nbsp;by&nbsp;Return</h1>
+        <p class="sub">
+          The ten largest U.S.-traded companies by market capitalization, ordered by trailing
+          performance. Switch the window to see how the ranking shifts.
+        </p>
+        <div class="meta-row" id="meta-row">
+          <span>Universe: <b>top 10 by market cap</b>, NYSE/NASDAQ, funds &amp; multiple share classes excluded</span>
+          <span id="as-of">Loading&hellip;</span>
+          <span>Source: <b>Financial Modeling Prep</b></span>
         </div>
-        <div id="rows">
-          <div class="loading">Fetching live data from Financial Modeling Prep&hellip;</div>
+
+        <div class="controls">
+          <span class="controls-label" id="ranks-score-label">Return window</span>
+          <div class="segmented" role="group" aria-label="Return window" data-segmented="ranks"></div>
+        </div>
+
+        <div class="board">
+          <div class="board-inner">
+            <div class="row head">
+              <span>#</span>
+              <span>Company</span>
+              <span class="num price">Price</span>
+              <span class="num cap">Mkt Cap</span>
+              <span id="ranks-return-head">Return</span>
+              <span class="select-head" aria-hidden="true"></span>
+            </div>
+            <div id="ranks-rows">
+              <div class="loading">Fetching live data from Financial Modeling Prep&hellip;</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout" id="ranks-callout" hidden>
+          <span class="mark">&#8224;</span>
+          <p id="ranks-callout-text"></p>
+        </div>
+
+        <footer>
+          <span>Data via financialmodelingprep.com, fetched live by this server and cached for 5 minutes.</span>
+          <span class="expand-note">
+            Framework: add a metric key to <code>src/config.js</code> and it appears in the toggle and
+            API response automatically; bump <code>universeSize</code> to widen the board.
+          </span>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ─────────────────────── Watchlist ─────────────────────── -->
+    <section class="panel" id="panel-watchlist" data-panel="watchlist" hidden>
+      <div class="wrap">
+        <div class="eyebrow"><span class="dot"></span>Saved by You</div>
+        <h1>Watchlist</h1>
+        <p class="sub">Companies you've selected from the board. Tap a filled circle to remove one.</p>
+
+        <div class="controls">
+          <span class="controls-label" id="watchlist-score-label">Return window</span>
+          <div class="segmented" role="group" aria-label="Return window" data-segmented="watchlist"></div>
+        </div>
+
+        <div class="board">
+          <div class="board-inner">
+            <div class="row head" id="watchlist-head" hidden>
+              <span>#</span>
+              <span>Company</span>
+              <span class="num price">Price</span>
+              <span class="num cap">Mkt Cap</span>
+              <span id="watchlist-return-head">Return</span>
+              <span class="select-head" aria-hidden="true"></span>
+            </div>
+            <div id="watchlist-rows">
+              <div class="empty-state">
+                <div class="empty-state-glyph" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="30" height="30"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
+                </div>
+                <p>Your watchlist is empty. Head to Ranks and tap the circle on any company to save it here.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="callout" id="callout" hidden>
-      <span class="mark">&#8224;</span>
-      <p id="callout-text"></p>
-    </div>
+    <!-- ──────────────────────── Settings ─────────────────────── -->
+    <section class="panel" id="panel-settings" data-panel="settings" hidden>
+      <div class="wrap">
+        <div class="eyebrow"><span class="dot"></span>Preferences</div>
+        <h1>Settings</h1>
+        <p class="sub">Tune how the board scores and ranks companies.</p>
 
-    <footer>
-      <span>Data via financialmodelingprep.com, fetched live by this server and cached for 5 minutes.</span>
-      <span class="expand-note">
-        Framework: add a metric key to <code>src/config.js</code> and it appears in the toggle and the
-        API response automatically; bump <code>universeSize</code> to widen the board.
-      </span>
-    </footer>
-  </div>
+        <div class="settings-group">
+          <div class="settings-group-label">Scoring</div>
+          <div class="settings-list" id="settings-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────────────────── Tab bar chrome ─────────────────── -->
+    <nav class="tabbar" role="tablist" aria-label="Primary">
+      <button class="tab-btn" data-tab="ranks" role="tab" aria-selected="true">
+        <span class="tab-icon">
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4.2" height="8.5" rx="1"/><rect x="9.9" y="7" width="4.2" height="13.5" rx="1"/><rect x="16.8" y="3" width="4.2" height="17.5" rx="1"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="12" width="4.2" height="8.5" rx="1"/><rect x="9.9" y="7" width="4.2" height="13.5" rx="1"/><rect x="16.8" y="3" width="4.2" height="17.5" rx="1"/></svg>
+        </span>
+        <span class="tab-label">Ranks</span>
+      </button>
+      <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
+        <span class="tab-icon">
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
+        </span>
+        <span class="tab-label">Watchlist</span>
+        <span class="tab-badge" id="watchlist-badge" hidden>0</span>
+      </button>
+      <button class="tab-btn" data-tab="settings" role="tab" aria-selected="false">
+        <span class="tab-icon">
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3.4"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </span>
+        <span class="tab-label">Settings</span>
+      </button>
+    </nav>
+  </main>
 
   <script src="/app.js"></script>
 </body>
