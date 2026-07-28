@@ -72,6 +72,7 @@ async function getLeaderboard() {
         sector: c.sector,
         price: c.price,
         marketCap: c.marketCap,
+        beta: typeof c.beta === 'number' ? c.beta : null,
         ipoDate,
         returns: extractReturns(priceChange),
         availability: metricAvailability(ipoDate, asOf),
