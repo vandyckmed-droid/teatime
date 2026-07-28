@@ -1,0 +1,13 @@
+{
+  "name": "teatime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Largest US-traded companies ranked by trailing return, powered by Financial Modeling Prep.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ten Largest, Ranked by Return</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="eyebrow"><span class="dot"></span>U.S. Equity Market &middot; Live</div>
+    <h1>Ten Largest, Ranked&nbsp;by&nbsp;Return</h1>
+    <p class="sub">
+      The ten largest U.S.-traded companies by market capitalization, ordered by trailing price
+      return. Switch the window to see how the ranking shifts.
+    </p>
+    <div class="meta-row" id="meta-row">
+      <span>Universe: <b>top 10 by market cap</b>, NYSE/NASDAQ, funds &amp; multiple share classes excluded</span>
+      <span id="as-of">Loading&hellip;</span>
+      <span>Source: <b>Financial Modeling Prep</b></span>
+    </div>
+
+    <div class="controls">
+      <span class="controls-label">Return window</span>
+      <div class="segmented" role="group" aria-label="Return window" id="segmented"></div>
+    </div>
+
+    <div class="board">
+      <div class="board-inner">
+        <div class="row head">
+          <span>#</span>
+          <span>Company</span>
+          <span class="num price">Price</span>
+          <span class="num cap">Mkt Cap</span>
+          <span>Return</span>
+        </div>
+        <div id="rows">
+          <div class="loading">Fetching live data from Financial Modeling Prep&hellip;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout" id="callout" hidden>
+      <span class="mark">&#8224;</span>
+      <p id="callout-text"></p>
+    </div>
+
+    <footer>
+      <span>Data via financialmodelingprep.com, fetched live by this server and cached for 5 minutes.</span>
+      <span class="expand-note">
+        Framework: add a metric key to <code>src/config.js</code> and it appears in the toggle and the
+        API response automatically; bump <code>universeSize</code> to widen the board.
+      </span>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
