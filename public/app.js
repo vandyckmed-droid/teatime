@@ -607,6 +607,7 @@ function renderChart() {
   const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
   const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(2)},${CHART_H} L0,${CHART_H} Z`;
   const baselineY = coords[0].y.toFixed(2);
+  const first = coords[0];
   const last = coords[coords.length - 1];
 
   wrap.innerHTML = `
@@ -616,6 +617,7 @@ function renderChart() {
       <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${CHART_W}" y2="${baselineY}" />
       <path class="chart-area ${dir}" id="chart-area-path" d="${areaPath}" />
       <path class="chart-line ${dir}" id="chart-line-path" d="${linePath}" />
+      <circle class="chart-startpoint" id="chart-startpoint-dot" cx="${first.x.toFixed(2)}" cy="${first.y.toFixed(2)}" r="3.5" />
       <circle class="chart-endpoint ${dir}" id="chart-endpoint-dot" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
       <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${CHART_H}" />
       <circle class="chart-crosshair-dot" id="crosshair-dot" r="4.5" />

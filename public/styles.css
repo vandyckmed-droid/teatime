@@ -425,6 +425,15 @@ body {
   fill: currentColor; stroke: var(--panel); stroke-width: 2;
   animation: chart-fade-in 300ms ease-out 550ms both;
 }
+/* Marks the other end of the currently-displayed range (the oldest point in
+   the range toggle's window, e.g. "1Y" ago) — hollow and smaller than the
+   solid endpoint dot so it reads as a secondary reference, not a second
+   "current value" competing with it. Position alone (always left of the
+   endpoint) makes which is which unambiguous. */
+.chart-startpoint {
+  fill: var(--panel); stroke: var(--muted); stroke-width: 2;
+  animation: chart-fade-in 300ms ease-out 550ms both;
+}
 @keyframes chart-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .chart-crosshair-line { stroke: var(--ink-soft); stroke-width: 1; opacity: 0; pointer-events: none; }
 .chart-crosshair-dot { fill: var(--ink); stroke: var(--panel); stroke-width: 2; opacity: 0; pointer-events: none; }
@@ -438,7 +447,10 @@ body {
 .chart-tooltip b { color: var(--ink); font-weight: 600; }
 
 .chart-axis-y {
-  position: absolute; left: 6px;
+  /* Clears the start-point dot (always near the left edge) — a chart's low
+     or high point coincides with its start day often enough that a tighter
+     left offset regularly overlapped the label with the dot. */
+  position: absolute; left: 22px;
   font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
   font-variant-numeric: tabular-nums; pointer-events: none;
   background: var(--panel); padding: 1px 5px; border-radius: 5px;
@@ -453,7 +465,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chart-line, .chart-area, .chart-endpoint, .chart-axis-y { animation: none; }
+  .chart-line, .chart-area, .chart-endpoint, .chart-startpoint, .chart-axis-y { animation: none; }
 }
 
 .detail-facts { display: flex; flex-wrap: wrap; gap: 10px; }
