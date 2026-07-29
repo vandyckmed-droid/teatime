@@ -171,31 +171,66 @@ shows the sector name as text alongside the color, so identity never depends
 on hue alone. Worth a real attempt if sector color-coding turns out to
 matter more than expected in practice.
 
-## The standalone preview link
+## Preview channels: the repo isn't what the owner actually looks at
 
-The owner's primary way of reviewing work is a single persistent Artifact
-URL — https://claude.ai/code/artifact/f3363de1-0c82-4e1d-a349-283203af7b4f —
-not a locally-run server, since Artifacts can't reach FMP directly (sandboxed,
-no arbitrary external fetch) or hold a secret API key safely. After merging
-a change to `main`:
+Neither of the owner's two preview channels can reach FMP directly or hold
+a secret API key — Artifacts are sandboxed (no arbitrary external fetch),
+and a static GitHub Pages site has no server at all. Both are static
+snapshots assembled from a locally-run `server.js`, not live-fetching
+copies of the app. This means every feature lands in **three** places: the
+real repo (source of truth, always live-fetching, needs Railway or a local
+run to actually see data), and two redeployed snapshots. Don't consider a
+change shipped until all three are done.
+
+### Building the snapshot bundle (shared by both channels)
 
 1. Boot `server.js` locally with a real `API_KEY`/`FMP_API_KEY`.
-2. Pull a fresh snapshot: `GET /api/leaderboard`, then `GET /api/history?symbol=X`
-   for every company in that snapshot (all 10, in parallel).
+2. Pull a fresh snapshot: `GET /api/leaderboard`, then
+   `GET /api/history/batch?symbols=A,B,C,...` for every company in that
+   snapshot in one call (not one request per symbol — see the
+   Extensibility section above on why).
 3. Assemble a single self-contained HTML file: inline `public/styles.css`,
    the `<main class="app">…</main>` body from `public/index.html` (its
-   footnote line needs overriding to the "snapshot preview, not live" wording
-   — see below), and `public/app.js` with its two `fetch()` calls
-   (`loadLeaderboard`, `loadHistoryFor`) replaced by reads from
-   `EMBEDDED_LEADERBOARD` / `EMBEDDED_HISTORY` constants holding the JSON you
-   just pulled. No fonts to embed — system fonts need no asset.
-4. Test the assembled file by opening it with Playwright over `file://`
-   (proves it truly has no network dependency, matching the Artifact
-   sandbox) before publishing.
-5. Publish via the `Artifact` tool with `url` set to the URL above, so it
-   redeploys in place rather than minting a new link. Keep the same favicon
-   (📈) across redeploys.
+   footnote line needs overriding to the "snapshot preview, not live"
+   wording), and `public/app.js` with its network-touching functions
+   patched to read from embedded data instead of fetching:
+   - `loadLeaderboard` → returns `EMBEDDED_LEADERBOARD` directly.
+   - `loadHistoryFor` → looks up `EMBEDDED_HISTORY[symbol]` instead of
+     calling `/api/history`.
+   - `loadAllHistories` → populates `historyCache` directly from
+     `EMBEDDED_HISTORY` for the requested symbols instead of calling
+     `/api/history/batch`.
+   No fonts to embed — system fonts need no asset.
+4. Test the assembled file by opening it with Playwright over `file://` in
+   both color schemes (proves it truly has no network dependency) before
+   publishing anywhere.
 
-This means every feature lands in two places: the real repo (source of
-truth, always live-fetching) and a redeployed snapshot of it (what the owner
-actually clicks on). Don't consider a change shipped until both are done.
+### Channel 1 — Artifact (zero-setup, but claude.ai-wrapped)
+
+Persistent URL: https://claude.ai/code/artifact/f3363de1-0c82-4e1d-a349-283203af7b4f.
+Publish the bundle via the `Artifact` tool with `url` set to that URL so it
+redeploys in place rather than minting a new link. Keep the same favicon
+(📈) across redeploys. Nothing to set up, works instantly — but because the
+page is wrapped inside a claude.ai viewer rather than served at its own
+origin, "Add to Home Screen" from there won't reliably trigger the
+full-screen, no-Safari-chrome standalone mode the app's meta tags
+(`apple-mobile-web-app-capable`, `theme-color`) are built for.
+
+### Channel 2 — GitHub Pages (own URL, real install experience)
+
+Public URL: https://vandyckmed-droid.github.io/teatime/. Copy the same
+assembled bundle to `docs/index.html` in the repo (that's the whole
+deploy — no build step, no Actions workflow) and ship it through the
+normal branch/PR/merge flow like any other change. GitHub Pages is
+configured to serve from `main` branch, `/docs` folder — enabled once
+already; nothing further to toggle on GitHub's side for future updates.
+Because this is served at its own origin (not wrapped in a viewer), "Add to
+Home Screen" on iOS gets the real standalone-app experience: full screen,
+no Safari chrome, tinted status bar — this is the channel that actually
+looks and feels like a native app, at zero hosting cost since it's fully
+static.
+
+One cost worth knowing about: each redeploy commits a new ~2.5MB HTML file
+(the embedded data is what makes it self-contained), so `docs/index.html`'s
+history adds up in repo size over many iterations. Not a problem at this
+scale; flag it if it ever becomes one.
