@@ -1,5 +1,6 @@
 const fmp = require('./fmpClient');
 const config = require('./config');
+const { mapWithConcurrency } = require('./concurrency');
 
 // Multiple share classes (GOOGL/GOOG, BRK-A/BRK-B) and duplicate listings
 // map to the same company; keep only the higher-market-cap line per name.
@@ -59,26 +60,24 @@ async function getLeaderboard() {
     .sort((a, b) => b.marketCap - a.marketCap)
     .slice(0, config.universeSize);
 
-  const companies = await Promise.all(
-    universe.map(async (c) => {
-      const [priceChange, profile] = await Promise.all([
-        fmp.getPriceChange(c.symbol).catch(() => null),
-        fmp.getProfile(c.symbol).catch(() => null),
-      ]);
-      const ipoDate = profile ? profile.ipoDate : null;
-      return {
-        symbol: c.symbol,
-        name: c.companyName,
-        sector: c.sector,
-        price: c.price,
-        marketCap: c.marketCap,
-        beta: typeof c.beta === 'number' ? c.beta : null,
-        ipoDate,
-        returns: extractReturns(priceChange),
-        availability: metricAvailability(ipoDate, asOf),
-      };
-    })
-  );
+  const companies = await mapWithConcurrency(universe, config.fmpConcurrency, async (c) => {
+    const [priceChange, profile] = await Promise.all([
+      fmp.getPriceChange(c.symbol).catch(() => null),
+      fmp.getProfile(c.symbol).catch(() => null),
+    ]);
+    const ipoDate = profile ? profile.ipoDate : null;
+    return {
+      symbol: c.symbol,
+      name: c.companyName,
+      sector: c.sector,
+      price: c.price,
+      marketCap: c.marketCap,
+      beta: typeof c.beta === 'number' ? c.beta : null,
+      ipoDate,
+      returns: extractReturns(priceChange),
+      availability: metricAvailability(ipoDate, asOf),
+    };
+  });
 
   return {
     asOf: asOf.toISOString(),

@@ -30,12 +30,20 @@ const DATE_RANGE_MIN_GAP = 10;
 
 const TRADING_DAYS_PER_YEAR = 252;
 
+// Sectors actually seen in the top 50 by market cap as of the scale-up to
+// universeSize=50 (checked live against the screener). Add more here if a
+// future resize surfaces a sector not covered — falls back to
+// --sector-default rather than breaking.
 const SECTOR_VAR = {
   Technology: '--sector-tech',
   'Communication Services': '--sector-comm',
   'Consumer Cyclical': '--sector-consumer',
   Healthcare: '--sector-health',
   'Financial Services': '--sector-financial',
+  'Consumer Defensive': '--sector-consumer-defensive',
+  Industrials: '--sector-industrials',
+  Energy: '--sector-energy',
+  Utilities: '--sector-utilities',
 };
 
 const STORAGE_KEYS = { watchlist: 'teatime.watchlist', settings: 'teatime.settings' };
@@ -531,7 +539,20 @@ async function loadHistoryFor(symbol) {
 }
 
 async function loadAllHistories(symbols) {
-  await Promise.all(symbols.map((s) => loadHistoryFor(s).catch(() => null)));
+  const uncached = symbols.filter((s) => !historyCache.has(s));
+  if (uncached.length === 0) return;
+
+  try {
+    const res = await fetch(`/api/history/batch?symbols=${uncached.map(encodeURIComponent).join(',')}`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    const data = await res.json();
+    for (const [symbol, history] of Object.entries(data)) {
+      historyCache.set(symbol, history);
+    }
+  } catch {
+    // Best-effort: if the batch call fails, per-ticker taps still work via
+    // loadHistoryFor's own fetch — Ranks/Watchlist just show fewer scored rows.
+  }
 }
 
 function sliceForRange(series, rangeKey) {

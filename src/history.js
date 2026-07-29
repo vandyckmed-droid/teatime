@@ -1,5 +1,6 @@
 const fmp = require('./fmpClient');
 const config = require('./config');
+const { mapWithConcurrency } = require('./concurrency');
 
 function isoDate(d) {
   return d.toISOString().slice(0, 10);
@@ -19,4 +20,12 @@ async function getHistory(symbol) {
   return { symbol, asOf: to.toISOString(), series };
 }
 
-module.exports = { getHistory };
+// Fetches history for many symbols at once, throttled to config.fmpConcurrency
+// in flight — the batch companion to getHistory. Ranks/Watchlist need the
+// whole universe's history to rank by a custom date range, so this is what
+// lets that stay one request instead of one per company as the universe grows.
+async function getHistoryBatch(symbols) {
+  return mapWithConcurrency(symbols, config.fmpConcurrency, (symbol) => getHistory(symbol));
+}
+
+module.exports = { getHistory, getHistoryBatch };
