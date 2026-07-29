@@ -29,16 +29,36 @@ Then open http://localhost:3000.
 - `src/history.js` — daily closes per symbol (`getHistory`) and a
   concurrency-limited batch variant (`getHistoryBatch`) used to load the whole
   universe's history in one request instead of one per company.
+- `src/dataStore.js` — an in-memory store refreshed on a timer
+  (`config.pricedRefreshMs`, once every 24h) instead of per-request: this data
+  is end-of-day, so nothing is gained by checking more often. A refresh cycle
+  is all-or-nothing — every fetch it depends on has to succeed before any of
+  the store's fields are updated, so a failed cycle just logs and leaves the
+  last-known-good data serving untouched. Sector/beta/IPO-date ("slow facts")
+  arrive for free in the same fetch as price but are only committed on their
+  own, much slower cadence (`config.slowFactsRefreshMs`, ~quarterly) — this
+  costs zero extra API calls, it just decides whether to use what came back or
+  keep the last-known values. `server.js` blocks startup on the first
+  successful refresh before it starts listening.
+- `src/ranking.js` — the custom-date-range return / volatility-adjusted score
+  math, run server-side over the store's history so the browser only ever
+  gets back a small `{symbol: score}` map, not raw daily-close arrays for the
+  whole universe.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
-  `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`, and
-  `GET /api/meta`, each with a 5-minute in-memory cache. History endpoints
-  only serve symbols in the current leaderboard universe — this is a
-  leaderboard companion, not an open proxy for arbitrary FMP queries.
+  `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
+  `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`, and `GET /api/meta`,
+  all reading from `src/dataStore.js`'s scheduled-refresh store. History
+  endpoints only serve symbols in the current leaderboard universe — this is
+  a leaderboard companion, not an open proxy for arbitrary FMP queries.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
   bottom sheet that opens a price chart when you tap a company. Ranks and
   Watchlist rank by a custom date range (set in Settings, adjustable via
-  +/− steppers), computed client-side from the batch-fetched history; the
-  per-company chart sheet has its own independent window toggle (1D-5Y).
+  +/− steppers); scoring is computed server-side via `/api/rank` and cached
+  in `state.rankScores`. The frontend falls back to the old client-side
+  computation (over batch-fetched history) if `/api/rank` isn't reachable —
+  this is what makes the static-snapshot preview channels (which have no
+  backend at all) still work unmodified. The per-company chart sheet has its
+  own independent window toggle (1D-5Y), unrelated to the ranking date range.
 
 ## Extending it
 
@@ -48,12 +68,11 @@ Then open http://localhost:3000.
 - Bigger or smaller board: `universeSize` in `src/config.js` is the whole
   change — bump it (and `screenerCandidatePool` a good margin above it, since
   candidates get deduped/filtered down) or cut it back down. This is expected
-  to change often; see the comment above it in `src/config.js`. Works as-is
-  up to a few hundred companies — past that, the fetch-everything-on-load
-  architecture itself needs to change (server-side scheduled refresh instead
-  of fetch-on-request, ranking computed server-side instead of shipped to the
-  browser as raw history). Not built yet; flag it if you're actually headed
-  there.
+  to change often; see the comment above it in `src/config.js`. Server-side
+  scheduled refresh and server-side ranking (see `src/dataStore.js` /
+  `src/ranking.js` above) already remove the two biggest costs of scaling
+  further — repeated FMP fetches per visitor, and shipping the full universe's
+  history JSON to the browser just to rank it.
 - New setting: add an entry to `SETTINGS` in `public/app.js` — `renderSettings()`
   dispatches on `type` (`'toggle'`, `'daterange'`, ...); a new `type` needs one
   more branch there.

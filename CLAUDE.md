@@ -119,9 +119,9 @@ no breakpoint compromises. Concretely:
   same pattern for return windows. Ranks/Watchlist ranking is a custom
   date range (Settings-driven); the per-ticker chart sheet's own window
   pills are a separate, independent control — don't conflate the two again.
-- Backend history/leaderboard caching, dedupe, and "insufficient history"
-  handling are centralized (`src/leaderboard.js`, `src/history.js`) — extend
-  those rather than special-casing a symbol or a window inline.
+- Backend history/leaderboard dedupe and "insufficient history" handling are
+  centralized (`src/leaderboard.js`, `src/history.js`) — extend those rather
+  than special-casing a symbol or a window inline.
 - `universeSize` in `src/config.js` is the scaling dial, expected to move
   both directions repeatedly (the owner's own framing: "bigger and better,"
   then "removal and cutting"). Bump or cut it — `screenerCandidatePool`
@@ -130,17 +130,34 @@ no breakpoint compromises. Concretely:
   and history in `src/history.js`) go through `mapWithConcurrency`
   (`src/concurrency.js`) capped at `config.fmpConcurrency`, not unbounded
   `Promise.all` — this is what keeps a bigger `universeSize` from turning
-  into a burst of simultaneous FMP requests. The frontend loads the whole
-  universe's history in one call via `GET /api/history/batch?symbols=...`
-  (`loadAllHistories` in `public/app.js`) rather than one request per
-  company — extend the batch endpoint, don't add more per-symbol fetches, if
-  boot time needs to improve further.
-- This holds up to a few hundred companies as-is. Past that, the
-  fetch-everything-on-load model itself needs to change: a scheduled
-  server-side refresh instead of fetch-on-request, and ranking computed
-  server-side instead of shipping raw history to the browser (25-30MB+ of
-  JSON at S&P-500 scale otherwise). That's a real second project, not a
-  config bump — don't start it without being asked.
+  into a burst of simultaneous FMP requests.
+- The old "fetch-everything-on-load, past a few hundred companies this
+  breaks" ceiling has been addressed: `src/dataStore.js` refreshes the whole
+  universe (price/returns/market cap/history) on a once-daily timer instead
+  of per-request — this data is end-of-day, so nothing is gained by checking
+  more often, and a refresh cycle is all-or-nothing (nothing commits until
+  every fetch it needs has succeeded, so a failed cycle just keeps serving
+  last-known-good data and logs, rather than partially updating). Sector,
+  beta, and IPO-date ("slow facts") arrive for free in that same fetch but
+  are only committed on their own much slower cadence
+  (`config.slowFactsRefreshMs`, ~quarterly) — this costs zero extra API
+  calls, it just decides whether to use the fresh values or keep the
+  retained ones. Ranking (`src/ranking.js`) now runs server-side over the
+  store's history via `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
+  which returns only a `{symbol: score}` map — the browser no longer
+  downloads the whole universe's raw daily-close history just to rank it.
+  The frontend (`refreshRankings()` in `public/app.js`) tries `/api/rank`
+  first and falls back to the old client-side computation over
+  `loadAllHistories`-fetched history when that call fails or isn't
+  reachable — which is exactly what happens on the two static-snapshot
+  preview channels below, since neither has a backend to answer `/api/rank`
+  at all; `EMBEDDED_LEADERBOARD` being defined is the signal those bundles
+  use to skip the live-endpoint attempt outright rather than let it fail
+  into the console every load. This holds well past a few hundred
+  companies now; the remaining cost to watch as `universeSize` keeps
+  growing is the once-daily refresh cycle's own wall-clock time
+  (bounded by `config.fmpConcurrency`) and the size of the in-memory store,
+  not per-visitor load.
 
 ## Charts: follow the dataviz skill, including its accessibility checks
 
