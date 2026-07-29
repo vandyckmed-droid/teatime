@@ -10,7 +10,20 @@ const SETTINGS = [
     description: 'Rank and score by return ÷ beta instead of raw price return, so high-beta movers are discounted for the extra risk taken to get there.',
     default: false,
   },
+  {
+    key: 'rankDateRange',
+    type: 'daterange',
+    label: 'Ranking date range',
+    description: 'Rank and score the board by price change between these two dates, instead of a fixed window.',
+    default: { startDaysAgo: 250, endDaysAgo: 20 },
+  },
 ];
+
+// Stepper bounds for the ranking date range. Step is in days; the max keeps
+// "start" within the 5-year history the backend fetches per symbol.
+const DATE_RANGE_STEP = 10;
+const DATE_RANGE_MAX_DAYS_AGO = 1800;
+const DATE_RANGE_MIN_GAP = 10;
 
 const SECTOR_VAR = {
   Technology: '--sector-tech',
@@ -37,16 +50,19 @@ const DEFAULT_CHART_RANGE = '1Y';
 
 const state = {
   leaderboard: null,
-  activeMetric: null,
   activeTab: 'ranks',
   watchlist: loadWatchlist(),
   settings: loadSettings(),
+  historiesLoaded: false,
 };
+
+// symbol -> { symbol, asOf, series }, oldest first. Shared by the Ranks/Watchlist
+// custom-date-range scoring and the per-ticker detail chart.
+const historyCache = new Map();
 
 const detail = {
   symbol: null,
   range: DEFAULT_CHART_RANGE,
-  historyCache: new Map(), // symbol -> { series, asOf }
   slice: null, // the currently-rendered range's [{date, close}], oldest first
 };
 
@@ -97,12 +113,42 @@ function fmtDate(iso) {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   });
 }
+function daysAgoToDate(daysAgo) {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d;
+}
+function daysAgoToDateStr(daysAgo) {
+  return daysAgoToDate(daysAgo).toISOString().slice(0, 10);
+}
+function fmtStepperDate(daysAgo) {
+  return daysAgoToDate(daysAgo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-// ── scoring: raw return, or return ÷ beta when volatility-adjusted ──
-function scoreFor(company, metric) {
-  const raw = company.returns[metric];
-  const historyOk = company.availability[metric] && typeof raw === 'number';
-  if (!historyOk) return null;
+// ── scoring: return over the custom date range, or ÷ beta when volatility-adjusted ──
+function closeOnOrBefore(series, dateStr) {
+  let result = null;
+  for (const p of series) {
+    if (p.date <= dateStr) result = p.close;
+    else break;
+  }
+  return result;
+}
+
+function customRangeReturn(company) {
+  const cached = historyCache.get(company.symbol);
+  if (!cached || !cached.series || cached.series.length === 0) return null;
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const startClose = closeOnOrBefore(cached.series, daysAgoToDateStr(startDaysAgo));
+  const endClose = closeOnOrBefore(cached.series, daysAgoToDateStr(endDaysAgo));
+  if (startClose == null || endClose == null) return null;
+  return ((endClose - startClose) / startClose) * 100;
+}
+
+function scoreFor(company) {
+  const raw = customRangeReturn(company);
+  if (raw === null) return null;
   if (!state.settings.volAdjusted) return raw;
   const beta = company.beta;
   if (typeof beta !== 'number' || beta <= 0.05) return null;
@@ -133,30 +179,15 @@ function initTabBar() {
   goToTab(['ranks', 'watchlist', 'settings'].includes(initial) ? initial : 'ranks');
 }
 
-// ── segmented (return window) control, mirrored across both boards ──
-function renderAllSegmented() {
-  document.querySelectorAll('[data-segmented]').forEach((el) => {
-    el.innerHTML = '';
-    state.leaderboard.metrics.forEach((m) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = m.label;
-      btn.setAttribute('aria-pressed', String(m.key === state.activeMetric));
-      btn.addEventListener('click', () => {
-        state.activeMetric = m.key;
-        renderAllSegmented();
-        renderAll();
-      });
-      el.appendChild(btn);
-    });
-  });
+function rankDateRangeLabel() {
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  return `${fmtStepperDate(startDaysAgo)} → ${fmtStepperDate(endDaysAgo)}`;
 }
 
 function updateScoreLabels() {
-  const metricLabel = state.leaderboard.metrics.find((m) => m.key === state.activeMetric)?.label || state.activeMetric;
   const text = state.settings.volAdjusted
-    ? `Ranked by ${metricLabel} · vol-adjusted score`
-    : `Ranked by ${metricLabel} return`;
+    ? `Ranked by return, ${rankDateRangeLabel()} · vol-adjusted`
+    : `Ranked by return, ${rankDateRangeLabel()}`;
   const ranksLabel = document.getElementById('ranks-score-label');
   if (ranksLabel) ranksLabel.textContent = text;
   const watchlistLabel = document.getElementById('watchlist-score-label');
@@ -261,10 +292,9 @@ function attachRowHandlers(container) {
 }
 
 function renderRanksBoard() {
-  const metric = state.activeMetric;
   const companies = state.leaderboard.companies;
 
-  const scored = companies.map((c) => ({ c, value: scoreFor(c, metric) }));
+  const scored = companies.map((c) => ({ c, value: scoreFor(c) }));
   const available = scored.filter((x) => x.value !== null).sort((a, b) => b.value - a.value);
   const unavailable = scored.filter((x) => x.value === null).map((x) => x.c);
   const maxAbs = Math.max(...available.map((x) => Math.abs(x.value)), 1);
@@ -286,27 +316,25 @@ function renderRanksBoard() {
 
   attachSelectHandlers(rowsEl);
   attachRowHandlers(rowsEl);
-  renderRanksCallout(unavailable, metric);
+  renderRanksCallout(unavailable);
 }
 
-function renderRanksCallout(unavailable, metric) {
+function renderRanksCallout(unavailable) {
   const box = document.getElementById('ranks-callout');
   const text = document.getElementById('ranks-callout-text');
   if (unavailable.length === 0) {
     box.hidden = true;
     return;
   }
-  const metricLabel = state.leaderboard.metrics.find((m) => m.key === metric)?.label || metric;
   const reasonSuffix = state.settings.volAdjusted ? ' or a beta isn’t available' : '';
   const names = unavailable
     .map((c) => `<b>${c.name} (${c.symbol})</b>${c.ipoDate ? `, IPO'd ${c.ipoDate}` : ''}`)
     .join('; ');
-  text.innerHTML = `Not ranked on the ${metricLabel} window: ${names} &mdash; not enough trading history yet for a like-for-like score${reasonSuffix}.`;
+  text.innerHTML = `Not ranked over ${rankDateRangeLabel()}: ${names} &mdash; not enough trading history for a like-for-like score${reasonSuffix}.`;
   box.hidden = false;
 }
 
 function renderWatchlistBoard() {
-  const metric = state.activeMetric;
   const label = document.getElementById('watchlist-score-label');
   const rowsEl = document.getElementById('watchlist-rows');
   const companies = state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol));
@@ -324,7 +352,7 @@ function renderWatchlistBoard() {
   }
 
   label.hidden = false;
-  const scored = companies.map((c) => ({ c, value: scoreFor(c, metric) }));
+  const scored = companies.map((c) => ({ c, value: scoreFor(c) }));
   const available = scored.filter((x) => x.value !== null).sort((a, b) => b.value - a.value);
   const unavailable = scored.filter((x) => x.value === null).map((x) => x.c);
   const maxAbs = Math.max(...available.map((x) => Math.abs(x.value)), 1);
@@ -454,15 +482,19 @@ function renderDetailSegmented() {
 }
 
 async function loadHistoryFor(symbol) {
-  if (detail.historyCache.has(symbol)) return detail.historyCache.get(symbol);
+  if (historyCache.has(symbol)) return historyCache.get(symbol);
   const res = await fetch(`/api/history?symbol=${encodeURIComponent(symbol)}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed: ${res.status}`);
   }
   const data = await res.json();
-  detail.historyCache.set(symbol, data);
+  historyCache.set(symbol, data);
   return data;
+}
+
+async function loadAllHistories(symbols) {
+  await Promise.all(symbols.map((s) => loadHistoryFor(s).catch(() => null)));
 }
 
 function sliceForRange(series, rangeKey) {
@@ -485,7 +517,7 @@ const CHART_PAD = 10;
 
 function renderChart() {
   const wrap = document.getElementById('chart-wrap');
-  const cached = detail.historyCache.get(detail.symbol);
+  const cached = historyCache.get(detail.symbol);
   if (!cached || cached.series.length < 2) {
     wrap.innerHTML = `<div class="chart-error">No chart data available for ${detail.symbol}.</div>`;
     return;
@@ -623,7 +655,7 @@ function renderSettings() {
         btn.setAttribute('aria-checked', String(next));
         state.settings[setting.key] = next;
         saveSettings();
-        if (state.leaderboard) renderAll();
+        if (state.leaderboard && state.historiesLoaded) renderAll();
       });
     }
   });
@@ -635,6 +667,64 @@ function renderSettings() {
     note.innerHTML = 'More settings land here as the board grows — each one is a config entry in <code>public/app.js</code> (<code>SETTINGS</code>) with no other wiring required.';
     list.parentElement.appendChild(note);
   }
+
+  renderDateRangeSetting();
+}
+
+function renderDateRangeSetting() {
+  const setting = SETTINGS.find((s) => s.key === 'rankDateRange');
+  const container = document.getElementById('daterange-settings');
+  if (!setting || !container) return;
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+
+  container.innerHTML = `
+    <div class="settings-row">
+      <div class="settings-row-text">
+        <div class="settings-row-label">${setting.label}</div>
+        <div class="settings-row-desc">${setting.description}</div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-text">
+        <div class="settings-row-label">Start</div>
+        <div class="stepper-date">${fmtStepperDate(startDaysAgo)}</div>
+        <div class="stepper-days">${startDaysAgo} days ago</div>
+      </div>
+      <div class="stepper" role="group" aria-label="Start date">
+        <button type="button" class="stepper-btn" data-field="start" data-dir="-1" aria-label="Move start date later"${startDaysAgo - DATE_RANGE_STEP < endDaysAgo + DATE_RANGE_MIN_GAP ? ' disabled' : ''}>&minus;</button>
+        <button type="button" class="stepper-btn" data-field="start" data-dir="1" aria-label="Move start date earlier"${startDaysAgo + DATE_RANGE_STEP > DATE_RANGE_MAX_DAYS_AGO ? ' disabled' : ''}>+</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-text">
+        <div class="settings-row-label">End</div>
+        <div class="stepper-date">${fmtStepperDate(endDaysAgo)}</div>
+        <div class="stepper-days">${endDaysAgo} days ago</div>
+      </div>
+      <div class="stepper" role="group" aria-label="End date">
+        <button type="button" class="stepper-btn" data-field="end" data-dir="-1" aria-label="Move end date later"${endDaysAgo - DATE_RANGE_STEP < 0 ? ' disabled' : ''}>&minus;</button>
+        <button type="button" class="stepper-btn" data-field="end" data-dir="1" aria-label="Move end date earlier"${endDaysAgo + DATE_RANGE_STEP > startDaysAgo - DATE_RANGE_MIN_GAP ? ' disabled' : ''}>+</button>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll('.stepper-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.field;
+      const dir = Number(btn.dataset.dir);
+      const range = state.settings.rankDateRange;
+      if (field === 'start') {
+        const next = range.startDaysAgo + dir * DATE_RANGE_STEP;
+        range.startDaysAgo = Math.max(range.endDaysAgo + DATE_RANGE_MIN_GAP, Math.min(next, DATE_RANGE_MAX_DAYS_AGO));
+      } else {
+        const next = range.endDaysAgo + dir * DATE_RANGE_STEP;
+        range.endDaysAgo = Math.max(0, Math.min(next, range.startDaysAgo - DATE_RANGE_MIN_GAP));
+      }
+      saveSettings();
+      renderDateRangeSetting();
+      if (state.leaderboard && state.historiesLoaded) renderAll();
+    });
+  });
 }
 
 // ── boot ─────────────────────────────────────────────────────────────
@@ -656,9 +746,12 @@ async function init() {
   try {
     const data = await loadLeaderboard();
     state.leaderboard = data;
-    state.activeMetric = data.defaultMetric;
     document.getElementById('as-of').innerHTML = `As of <b>${fmtDate(data.asOf)}</b> · Financial Modeling Prep`;
-    renderAllSegmented();
+
+    document.getElementById('ranks-rows').innerHTML = '<div class="loading">Loading price history&hellip;</div>';
+    await loadAllHistories(data.companies.map((c) => c.symbol));
+    state.historiesLoaded = true;
+
     renderAll();
   } catch (err) {
     document.getElementById('ranks-rows').innerHTML = `<div class="error-box">Couldn't load live data: ${err.message}</div>`;
