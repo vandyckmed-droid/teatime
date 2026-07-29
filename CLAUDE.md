@@ -75,6 +75,35 @@ Trigger: the owner says `/unleash` or "unleash my constraints."
 Same spirit as `/quote`: this is a read, not a commitment. It doesn't
 authorize dropping or changing any constraint on its own.
 
+## /prune — code & doc pruning pass
+
+Trigger: the owner says `/prune` or asks for a cleanup/pruning pass.
+
+Scan the repo for dead code, stale documentation, and inconsistencies.
+Remove obvious junk without asking.
+
+**Remove without asking:**
+- Unused functions, imports, or variables
+- Comments that contradict current code behavior
+- Documentation describing logic that no longer exists
+- Dead branches or feature flags that are always on/off
+- Stale TODOs or notes (no context, no linked issues)
+
+**Fix without asking:**
+- Inconsistencies between docs and actual behavior
+- Docstrings that describe old signatures or removed parameters
+- Typos, formatting, broken links
+
+**Ask briefly (one-liner) only for:**
+- Unused code that might be intentional (placeholder, experimental, etc.)
+- Documentation you can't confidently say is stale
+- Config/constants with no references — might be sentinel values
+
+**After cleanup:** test per the testing bar below, then commit directly to
+`main` (see "Shipping" above — no branch, no PR) with a summary of removals
+at the top of the commit message. List any skipped items (things you asked
+about) at the end.
+
 ## Parking ideas
 
 Not every idea the owner floats should turn into a build-it-now task. When
