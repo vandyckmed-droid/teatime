@@ -103,36 +103,19 @@ conversation and losing it to context rot:
   `Shipped` / `Rejected: <reason>`) rather than deleting the file — it's a
   record of what was considered and why, not just a todo list.
 
-## Branch & PR workflow
+## Shipping: commit directly to `main`
 
-- All work happens on a single long-lived branch:
-  `claude/top-10-us-companies-returns-dcsgnn`. Don't invent a new branch name
-  per feature.
-- Because every PR from this branch gets merged (usually squashed), the
-  branch and `main` diverge in history even when their content matches.
-  Before starting new work:
-  ```
-  git fetch origin main
-  git checkout -B claude/top-10-us-companies-returns-dcsgnn origin/main
-  ```
-  If you're resuming uncommitted work, `git stash` before the reset and
-  `git stash pop` after.
-- Push with `git push --force-with-lease -u origin claude/top-10-us-companies-returns-dcsgnn`.
-  Force-push is fine here — verify first that the remote branch's content is
-  already fully merged into `main` (`git diff <remote-branch-sha> <main-squash-sha> --stat`
-  should be empty) if you want to double check, but in practice this branch
-  only ever holds either unmerged work-in-progress or already-merged history.
-- Open PRs directly as **ready, not draft** (`draft: false`) — there's no CI
-  and no other reviewer, so a draft stage is a no-op click. Check
-  `pull_request_read` → `get_status` (expect no checks configured) and merge
-  with `merge_method: "squash"`.
-- Branch deletion after merge will likely fail with a 403 (this session's git
-  credentials can delete files but not refs). That's fine — leave it, it's
-  harmless, don't spend time working around it.
-- If a merge attempt 405s with "has merge conflicts" right after a squash
-  merge landed, it's almost always the squash-history mismatch, not a real
-  conflict: reset the branch from `origin/main` again, reapply your commit on
-  top, force-push, retry.
+No feature branches, no PRs. This is a single-owner repo with no CI and no
+other reviewer, so the branch/PR/squash-merge dance was pure ceremony with
+no safety benefit — a one-line change paid the same overhead as a large one.
+
+- Work directly on `main`. Before starting: `git fetch origin main && git
+  reset --hard origin/main` (stash first if you're resuming uncommitted
+  work) so you're never committing on top of stale local history.
+- Test per the bar below, then `git commit` and `git push origin main`
+  directly. No branch to open, no PR to merge.
+- The old long-lived branch (`claude/top-10-us-companies-returns-dcsgnn`)
+  is retired — don't push new work there.
 
 ## Testing bar before shipping any UI change
 
@@ -179,8 +162,9 @@ no breakpoint compromises. Concretely:
   `renderSettings()` — not a bespoke one-off section.
 - `METRICS` / `CHART_RANGES` in `src/config.js` / `public/app.js` are the
   same pattern for return windows. Ranks/Watchlist ranking is a custom
-  date range (Settings-driven); the per-ticker chart sheet's own window
-  pills are a separate, independent control — don't conflate the two again.
+  date range (Settings-driven); the per-ticker chart sheet has its own
+  window toggle. No standing rule on how connected these two should be —
+  judge it fresh each time a feature touches both.
 - Backend history/leaderboard dedupe and "insufficient history" handling are
   centralized (`src/leaderboard.js`, `src/history.js`) — extend those rather
   than special-casing a symbol or a window inline.
@@ -221,18 +205,23 @@ no breakpoint compromises. Concretely:
   (bounded by `config.fmpConcurrency`) and the size of the in-memory store,
   not per-visitor load.
 
-## Preview channels: the repo isn't what the owner actually looks at
+## Preview channel: GitHub Pages is what the owner actually looks at
 
-Neither of the owner's two preview channels can reach FMP directly or hold
-a secret API key — Artifacts are sandboxed (no arbitrary external fetch),
-and a static GitHub Pages site has no server at all. Both are static
-snapshots assembled from a locally-run `server.js`, not live-fetching
-copies of the app. This means every feature lands in **three** places: the
-real repo (source of truth, always live-fetching, needs Railway or a local
-run to actually see data), and two redeployed snapshots. Don't consider a
-change shipped until all three are done.
+The owner only uses the GitHub Pages link — there's no separate Artifact
+channel to keep in sync anymore, and no live-hosted deployment either. It
+can't reach FMP directly or hold a secret API key (a static site has no
+server at all), so it's a static snapshot assembled from a locally-run
+`server.js`, not a live-fetching copy of the app. A change isn't shipped
+until this snapshot is rebuilt and pushed, even though it's a separate step
+from the code change itself.
 
-### Building the snapshot bundle (shared by both channels)
+Public URL: https://vandyckmed-droid.github.io/teatime/. GitHub Pages is
+configured to serve from `main`, `/docs` folder — enabled once already,
+nothing further to toggle on GitHub's side for future updates. Served at
+its own origin, so "Add to Home Screen" on iOS gets the real standalone-app
+experience: full screen, no Safari chrome, tinted status bar.
+
+### Building and publishing the snapshot
 
 1. Boot `server.js` locally with a real `API_KEY`/`FMP_API_KEY`.
 2. Pull a fresh snapshot: `GET /api/leaderboard`, then
@@ -252,34 +241,14 @@ change shipped until all three are done.
      `/api/history/batch`.
    No fonts to embed — system fonts need no asset.
 4. Test the assembled file by opening it with Playwright over `file://`
-   (proves it truly has no network dependency) before publishing anywhere.
-
-### Channel 1 — Artifact (zero-setup, but claude.ai-wrapped)
-
-Persistent URL: https://claude.ai/code/artifact/f3363de1-0c82-4e1d-a349-283203af7b4f.
-Publish the bundle via the `Artifact` tool with `url` set to that URL so it
-redeploys in place rather than minting a new link. Keep the same favicon
-(📈) across redeploys. Nothing to set up, works instantly — but because the
-page is wrapped inside a claude.ai viewer rather than served at its own
-origin, "Add to Home Screen" from there won't reliably trigger the
-full-screen, no-Safari-chrome standalone mode the app's meta tags
-(`apple-mobile-web-app-capable`, `theme-color`) are built for.
-
-### Channel 2 — GitHub Pages (own URL, real install experience)
-
-Public URL: https://vandyckmed-droid.github.io/teatime/. Copy the same
-assembled bundle to `docs/index.html` in the repo (that's the whole
-deploy — no build step, no Actions workflow) and ship it through the
-normal branch/PR/merge flow like any other change. GitHub Pages is
-configured to serve from `main` branch, `/docs` folder — enabled once
-already; nothing further to toggle on GitHub's side for future updates.
-Because this is served at its own origin (not wrapped in a viewer), "Add to
-Home Screen" on iOS gets the real standalone-app experience: full screen,
-no Safari chrome, tinted status bar — this is the channel that actually
-looks and feels like a native app, at zero hosting cost since it's fully
-static.
+   (proves it truly has no network dependency) before publishing.
+5. Copy the assembled file to `docs/index.html` and commit it straight to
+   `main` (that's the whole deploy — no build step, no Actions workflow).
 
 One cost worth knowing about: each redeploy commits a new ~2.5MB HTML file
 (the embedded data is what makes it self-contained), so `docs/index.html`'s
 history adds up in repo size over many iterations. Not a problem at this
 scale; flag it if it ever becomes one.
+
+The Artifact preview that used to be a second channel is retired — don't
+republish it going forward.
