@@ -7,7 +7,7 @@ const SETTINGS = [
     key: 'volAdjusted',
     type: 'toggle',
     label: 'Volatility-adjusted scores',
-    description: 'Rank and score by return ÷ beta instead of raw price return, so high-beta movers are discounted for the extra risk taken to get there.',
+    description: 'Rank and score by annualized return ÷ annualized volatility (a Sharpe-like ratio) instead of raw price return, both computed from daily closes over the ranking date range.',
     default: false,
   },
   {
@@ -27,6 +27,8 @@ const DATE_RANGE_STEP_START = 10;
 const DATE_RANGE_STEP_END = 2;
 const DATE_RANGE_MAX_DAYS_AGO = 1800;
 const DATE_RANGE_MIN_GAP = 10;
+
+const TRADING_DAYS_PER_YEAR = 252;
 
 const SECTOR_VAR = {
   Technology: '--sector-tech',
@@ -101,7 +103,7 @@ function fmtPct(v) {
 }
 function fmtScore(v) {
   const sign = v > 0 ? '+' : '';
-  return `${sign}${v.toFixed(1)}`;
+  return `${sign}${v.toFixed(2)}`;
 }
 function fmtPrice(v) {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -129,7 +131,9 @@ function fmtStepperDate(daysAgo) {
   return daysAgoToDate(daysAgo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ── scoring: return over the custom date range, or ÷ beta when volatility-adjusted ──
+// ── scoring: point-to-point return over the custom date range, or an
+// annualized-return ÷ annualized-volatility (Sharpe-like) score over the
+// same range when volatility-adjusted ──
 function closeOnOrBefore(series, dateStr) {
   let result = null;
   for (const p of series) {
@@ -149,13 +153,44 @@ function customRangeReturn(company) {
   return ((endClose - startClose) / startClose) * 100;
 }
 
+// Day-over-day % changes for the trading days that fall within [startStr, endStr].
+function dailyReturnsInRange(series, startStr, endStr) {
+  const inRange = series.filter((p) => p.date >= startStr && p.date <= endStr);
+  const returns = [];
+  for (let i = 1; i < inRange.length; i++) {
+    const prev = inRange[i - 1].close;
+    const cur = inRange[i].close;
+    if (prev > 0) returns.push((cur - prev) / prev);
+  }
+  return returns;
+}
+
+// Annualized return ÷ annualized volatility, both derived from the same daily
+// returns: annualized mean is mean*252, annualized stdev is stdev*sqrt(252),
+// so the ratio simplifies to (mean / stdev) * sqrt(252) — a Sharpe ratio
+// without a risk-free-rate subtraction, over the selected date range.
+function volAdjustedScore(company) {
+  const cached = historyCache.get(company.symbol);
+  if (!cached || !cached.series || cached.series.length === 0) return null;
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const startStr = daysAgoToDateStr(startDaysAgo);
+  const endStr = daysAgoToDateStr(endDaysAgo);
+  if (cached.series[0].date > startStr) return null; // no coverage back to the start date
+
+  const returns = dailyReturnsInRange(cached.series, startStr, endStr);
+  if (returns.length < 2) return null;
+
+  const n = returns.length;
+  const mean = returns.reduce((a, b) => a + b, 0) / n;
+  const variance = returns.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+  const stdev = Math.sqrt(variance);
+  if (!(stdev > 0)) return null;
+
+  return (mean / stdev) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+}
+
 function scoreFor(company) {
-  const raw = customRangeReturn(company);
-  if (raw === null) return null;
-  if (!state.settings.volAdjusted) return raw;
-  const beta = company.beta;
-  if (typeof beta !== 'number' || beta <= 0.05) return null;
-  return raw / beta;
+  return state.settings.volAdjusted ? volAdjustedScore(company) : customRangeReturn(company);
 }
 
 // ── tab routing ──────────────────────────────────────────────────────
@@ -329,11 +364,10 @@ function renderRanksCallout(unavailable) {
     box.hidden = true;
     return;
   }
-  const reasonSuffix = state.settings.volAdjusted ? ' or a beta isn’t available' : '';
   const names = unavailable
     .map((c) => `<b>${c.name} (${c.symbol})</b>${c.ipoDate ? `, IPO'd ${c.ipoDate}` : ''}`)
     .join('; ');
-  text.innerHTML = `Not ranked over ${rankDateRangeLabel()}: ${names} &mdash; not enough trading history for a like-for-like score${reasonSuffix}.`;
+  text.innerHTML = `Not ranked over ${rankDateRangeLabel()}: ${names} &mdash; not enough trading history for a like-for-like score.`;
   box.hidden = false;
 }
 
