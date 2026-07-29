@@ -44,6 +44,32 @@ boundary, not a soft preference:
 This doesn't override anything else in this file — once the owner is back
 to the normal loop, the standing authority above applies as usual.
 
+## /quote — scope check before planning
+
+Trigger: the owner says `/quote <topic>` or "give me a quote on X."
+
+- Give a rough read in a few sentences: problem shape, likely effort/risk,
+  where the complexity actually lives. Not a full plan.
+- Do not propose a plan, file changes, or a task breakdown at this stage.
+- Only move to planning/implementation if the owner explicitly follows up
+  with something like "okay, plan it."
+
+This works whether or not consultation mode is active — it's a scoping
+estimate, not a commitment, so it doesn't by itself authorize any change.
+
+## /unleash — constraint review
+
+Trigger: the owner says `/unleash` or "unleash my constraints."
+
+- List active constraints/assumptions from `CLAUDE.md`, skills, and prior
+  instructions in plain language.
+- Rank by likely unintentional cost (friction, overhead, blocked
+  improvements) — most costly first, one line of reasoning each.
+- Do not propose fixes or changes unless asked.
+
+Same spirit as `/quote`: this is a read, not a commitment. It doesn't
+authorize dropping or changing any constraint on its own.
+
 ## Parking ideas
 
 Not every idea the owner floats should turn into a build-it-now task. When
@@ -191,45 +217,6 @@ no breakpoint compromises. Concretely:
   growing is the once-daily refresh cycle's own wall-clock time
   (bounded by `config.fmpConcurrency`) and the size of the in-memory store,
   not per-visitor load.
-
-## Charts: follow the dataviz skill, including its accessibility checks
-
-Any new chart work should follow the project's dataviz skill procedure (form
-→ color → validate → marks → interaction). Concretely learned from the
-existing price chart: this app's `--gain`/`--loss` red/green pair **fails**
-the palette validator's colorblind-separation check (CVD ΔE 4.7–5.3, under
-the 6.0 floor). Recoloring the app is a real design decision, not something
-to do as a side effect of an unrelated feature — the mitigation in place
-instead is redundant encoding (▲/▼ glyph + explicit sign on every colored
-return value, never color alone). Keep that pattern for new colored values;
-raise recoloring the palette itself as an explicit, separate suggestion if
-it comes up again.
-
-The sector chip colors (`--sector-*` in `public/styles.css`, `SECTOR_VAR` in
-`public/app.js`) have the same problem, worse: run as a categorical set
-through the validator (needed once `universeSize` grew past 10 and more
-sectors started appearing), it fails chroma-floor and CVD-separation hard —
-not the borderline "under the 6.0 floor" case gain/loss is, some pairs came
-back near 1.0 ΔE, barely distinguishable even with normal color vision. Two
-rounds of hand-picked hue redesigns (even hue-wheel spacing, then boosted
-saturation) both still failed. This was scoped out rather than chased
-further: it's a secondary polish item, not the thing being shipped, and a
-real fix needs either a proper systematic OKLCH palette search or accepting
-fewer fully-distinct sector categories — both bigger asks than "add a couple
-colors." Mitigation in place is the same principle as gain/loss: every chip
-shows the sector name as text alongside the color, so identity never depends
-on hue alone. Worth a real attempt if sector color-coding turns out to
-matter more than expected in practice.
-
-The set has grown twice as `universeSize` scaled up — from 5 (at 10
-companies) to 9 (at 50) to 11 (`Basic Materials`, `Real Estate` added at
-100) — and re-validated failing the same categories each time, never newly
-regressing. Expect it to keep growing the same way: add a new sector to
-`SECTOR_VAR` plus its `--sector-*` value in all four theme blocks in
-`styles.css` (default `@media`/`prefers-color-scheme`, both explicit
-`data-theme` overrides) when the screener surfaces one not yet covered,
-same muted-aesthetic-but-not-validator-passing treatment as the rest —
-don't block a routine `universeSize` bump on trying to fix this.
 
 ## Preview channels: the repo isn't what the owner actually looks at
 
