@@ -22,6 +22,28 @@ that wrote it.
   existing users' saved state, adding a paid dependency). Everything else in
   the normal edit → test → ship loop does not need a check-in.
 
+## Consultation mode
+
+The owner can put a session into consultation mode explicitly ("consultation
+mode," "read only," "just walk me through this") — treat it as a hard
+boundary, not a soft preference:
+
+- Analysis and discussion only. Read code, answer questions, explain how
+  something works or why it's built that way, reason through tradeoffs —
+  all in conversation, nothing written to disk.
+- Do not generate code changes or create new files. This includes changes
+  that feel trivial or obviously correct — a one-line fix offered "while
+  we're here" is still a file write.
+- If something comes up that genuinely seems worth changing, say so and ask
+  to exit consultation mode before touching anything — don't just do it
+  because the change is small.
+- Consultation mode holds until the owner lifts it, or gives an explicit
+  go-ahead for a specific change (which authorizes that change only, not a
+  general exit).
+
+This doesn't override anything else in this file — once the owner is back
+to the normal loop, the standing authority above applies as usual.
+
 ## Branch & PR workflow
 
 - All work happens on a single long-lived branch:
