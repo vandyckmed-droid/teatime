@@ -30,8 +30,25 @@ const METRIC_MIN_DAYS = {
 };
 
 module.exports = {
-  universeSize: 10,
-  screenerCandidatePool: 40,
+  // ── The scaling dial ──────────────────────────────────────────────
+  // universeSize is expected to keep changing — bigger, then smaller, back
+  // and forth — as this app grows. Bump or cut it here; screenerCandidatePool
+  // should stay comfortably above it (candidates get deduped and filtered
+  // down, so ask the screener for more than you need). Both are one-line
+  // changes with no other code to touch up to a few hundred companies; past
+  // that, the fetch-everything-on-load architecture itself needs to change
+  // (see CLAUDE.md's Extensibility patterns section).
+  universeSize: 50,
+  screenerCandidatePool: 150,
+  // Caps how many FMP requests this server has in flight at once (leaderboard
+  // per-company calls, and batch history fetches). Keeps growth in
+  // universeSize from turning into a burst of N simultaneous outbound
+  // requests — comfortably under any FMP plan's per-minute limit regardless
+  // of how big the universe gets, at the cost of the fetch taking a bit
+  // longer wall-clock. Raise it if refreshes feel slow and the FMP plan has
+  // headroom; lower it if requests start getting rate-limited.
+  fmpConcurrency: 10,
+
   screenerMinMarketCap: 50e9,
   country: 'US',
   exchanges: 'NYSE,NASDAQ',

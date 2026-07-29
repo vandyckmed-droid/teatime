@@ -4,7 +4,7 @@ const path = require('path');
 
 const config = require('./src/config');
 const { getLeaderboard } = require('./src/leaderboard');
-const { getHistory } = require('./src/history');
+const { getHistory, getHistoryBatch } = require('./src/history');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -68,6 +68,48 @@ async function handleHistory(req, res, symbol) {
   }
 }
 
+// Batch companion to handleHistory — fetches history for every requested
+// symbol in one request instead of one per symbol, so a page load doesn't
+// turn into universeSize simultaneous browser-initiated requests as the
+// universe grows. Same universe restriction and per-symbol cache as above.
+async function handleHistoryBatch(req, res, symbols) {
+  try {
+    if (!cache.data || Date.now() >= cache.expiresAt) {
+      cache = { data: await getLeaderboard(), expiresAt: Date.now() + config.cacheTtlMs };
+    }
+    const validSymbols = new Set(cache.data.companies.map((c) => c.symbol));
+    const requested = symbols.filter((s) => validSymbols.has(s));
+    if (requested.length === 0) {
+      sendJSON(res, 400, { error: 'No valid symbols requested.' });
+      return;
+    }
+
+    const results = {};
+    const toFetch = [];
+    for (const symbol of requested) {
+      const cached = historyCache.get(symbol);
+      if (cached && Date.now() < cached.expiresAt) {
+        results[symbol] = cached.data;
+      } else {
+        toFetch.push(symbol);
+      }
+    }
+
+    if (toFetch.length > 0) {
+      const fetched = await getHistoryBatch(toFetch);
+      fetched.forEach((data, i) => {
+        const symbol = toFetch[i];
+        historyCache.set(symbol, { data, expiresAt: Date.now() + config.cacheTtlMs });
+        results[symbol] = data;
+      });
+    }
+
+    sendJSON(res, 200, results);
+  } catch (err) {
+    sendJSON(res, 502, { error: err.message });
+  }
+}
+
 function serveStatic(req, res) {
   const reqPath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.normalize(path.join(PUBLIC_DIR, reqPath));
@@ -90,6 +132,14 @@ function serveStatic(req, res) {
 const server = http.createServer((req, res) => {
   if (req.url.startsWith('/api/leaderboard')) {
     handleLeaderboard(req, res);
+    return;
+  }
+  if (req.url.startsWith('/api/history/batch')) {
+    const symbols = (new URL(req.url, 'http://localhost').searchParams.get('symbols') || '')
+      .split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+    handleHistoryBatch(req, res, symbols);
     return;
   }
   if (req.url.startsWith('/api/history')) {

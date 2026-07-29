@@ -122,6 +122,25 @@ no breakpoint compromises. Concretely:
 - Backend history/leaderboard caching, dedupe, and "insufficient history"
   handling are centralized (`src/leaderboard.js`, `src/history.js`) — extend
   those rather than special-casing a symbol or a window inline.
+- `universeSize` in `src/config.js` is the scaling dial, expected to move
+  both directions repeatedly (the owner's own framing: "bigger and better,"
+  then "removal and cutting"). Bump or cut it — `screenerCandidatePool`
+  should stay a healthy margin above it since screener results get deduped
+  and filtered down. Outbound FMP calls (per-company in `src/leaderboard.js`,
+  and history in `src/history.js`) go through `mapWithConcurrency`
+  (`src/concurrency.js`) capped at `config.fmpConcurrency`, not unbounded
+  `Promise.all` — this is what keeps a bigger `universeSize` from turning
+  into a burst of simultaneous FMP requests. The frontend loads the whole
+  universe's history in one call via `GET /api/history/batch?symbols=...`
+  (`loadAllHistories` in `public/app.js`) rather than one request per
+  company — extend the batch endpoint, don't add more per-symbol fetches, if
+  boot time needs to improve further.
+- This holds up to a few hundred companies as-is. Past that, the
+  fetch-everything-on-load model itself needs to change: a scheduled
+  server-side refresh instead of fetch-on-request, and ranking computed
+  server-side instead of shipping raw history to the browser (25-30MB+ of
+  JSON at S&P-500 scale otherwise). That's a real second project, not a
+  config bump — don't start it without being asked.
 
 ## Charts: follow the dataviz skill, including its accessibility checks
 
@@ -135,6 +154,22 @@ instead is redundant encoding (▲/▼ glyph + explicit sign on every colored
 return value, never color alone). Keep that pattern for new colored values;
 raise recoloring the palette itself as an explicit, separate suggestion if
 it comes up again.
+
+The sector chip colors (`--sector-*` in `public/styles.css`, `SECTOR_VAR` in
+`public/app.js`) have the same problem, worse: run as a 9-color categorical
+set through the validator (needed once `universeSize` grew past 10 and more
+sectors started appearing), it fails chroma-floor and CVD-separation hard —
+not the borderline "under the 6.0 floor" case gain/loss is, some pairs came
+back near 1.0 ΔE, barely distinguishable even with normal color vision. Two
+rounds of hand-picked hue redesigns (even hue-wheel spacing, then boosted
+saturation) both still failed. This was scoped out rather than chased
+further: it's a secondary polish item, not the thing being shipped, and a
+real fix needs either a proper systematic OKLCH palette search or accepting
+fewer fully-distinct sector categories — both bigger asks than "add four
+colors." Mitigation in place is the same principle as gain/loss: every chip
+shows the sector name as text alongside the color, so identity never depends
+on hue alone. Worth a real attempt if sector color-coding turns out to
+matter more than expected in practice.
 
 ## The standalone preview link
 
