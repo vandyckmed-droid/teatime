@@ -79,12 +79,14 @@ Then open http://localhost:3000.
 - Different universe (e.g. a specific sector, or largest by revenue instead of
   market cap): adjust the screener call in `src/leaderboard.js`.
 
-## Known limitation
+## Design notes
 
-The sector color-coding (`SECTOR_VAR` in `public/app.js`, `--sector-*` custom
-properties in `public/styles.css`) doesn't cleanly pass the project's dataviz
-colorblind/chroma validator as a categorical set — currently 11 colors,
-checked at each `universeSize` bump that surfaced new sectors, documented in
-`CLAUDE.md`. Every sector chip always shows the sector name as text too, so
-color is never the sole signal, but a real fix needs a proper palette
-redesign, not just picking different hex values by eye.
+- Dark is the only theme — there's no light-mode CSS or `prefers-color-scheme`
+  branching to maintain (this is a single-user app; see `CLAUDE.md`).
+- Sector chip colors (`SECTOR_VAR` in `public/app.js`, `--sector-*` custom
+  properties in `public/styles.css`, currently 11 sectors + a default) are
+  evenly spaced around the hue wheel at a consistent saturation/lightness for
+  quick-glance distinctness — not validated against a colorblind-safety floor.
+  Every chip still shows the sector name as text too, so color is never the
+  sole signal. Add a new sector's hue in the same spread if `universeSize`
+  surfaces one not yet covered.

@@ -146,8 +146,8 @@ conversation and losing it to context rot:
   `/opt/pw-browsers/chromium`. Test at an iPhone viewport
   (`devices['iPhone 14 Pro']`) since this is an iPhone-only interface — see
   below.
-- Check both color schemes (`colorScheme: 'light'` and `'dark'`) — this app
-  fully themes both, and it's a real design surface, not decoration.
+- The app is dark-only (see "This is an iPhone interface" below) — no need
+  to test a light color scheme.
 - Take screenshots and actually look at them. Playwright assertions catch
   logic bugs; they don't catch a clipped element, a wrapped label, or a
   color pair that doesn't read right. Both matter before calling it done.
@@ -167,6 +167,9 @@ no breakpoint compromises. Concretely:
   There's no dedicated iOS/HIG skill installed in this account (checked via
   `SearchSkills` — only `canvas-design` and `brand-guidelines` exist, neither
   fits); work from Apple's Human Interface Guidelines directly.
+- Dark is the only theme (`public/styles.css`'s `:root` block) — there's no
+  light-mode CSS anymore and no `prefers-color-scheme`/`data-theme` branching
+  to maintain. Don't reintroduce a light variant without being asked.
 
 ## Extensibility patterns already in place — use them, don't route around them
 
@@ -248,9 +251,8 @@ change shipped until all three are done.
      `EMBEDDED_HISTORY` for the requested symbols instead of calling
      `/api/history/batch`.
    No fonts to embed — system fonts need no asset.
-4. Test the assembled file by opening it with Playwright over `file://` in
-   both color schemes (proves it truly has no network dependency) before
-   publishing anywhere.
+4. Test the assembled file by opening it with Playwright over `file://`
+   (proves it truly has no network dependency) before publishing anywhere.
 
 ### Channel 1 — Artifact (zero-setup, but claude.ai-wrapped)
 
