@@ -68,7 +68,11 @@ const state = {
   activeTab: 'ranks',
   watchlist: loadWatchlist(),
   settings: loadSettings(),
-  historiesLoaded: false,
+  rankingsLoaded: false,
+  // symbol -> score, populated by refreshRankings() from /api/rank (or the
+  // client-side fallback below when running as a static snapshot with no
+  // backend to call).
+  rankScores: null,
 };
 
 // symbol -> { symbol, asOf, series }, oldest first. Shared by the Ranks/Watchlist
@@ -199,8 +203,57 @@ function volAdjustedScore(company) {
   return (mean / stdev) * Math.sqrt(TRADING_DAYS_PER_YEAR);
 }
 
+// Live path reads server-computed scores (see refreshRankings below);
+// customRangeReturn/volAdjustedScore above only run client-side as the
+// fallback for the static-snapshot preview channels, which have no backend.
 function scoreFor(company) {
-  return state.settings.volAdjusted ? volAdjustedScore(company) : customRangeReturn(company);
+  const v = state.rankScores ? state.rankScores[company.symbol] : undefined;
+  return typeof v === 'number' ? v : null;
+}
+
+function computeRankScoresClientSide() {
+  const scores = {};
+  for (const c of state.leaderboard.companies) {
+    scores[c.symbol] = state.settings.volAdjusted ? volAdjustedScore(c) : customRangeReturn(c);
+  }
+  return scores;
+}
+
+// Refreshes state.rankScores for the current date-range/vol-adjusted
+// settings. Tries the server's /api/rank first (cheap: only a symbol->score
+// map, no raw history download) and falls back to the old client-side
+// computation over historyCache when that call fails or isn't available at
+// all — which is the case on the two static-snapshot preview channels,
+// which have no backend to answer /api/rank. EMBEDDED_LEADERBOARD is defined
+// only in those assembled snapshot bundles, so it doubles as the signal to
+// skip the doomed fetch attempt outright rather than let it fail into the
+// console on every load and Settings change.
+let rankRequestSeq = 0;
+async function refreshRankings() {
+  const seq = ++rankRequestSeq;
+  if (typeof EMBEDDED_LEADERBOARD !== 'undefined') {
+    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
+    if (seq !== rankRequestSeq) return;
+    state.rankScores = computeRankScoresClientSide();
+    return;
+  }
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const params = new URLSearchParams({
+    startDaysAgo: String(startDaysAgo),
+    endDaysAgo: String(endDaysAgo),
+    volAdjusted: String(!!state.settings.volAdjusted),
+  });
+  try {
+    const res = await fetch(`/api/rank?${params}`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    const data = await res.json();
+    if (seq !== rankRequestSeq) return; // superseded by a newer request
+    state.rankScores = data.scores;
+  } catch {
+    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
+    if (seq !== rankRequestSeq) return;
+    state.rankScores = computeRankScoresClientSide();
+  }
 }
 
 // ── tab routing ──────────────────────────────────────────────────────
@@ -760,13 +813,16 @@ function renderSettings() {
           <span class="knob"></span>
         </button>`;
       list.appendChild(row);
-      row.querySelector('.ios-switch').addEventListener('click', (e) => {
+      row.querySelector('.ios-switch').addEventListener('click', async (e) => {
         const btn = e.currentTarget;
         const next = btn.getAttribute('aria-checked') !== 'true';
         btn.setAttribute('aria-checked', String(next));
         state.settings[setting.key] = next;
         saveSettings();
-        if (state.leaderboard && state.historiesLoaded) renderAll();
+        if (state.leaderboard && state.rankingsLoaded) {
+          await refreshRankings();
+          renderAll();
+        }
       });
     }
   });
@@ -820,7 +876,7 @@ function renderDateRangeSetting() {
   `;
 
   container.querySelectorAll('.stepper-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const field = btn.dataset.field;
       const dir = Number(btn.dataset.dir);
       const range = state.settings.rankDateRange;
@@ -833,7 +889,12 @@ function renderDateRangeSetting() {
       }
       saveSettings();
       renderDateRangeSetting();
-      if (state.leaderboard && state.historiesLoaded) renderAll();
+      if (state.leaderboard && state.rankingsLoaded) {
+        // refreshRankings() sequences requests itself, so rapid stepper
+        // clicks each fire a request but only the latest response applies.
+        await refreshRankings();
+        renderAll();
+      }
     });
   });
 }
@@ -877,8 +938,8 @@ async function init() {
     document.getElementById('as-of').innerHTML = `As of <b>${fmtDate(data.asOf)}</b> · Financial Modeling Prep`;
 
     document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
-    await loadAllHistories(data.companies.map((c) => c.symbol));
-    state.historiesLoaded = true;
+    await refreshRankings();
+    state.rankingsLoaded = true;
 
     renderAll();
   } catch (err) {

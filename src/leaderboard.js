@@ -88,4 +88,4 @@ async function getLeaderboard() {
   };
 }
 
-module.exports = { getLeaderboard };
+module.exports = { getLeaderboard, metricAvailability };
