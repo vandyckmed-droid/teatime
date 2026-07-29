@@ -74,7 +74,7 @@ function fmtCap(v) {
 }
 function fmtDate(iso) {
   return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   });
 }
 
@@ -133,26 +133,26 @@ function renderAllSegmented() {
 }
 
 function updateScoreLabels() {
-  const adjusted = state.settings.volAdjusted;
-  const controlsLabel = adjusted ? 'Return window · vol-adjusted' : 'Return window';
-  const headLabel = adjusted ? 'Score' : 'Return';
-  ['ranks', 'watchlist'].forEach((tab) => {
-    const cl = document.getElementById(`${tab}-score-label`);
-    const hl = document.getElementById(`${tab}-return-head`);
-    if (cl) cl.textContent = controlsLabel;
-    if (hl) hl.textContent = headLabel;
-  });
+  const metricLabel = state.leaderboard.metrics.find((m) => m.key === state.activeMetric)?.label || state.activeMetric;
+  const text = state.settings.volAdjusted
+    ? `Ranked by ${metricLabel} · vol-adjusted score`
+    : `Ranked by ${metricLabel} return`;
+  const ranksLabel = document.getElementById('ranks-score-label');
+  if (ranksLabel) ranksLabel.textContent = text;
+  const watchlistLabel = document.getElementById('watchlist-score-label');
+  if (watchlistLabel) watchlistLabel.textContent = text;
 }
 
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
 function sectorChip(c) {
   const sectorVar = SECTOR_VAR[c.sector] || '--sector-default';
+  const secondary = [fmtCap(c.marketCap), c.sector || 'Uncategorized'].join(' · ');
   return `
     <span class="name-cell">
       <span class="ticker-chip" style="background: color-mix(in srgb, var(${sectorVar}) 16%, transparent); color: var(${sectorVar});">${c.symbol}</span>
       <span class="name-text">
         <div class="company-name">${c.name}</div>
-        <div class="sector-line"><span class="sector-dot" style="background: var(${sectorVar});"></span>${c.sector || 'Uncategorized'}</div>
+        <div class="sector-line">${secondary}</div>
       </span>
     </span>`;
 }
@@ -180,11 +180,10 @@ function rowEl(c, rank, value, isGain) {
   row.innerHTML = `
     <span class="rank">${rank}</span>
     ${sectorChip(c)}
-    <span class="num price">${fmtPrice(c.price)}</span>
-    <span class="num cap">${fmtCap(c.marketCap)}</span>
-    <span class="return-cell">
+    <span class="trailing-cell">
+      <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="return-val ${isGain ? 'gain' : 'loss'}"></span>
-      <span class="bar-track"><span class="bar-mid"></span><span class="bar-fill"></span></span>
+      <span class="mini-bar"><span class="mini-bar-mid"></span><span class="mini-bar-fill"></span></span>
     </span>
     ${selectCircle(c)}
   `;
@@ -199,11 +198,10 @@ function buildUnavailableRow(c) {
   row.innerHTML = `
     <span class="rank">&mdash;</span>
     ${sectorChip(c)}
-    <span class="num price">${fmtPrice(c.price)}</span>
-    <span class="num cap">${fmtCap(c.marketCap)}</span>
-    <span class="return-cell">
+    <span class="trailing-cell">
+      <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="return-val na">N/A</span>
-      <span class="bar-track"><span class="bar-mid"></span></span>
+      <span class="mini-bar"><span class="mini-bar-mid"></span></span>
     </span>
     ${selectCircle(c)}
   `;
@@ -238,7 +236,7 @@ function renderRanksBoard() {
   available.forEach(({ c, value }, i) => {
     const { el } = buildRow(c, i + 1, value);
     const pct = Math.min((Math.abs(value) / maxAbs) * 50, 50);
-    const fill = el.querySelector('.bar-fill');
+    const fill = el.querySelector('.mini-bar-fill');
     const isGain = value >= 0;
     fill.classList.add(isGain ? 'gain' : 'loss');
     fill.style.left = isGain ? '50%' : `${50 - pct}%`;
@@ -269,12 +267,12 @@ function renderRanksCallout(unavailable, metric) {
 
 function renderWatchlistBoard() {
   const metric = state.activeMetric;
-  const head = document.getElementById('watchlist-head');
+  const label = document.getElementById('watchlist-score-label');
   const rowsEl = document.getElementById('watchlist-rows');
   const companies = state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol));
 
   if (companies.length === 0) {
-    head.hidden = true;
+    label.hidden = true;
     rowsEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-glyph" aria-hidden="true">
@@ -285,7 +283,7 @@ function renderWatchlistBoard() {
     return;
   }
 
-  head.hidden = false;
+  label.hidden = false;
   const scored = companies.map((c) => ({ c, value: scoreFor(c, metric) }));
   const available = scored.filter((x) => x.value !== null).sort((a, b) => b.value - a.value);
   const unavailable = scored.filter((x) => x.value === null).map((x) => x.c);
@@ -295,7 +293,7 @@ function renderWatchlistBoard() {
   available.forEach(({ c, value }, i) => {
     const { el } = buildRow(c, i + 1, value);
     const pct = Math.min((Math.abs(value) / maxAbs) * 50, 50);
-    const fill = el.querySelector('.bar-fill');
+    const fill = el.querySelector('.mini-bar-fill');
     const isGain = value >= 0;
     fill.classList.add(isGain ? 'gain' : 'loss');
     fill.style.left = isGain ? '50%' : `${50 - pct}%`;
@@ -377,7 +375,7 @@ async function init() {
     const data = await loadLeaderboard();
     state.leaderboard = data;
     state.activeMetric = data.defaultMetric;
-    document.getElementById('as-of').innerHTML = `As of <b>${fmtDate(data.asOf)}</b>`;
+    document.getElementById('as-of').innerHTML = `As of <b>${fmtDate(data.asOf)}</b> · Financial Modeling Prep`;
     renderAllSegmented();
     renderAll();
   } catch (err) {

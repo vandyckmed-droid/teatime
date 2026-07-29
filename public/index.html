@@ -2,14 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <title>Ten Largest, Ranked by Return</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet"
-  />
+
+  <!-- Renders as a real app when added to the Home Screen: no Safari chrome, tinted status bar. -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ranks" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#F6F4EE" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#100E09" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23A2751C'/%3E%3Cpath d='M27 62 L42 44 L56 55 L74 30' stroke='%23FCEFD2' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -18,36 +22,21 @@
     <!-- ───────────────────────── Ranks ───────────────────────── -->
     <section class="panel" id="panel-ranks" data-panel="ranks">
       <div class="wrap">
-        <div class="eyebrow"><span class="dot"></span>U.S. Equity Market &middot; Live</div>
-        <h1>Ten Largest, Ranked&nbsp;by&nbsp;Return</h1>
-        <p class="sub">
-          The ten largest U.S.-traded companies by market capitalization, ordered by trailing
-          performance. Switch the window to see how the ranking shifts.
-        </p>
+        <div class="nav-title">Ranks</div>
+        <p class="sub">Largest U.S. companies by market cap, ranked by return.</p>
         <div class="meta-row" id="meta-row">
-          <span>Universe: <b>top 10 by market cap</b>, NYSE/NASDAQ, funds &amp; multiple share classes excluded</span>
           <span id="as-of">Loading&hellip;</span>
-          <span>Source: <b>Financial Modeling Prep</b></span>
         </div>
 
         <div class="controls">
-          <span class="controls-label" id="ranks-score-label">Return window</span>
           <div class="segmented" role="group" aria-label="Return window" data-segmented="ranks"></div>
         </div>
 
+        <div class="section-label" id="ranks-score-label">Top 10 by market cap</div>
+
         <div class="board">
-          <div class="board-inner">
-            <div class="row head">
-              <span>#</span>
-              <span>Company</span>
-              <span class="num price">Price</span>
-              <span class="num cap">Mkt Cap</span>
-              <span id="ranks-return-head">Return</span>
-              <span class="select-head" aria-hidden="true"></span>
-            </div>
-            <div id="ranks-rows">
-              <div class="loading">Fetching live data from Financial Modeling Prep&hellip;</div>
-            </div>
+          <div id="ranks-rows">
+            <div class="loading">Fetching live data from Financial Modeling Prep&hellip;</div>
           </div>
         </div>
 
@@ -56,45 +45,29 @@
           <p id="ranks-callout-text"></p>
         </div>
 
-        <footer>
-          <span>Data via financialmodelingprep.com, fetched live by this server and cached for 5 minutes.</span>
-          <span class="expand-note">
-            Framework: add a metric key to <code>src/config.js</code> and it appears in the toggle and
-            API response automatically; bump <code>universeSize</code> to widen the board.
-          </span>
-        </footer>
+        <p class="footnote">Data via financialmodelingprep.com. Not the live server &mdash; ask to refresh for current prices.</p>
       </div>
     </section>
 
     <!-- ─────────────────────── Watchlist ─────────────────────── -->
     <section class="panel" id="panel-watchlist" data-panel="watchlist" hidden>
       <div class="wrap">
-        <div class="eyebrow"><span class="dot"></span>Saved by You</div>
-        <h1>Watchlist</h1>
-        <p class="sub">Companies you've selected from the board. Tap a filled circle to remove one.</p>
+        <div class="nav-title">Watchlist</div>
+        <p class="sub">Tap a filled circle to remove one.</p>
 
         <div class="controls">
-          <span class="controls-label" id="watchlist-score-label">Return window</span>
           <div class="segmented" role="group" aria-label="Return window" data-segmented="watchlist"></div>
         </div>
 
+        <div class="section-label" id="watchlist-score-label" hidden>Saved</div>
+
         <div class="board">
-          <div class="board-inner">
-            <div class="row head" id="watchlist-head" hidden>
-              <span>#</span>
-              <span>Company</span>
-              <span class="num price">Price</span>
-              <span class="num cap">Mkt Cap</span>
-              <span id="watchlist-return-head">Return</span>
-              <span class="select-head" aria-hidden="true"></span>
-            </div>
-            <div id="watchlist-rows">
-              <div class="empty-state">
-                <div class="empty-state-glyph" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="30" height="30"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
-                </div>
-                <p>Your watchlist is empty. Head to Ranks and tap the circle on any company to save it here.</p>
+          <div id="watchlist-rows">
+            <div class="empty-state">
+              <div class="empty-state-glyph" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="28" height="28"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
               </div>
+              <p>Your watchlist is empty. Head to Ranks and tap the circle on any company to save it here.</p>
             </div>
           </div>
         </div>
@@ -104,14 +77,11 @@
     <!-- ──────────────────────── Settings ─────────────────────── -->
     <section class="panel" id="panel-settings" data-panel="settings" hidden>
       <div class="wrap">
-        <div class="eyebrow"><span class="dot"></span>Preferences</div>
-        <h1>Settings</h1>
+        <div class="nav-title">Settings</div>
         <p class="sub">Tune how the board scores and ranks companies.</p>
 
-        <div class="settings-group">
-          <div class="settings-group-label">Scoring</div>
-          <div class="settings-list" id="settings-list"></div>
-        </div>
+        <div class="section-label">Scoring</div>
+        <div class="settings-list" id="settings-list"></div>
       </div>
     </section>
 
