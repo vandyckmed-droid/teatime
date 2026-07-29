@@ -44,6 +44,39 @@ boundary, not a soft preference:
 This doesn't override anything else in this file — once the owner is back
 to the normal loop, the standing authority above applies as usual.
 
+## Parking ideas
+
+Not every idea the owner floats should turn into a build-it-now task. When
+asked to think through an idea "for later" — filed away, not implemented,
+just analyzed — file it under `ideas/` instead of just discussing it in
+conversation and losing it to context rot:
+
+- One markdown file per idea, `ideas/<kebab-case-name>.md`. Stamp the top
+  with:
+  ```
+  **Status:** Parked — not started
+  **Difficulty:** Easy | Medium | Hard
+  **Benefit:** Low | Medium | High
+  **Filed:** <date>
+  ```
+  followed by a one-line summary, what it is, why it might (and might not)
+  be worth doing, an implementation sketch, and open questions — enough for
+  a future session (or the owner) to pick it up cold without re-deriving the
+  analysis.
+- These are preliminary, gut-check ratings, not a committed estimate — the
+  point is a quick sort signal (worth revisiting soon vs. someday vs.
+  probably not), not a project-planning artifact. Don't over-invest in
+  precision here.
+- Add a row to `ideas/README.md`'s index table (name, difficulty, benefit,
+  status) so the whole set is scannable at a glance without opening every
+  file.
+- Filing an idea is analysis, not a commitment — same rule as consultation
+  mode: don't write feature code as a side effect of writing up the idea.
+  Building it later is a separate, explicit ask.
+- When an idea does get picked up, update its `Status` (`In progress` /
+  `Shipped` / `Rejected: <reason>`) rather than deleting the file — it's a
+  record of what was considered and why, not just a todo list.
+
 ## Branch & PR workflow
 
 - All work happens on a single long-lived branch:
