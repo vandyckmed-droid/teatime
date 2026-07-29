@@ -156,8 +156,8 @@ raise recoloring the palette itself as an explicit, separate suggestion if
 it comes up again.
 
 The sector chip colors (`--sector-*` in `public/styles.css`, `SECTOR_VAR` in
-`public/app.js`) have the same problem, worse: run as a 9-color categorical
-set through the validator (needed once `universeSize` grew past 10 and more
+`public/app.js`) have the same problem, worse: run as a categorical set
+through the validator (needed once `universeSize` grew past 10 and more
 sectors started appearing), it fails chroma-floor and CVD-separation hard —
 not the borderline "under the 6.0 floor" case gain/loss is, some pairs came
 back near 1.0 ΔE, barely distinguishable even with normal color vision. Two
@@ -165,11 +165,21 @@ rounds of hand-picked hue redesigns (even hue-wheel spacing, then boosted
 saturation) both still failed. This was scoped out rather than chased
 further: it's a secondary polish item, not the thing being shipped, and a
 real fix needs either a proper systematic OKLCH palette search or accepting
-fewer fully-distinct sector categories — both bigger asks than "add four
+fewer fully-distinct sector categories — both bigger asks than "add a couple
 colors." Mitigation in place is the same principle as gain/loss: every chip
 shows the sector name as text alongside the color, so identity never depends
 on hue alone. Worth a real attempt if sector color-coding turns out to
 matter more than expected in practice.
+
+The set has grown twice as `universeSize` scaled up — from 5 (at 10
+companies) to 9 (at 50) to 11 (`Basic Materials`, `Real Estate` added at
+100) — and re-validated failing the same categories each time, never newly
+regressing. Expect it to keep growing the same way: add a new sector to
+`SECTOR_VAR` plus its `--sector-*` value in all four theme blocks in
+`styles.css` (default `@media`/`prefers-color-scheme`, both explicit
+`data-theme` overrides) when the screener surfaces one not yet covered,
+same muted-aesthetic-but-not-validator-passing treatment as the rest —
+don't block a routine `universeSize` bump on trying to fix this.
 
 ## Preview channels: the repo isn't what the owner actually looks at
 

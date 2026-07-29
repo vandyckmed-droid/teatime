@@ -64,8 +64,8 @@ Then open http://localhost:3000.
 
 The sector color-coding (`SECTOR_VAR` in `public/app.js`, `--sector-*` custom
 properties in `public/styles.css`) doesn't cleanly pass the project's dataviz
-colorblind/chroma validator as a 9-color categorical set — checked when adding
-the last four sectors, documented in `CLAUDE.md`. Every sector chip always
-shows the sector name as text too, so color is never the sole signal, but a
-real fix needs a proper palette redesign, not just picking different hex
-values by eye.
+colorblind/chroma validator as a categorical set — currently 11 colors,
+checked at each `universeSize` bump that surfaced new sectors, documented in
+`CLAUDE.md`. Every sector chip always shows the sector name as text too, so
+color is never the sole signal, but a real fix needs a proper palette
+redesign, not just picking different hex values by eye.

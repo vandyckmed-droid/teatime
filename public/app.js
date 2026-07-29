@@ -30,8 +30,8 @@ const DATE_RANGE_MIN_GAP = 10;
 
 const TRADING_DAYS_PER_YEAR = 252;
 
-// Sectors actually seen in the top 50 by market cap as of the scale-up to
-// universeSize=50 (checked live against the screener). Add more here if a
+// Sectors actually seen in the top 100 by market cap as of the scale-up to
+// universeSize=100 (checked live against the screener). Add more here if a
 // future resize surfaces a sector not covered — falls back to
 // --sector-default rather than breaking.
 const SECTOR_VAR = {
@@ -44,6 +44,8 @@ const SECTOR_VAR = {
   Industrials: '--sector-industrials',
   Energy: '--sector-energy',
   Utilities: '--sector-utilities',
+  'Basic Materials': '--sector-basic-materials',
+  'Real Estate': '--sector-real-estate',
 };
 
 const STORAGE_KEYS = { watchlist: 'teatime.watchlist', settings: 'teatime.settings' };
