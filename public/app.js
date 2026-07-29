@@ -610,11 +610,13 @@ function renderChart() {
   const last = coords[coords.length - 1];
 
   wrap.innerHTML = `
+    <div class="chart-axis-y max" id="chart-axis-max">${fmtPrice(max)}</div>
+    <div class="chart-axis-y min" id="chart-axis-min">${fmtPrice(min)}</div>
     <svg viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
       <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${CHART_W}" y2="${baselineY}" />
-      <path class="chart-area ${dir}" d="${areaPath}" />
-      <path class="chart-line ${dir}" d="${linePath}" />
-      <circle class="chart-endpoint ${dir}" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
+      <path class="chart-area ${dir}" id="chart-area-path" d="${areaPath}" />
+      <path class="chart-line ${dir}" id="chart-line-path" d="${linePath}" />
+      <circle class="chart-endpoint ${dir}" id="chart-endpoint-dot" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
       <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${CHART_H}" />
       <circle class="chart-crosshair-dot" id="crosshair-dot" r="4.5" />
       <rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="transparent" id="chart-hit" />
@@ -622,7 +624,29 @@ function renderChart() {
     <div class="chart-tooltip" id="chart-tooltip"></div>
   `;
 
+  const axisXEl = document.getElementById('chart-axis-x');
+  if (axisXEl) {
+    axisXEl.innerHTML = `<span>${fmtChartDate(slice[0].date)}</span><span>${fmtChartDate(slice[slice.length - 1].date)}</span>`;
+  }
+
+  animateChartIn(wrap);
   attachChartScrub(wrap, coords);
+}
+
+// Line "draws in" left-to-right via the classic stroke-dasharray/dashoffset
+// technique (works regardless of point count, unlike morphing between ranges'
+// differing numbers of trading days). The CSS keyframe animation (chart-line-in
+// in styles.css) reads the --dash-length custom property set here for its
+// `from` state — animations (unlike transitions) declare their own start
+// state, so this plays correctly every time on a freshly-inserted element,
+// same technique the app already uses for .panel. prefers-reduced-motion
+// turns the animation off in CSS, so this just renders fully drawn instantly.
+function animateChartIn(wrap) {
+  const linePath = wrap.querySelector('#chart-line-path');
+  if (!linePath) return;
+  const length = linePath.getTotalLength();
+  linePath.style.strokeDasharray = String(length);
+  linePath.style.setProperty('--dash-length', String(length));
 }
 
 function attachChartScrub(wrap, coords) {

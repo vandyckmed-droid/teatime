@@ -376,13 +376,33 @@ body {
 }
 .chart-wrap svg { display: block; width: 100%; height: 100%; touch-action: none; }
 .chart-baseline { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 3; }
-.chart-area { opacity: 0.1; }
-.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+
+/* The chart is rebuilt via innerHTML on every open and every range switch, so
+   every mark is a freshly-inserted element each time — plain `animation`
+   (not `transition`) is what the rest of the app already uses for this exact
+   case (see .panel/panel-in above): animations define their own `from` state
+   via keyframes, so they play correctly on insertion. A `transition` on a
+   newly-inserted element has no "before" value to animate from and just
+   snaps straight to its final state. */
+.chart-area { fill: currentColor; animation: chart-area-in 500ms ease-out 150ms both; }
+@keyframes chart-area-in { from { opacity: 0; } to { opacity: 0.1; } }
+
+.chart-line {
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+  animation: chart-line-in 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes chart-line-in {
+  from { stroke-dashoffset: var(--dash-length, 0); }
+  to { stroke-dashoffset: 0; }
+}
 .chart-line.gain, .chart-area.gain { color: var(--gain); }
 .chart-line.loss, .chart-area.loss { color: var(--loss); }
-.chart-line { stroke: currentColor; }
-.chart-area { fill: currentColor; }
-.chart-endpoint { fill: currentColor; stroke: var(--panel); stroke-width: 2; }
+
+.chart-endpoint {
+  fill: currentColor; stroke: var(--panel); stroke-width: 2;
+  animation: chart-fade-in 300ms ease-out 550ms both;
+}
+@keyframes chart-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .chart-crosshair-line { stroke: var(--ink-soft); stroke-width: 1; opacity: 0; pointer-events: none; }
 .chart-crosshair-dot { fill: var(--ink); stroke: var(--panel); stroke-width: 2; opacity: 0; pointer-events: none; }
 .chart-tooltip {
@@ -393,6 +413,25 @@ body {
   transform: translateX(-50%);
 }
 .chart-tooltip b { color: var(--ink); font-weight: 600; }
+
+.chart-axis-y {
+  position: absolute; left: 6px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+  background: var(--panel); padding: 1px 5px; border-radius: 5px;
+  animation: chart-fade-in 400ms ease-out 200ms both;
+}
+.chart-axis-y.max { top: 4px; }
+.chart-axis-y.min { bottom: 4px; }
+.chart-axis-x {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
+  margin: 6px 6px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-line, .chart-area, .chart-endpoint, .chart-axis-y { animation: none; }
+}
 
 .detail-facts { display: flex; flex-wrap: wrap; gap: 10px; }
 .detail-fact {
