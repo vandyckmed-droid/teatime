@@ -319,7 +319,7 @@ function attachSelectHandlers(container) {
       if (state.watchlist.has(symbol)) state.watchlist.delete(symbol);
       else state.watchlist.add(symbol);
       saveWatchlist();
-      updateWatchlistBadge();
+      updateWatchlistBadge(true);
       renderAll();
     });
   });
@@ -419,11 +419,16 @@ function renderWatchlistBoard() {
   attachRowHandlers(rowsEl);
 }
 
-function updateWatchlistBadge() {
+function updateWatchlistBadge(animate = false) {
   const badge = document.getElementById('watchlist-badge');
   const count = state.watchlist.size;
   badge.textContent = String(count);
   badge.hidden = count === 0;
+  if (animate && count > 0) {
+    badge.classList.remove('pop');
+    void badge.offsetWidth; // restart the animation if it's re-triggered mid-play
+    badge.classList.add('pop');
+  }
 }
 
 function renderAll() {
@@ -463,6 +468,12 @@ function openDetail(symbol) {
     document.getElementById('detail-sheet').classList.add('open');
   });
 
+  // Usually replaced near-instantly (history is prefetched at boot), but shows
+  // for real when a symbol missed the batch prefetch and needs its own fetch —
+  // also clears out the previously-open company's chart immediately instead of
+  // leaving it on screen for a frame.
+  document.getElementById('chart-wrap').innerHTML = chartSkeletonHTML();
+
   loadHistoryFor(symbol).then(() => renderChart()).catch((err) => {
     const wrap = document.getElementById('chart-wrap');
     wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
@@ -493,16 +504,17 @@ function renderDetailReturn(company) {
 }
 
 function renderDetailFacts(company) {
+  const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
   const facts = [
-    ['Market cap', fmtCap(company.marketCap)],
-    ['Sector', company.sector || 'Uncategorized'],
-    ['Beta', typeof company.beta === 'number' ? company.beta.toFixed(2) : 'N/A'],
+    ['Market cap', fmtCap(company.marketCap), null],
+    ['Sector', company.sector || 'Uncategorized', sectorVar],
+    ['Beta', typeof company.beta === 'number' ? company.beta.toFixed(2) : 'N/A', null],
   ];
   document.getElementById('detail-facts').innerHTML = facts
-    .map(([label, value]) => `
+    .map(([label, value, colorVar]) => `
       <div class="detail-fact">
         <div class="detail-fact-label">${label}</div>
-        <div class="detail-fact-value">${value}</div>
+        <div class="detail-fact-value">${colorVar ? `<span class="fact-color-dot" style="background: var(${colorVar})"></span>` : ''}${value}</div>
       </div>`)
     .join('');
 }
@@ -572,6 +584,19 @@ function sliceForRange(series, rangeKey) {
 const CHART_W = 400;
 const CHART_H = 160;
 const CHART_PAD = 10;
+
+// A decorative (non-data) wave shape shown in place of "Loading chart…" while
+// a symbol's history is being fetched — same skeleton-pulse language as the
+// Ranks loading rows, shaped like a chart instead of a generic block.
+function chartSkeletonHTML() {
+  return `
+    <div class="chart-skeleton" aria-hidden="true">
+      <svg viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none">
+        <path class="chart-skeleton-area" d="M0,112 C40,96 60,124 100,104 C140,84 160,110 200,92 C240,74 260,100 300,86 C340,72 360,94 400,82 L400,160 L0,160 Z" />
+        <path class="chart-skeleton-line" d="M0,112 C40,96 60,124 100,104 C140,84 160,110 200,92 C240,74 260,100 300,86 C340,72 360,94 400,82" />
+      </svg>
+    </div>`;
+}
 
 function renderChart() {
   const wrap = document.getElementById('chart-wrap');
