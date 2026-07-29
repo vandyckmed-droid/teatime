@@ -137,7 +137,12 @@
 
         <div class="chart-card">
           <div class="chart-wrap" id="chart-wrap">
-            <div class="chart-loading" id="chart-loading">Loading chart&hellip;</div>
+            <div class="chart-skeleton" aria-hidden="true">
+              <svg viewBox="0 0 400 160" preserveAspectRatio="none">
+                <path class="chart-skeleton-area" d="M0,112 C40,96 60,124 100,104 C140,84 160,110 200,92 C240,74 260,100 300,86 C340,72 360,94 400,82 L400,160 L0,160 Z" />
+                <path class="chart-skeleton-line" d="M0,112 C40,96 60,124 100,104 C140,84 160,110 200,92 C240,74 260,100 300,86 C340,72 360,94 400,82" />
+              </svg>
+            </div>
           </div>
           <div class="chart-axis-x" id="chart-axis-x"></div>
         </div>
