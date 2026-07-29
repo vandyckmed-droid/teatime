@@ -20,6 +20,8 @@
   --sector-industrials: #5C6B7D;
   --sector-energy: #9C5233;
   --sector-utilities: #1D7A99;
+  --sector-basic-materials: #6B5D42;
+  --sector-real-estate: #4F7A52;
   --sector-default: #7A7364;
   --shadow: 0 1px 2px rgba(24,21,15,0.05), 0 10px 28px rgba(24,21,15,0.07);
   --tabbar-bg: rgba(251, 249, 244, 0.82);
@@ -51,6 +53,8 @@
     --sector-industrials: #94A8BC;
     --sector-energy: #D68A64;
     --sector-utilities: #4FB8D9;
+    --sector-basic-materials: #A69670;
+    --sector-real-estate: #7FB080;
     --sector-default: #A39C8A;
     --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 10px 28px rgba(0,0,0,0.45);
     --tabbar-bg: rgba(24, 21, 14, 0.78);
@@ -62,7 +66,8 @@
   --gain: #4CB483; --loss: #E17263; --sector-tech: #86A5D8; --sector-comm: #B79BD4;
   --sector-consumer: #DB9A63; --sector-health: #6FC4B0; --sector-financial: #CDA85E;
   --sector-consumer-defensive: #B5B571; --sector-industrials: #94A8BC; --sector-energy: #D68A64;
-  --sector-utilities: #4FB8D9; --sector-default: #A39C8A;
+  --sector-utilities: #4FB8D9; --sector-basic-materials: #A69670; --sector-real-estate: #7FB080;
+  --sector-default: #A39C8A;
   --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 10px 28px rgba(0,0,0,0.45);
   --tabbar-bg: rgba(24, 21, 14, 0.78);
 }
@@ -72,7 +77,8 @@
   --gain: #1E7A4C; --loss: #AF3A2C; --sector-tech: #4F6E9E; --sector-comm: #7C5C99;
   --sector-consumer: #B06A36; --sector-health: #3E8A7C; --sector-financial: #8A6B2C;
   --sector-consumer-defensive: #7A7A3D; --sector-industrials: #5C6B7D; --sector-energy: #9C5233;
-  --sector-utilities: #1D7A99; --sector-default: #7A7364;
+  --sector-utilities: #1D7A99; --sector-basic-materials: #6B5D42; --sector-real-estate: #4F7A52;
+  --sector-default: #7A7364;
   --shadow: 0 1px 2px rgba(24,21,15,0.05), 0 10px 28px rgba(24,21,15,0.07);
   --tabbar-bg: rgba(251, 249, 244, 0.82);
 }
