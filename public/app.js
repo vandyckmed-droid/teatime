@@ -22,12 +22,32 @@ const SECTOR_VAR = {
 
 const STORAGE_KEYS = { watchlist: 'teatime.watchlist', settings: 'teatime.settings' };
 
+// Chart ranges are a subset of METRICS — 1D/5D are dropped because a chart
+// built from daily closes has nothing meaningful to show for them.
+const CHART_RANGES = [
+  { key: '1M', label: '1M', days: 31 },
+  { key: '3M', label: '3M', days: 93 },
+  { key: '6M', label: '6M', days: 186 },
+  { key: 'ytd', label: 'YTD', days: null },
+  { key: '1Y', label: '1Y', days: 366 },
+  { key: '3Y', label: '3Y', days: 1097 },
+  { key: '5Y', label: '5Y', days: 1828 },
+];
+const DEFAULT_CHART_RANGE = '1Y';
+
 const state = {
   leaderboard: null,
   activeMetric: null,
   activeTab: 'ranks',
   watchlist: loadWatchlist(),
   settings: loadSettings(),
+};
+
+const detail = {
+  symbol: null,
+  range: DEFAULT_CHART_RANGE,
+  historyCache: new Map(), // symbol -> { series, asOf }
+  slice: null, // the currently-rendered range's [{date, close}], oldest first
 };
 
 // ── persistence ──────────────────────────────────────────────────────
@@ -177,6 +197,9 @@ function rowEl(c, rank, value, isGain) {
   const row = document.createElement('div');
   row.className = `row${rank === 1 ? ' ranked-1' : ''}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
+  row.tabIndex = 0;
+  row.setAttribute('role', 'button');
+  row.setAttribute('aria-label', `${c.name}: view chart`);
   row.innerHTML = `
     <span class="rank">${rank}</span>
     ${sectorChip(c)}
@@ -195,6 +218,9 @@ function buildUnavailableRow(c) {
   const row = document.createElement('div');
   row.className = `row unavailable${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
+  row.tabIndex = 0;
+  row.setAttribute('role', 'button');
+  row.setAttribute('aria-label', `${c.name}: view chart`);
   row.innerHTML = `
     <span class="rank">&mdash;</span>
     ${sectorChip(c)}
@@ -210,13 +236,26 @@ function buildUnavailableRow(c) {
 
 function attachSelectHandlers(container) {
   container.querySelectorAll('.select-circle').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
       const symbol = btn.dataset.symbol;
       if (state.watchlist.has(symbol)) state.watchlist.delete(symbol);
       else state.watchlist.add(symbol);
       saveWatchlist();
       updateWatchlistBadge();
       renderAll();
+    });
+  });
+}
+
+function attachRowHandlers(container) {
+  container.querySelectorAll('.row[data-symbol]').forEach((row) => {
+    row.addEventListener('click', () => openDetail(row.dataset.symbol));
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openDetail(row.dataset.symbol);
+      }
     });
   });
 }
@@ -246,6 +285,7 @@ function renderRanksBoard() {
   unavailable.forEach((c) => rowsEl.appendChild(buildUnavailableRow(c)));
 
   attachSelectHandlers(rowsEl);
+  attachRowHandlers(rowsEl);
   renderRanksCallout(unavailable, metric);
 }
 
@@ -303,6 +343,7 @@ function renderWatchlistBoard() {
   unavailable.forEach((c) => rowsEl.appendChild(buildUnavailableRow(c)));
 
   attachSelectHandlers(rowsEl);
+  attachRowHandlers(rowsEl);
 }
 
 function updateWatchlistBadge() {
@@ -316,6 +357,246 @@ function renderAll() {
   updateScoreLabels();
   renderRanksBoard();
   renderWatchlistBoard();
+}
+
+// ── detail sheet (tap a row to see its chart) ────────────────────────
+function findCompany(symbol) {
+  return state.leaderboard.companies.find((c) => c.symbol === symbol) || null;
+}
+
+function openDetail(symbol) {
+  const company = findCompany(symbol);
+  if (!company) return;
+
+  detail.symbol = symbol;
+  detail.range = DEFAULT_CHART_RANGE;
+
+  const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
+  const chip = document.getElementById('detail-chip');
+  chip.textContent = company.symbol;
+  chip.style.background = `color-mix(in srgb, var(${sectorVar}) 16%, transparent)`;
+  chip.style.color = `var(${sectorVar})`;
+  document.getElementById('detail-name').textContent = company.name;
+  document.getElementById('detail-sector').textContent = company.sector || 'Uncategorized';
+  document.getElementById('detail-price').textContent = fmtPrice(company.price);
+  renderDetailReturn(company);
+  renderDetailFacts(company);
+  renderDetailSegmented();
+
+  document.getElementById('sheet-backdrop').hidden = false;
+  document.getElementById('detail-sheet').hidden = false;
+  requestAnimationFrame(() => {
+    document.getElementById('sheet-backdrop').classList.add('open');
+    document.getElementById('detail-sheet').classList.add('open');
+  });
+
+  loadHistoryFor(symbol).then(() => renderChart()).catch((err) => {
+    const wrap = document.getElementById('chart-wrap');
+    wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
+  });
+}
+
+function closeDetail() {
+  document.getElementById('sheet-backdrop').classList.remove('open');
+  document.getElementById('detail-sheet').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('sheet-backdrop').hidden = true;
+    document.getElementById('detail-sheet').hidden = true;
+  }, 320);
+}
+
+function renderDetailReturn(company) {
+  const el = document.getElementById('detail-return');
+  const value = company.returns[detail.range];
+  const available = company.availability[detail.range] && typeof value === 'number';
+  const rangeLabel = CHART_RANGES.find((r) => r.key === detail.range)?.label || detail.range;
+  if (!available) {
+    el.className = 'detail-return na';
+    el.textContent = `N/A over ${rangeLabel}`;
+    return;
+  }
+  el.className = `detail-return ${value >= 0 ? 'gain' : 'loss'}`;
+  el.textContent = `${fmtPct(value)} · ${rangeLabel}`;
+}
+
+function renderDetailFacts(company) {
+  const facts = [
+    ['Market cap', fmtCap(company.marketCap)],
+    ['Sector', company.sector || 'Uncategorized'],
+    ['Beta', typeof company.beta === 'number' ? company.beta.toFixed(2) : 'N/A'],
+  ];
+  document.getElementById('detail-facts').innerHTML = facts
+    .map(([label, value]) => `
+      <div class="detail-fact">
+        <div class="detail-fact-label">${label}</div>
+        <div class="detail-fact-value">${value}</div>
+      </div>`)
+    .join('');
+}
+
+function renderDetailSegmented() {
+  const el = document.querySelector('[data-segmented="detail"]');
+  el.innerHTML = '';
+  CHART_RANGES.forEach((r) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = r.label;
+    btn.setAttribute('aria-pressed', String(r.key === detail.range));
+    btn.addEventListener('click', () => {
+      detail.range = r.key;
+      renderDetailSegmented();
+      const company = findCompany(detail.symbol);
+      if (company) renderDetailReturn(company);
+      renderChart();
+    });
+    el.appendChild(btn);
+  });
+}
+
+async function loadHistoryFor(symbol) {
+  if (detail.historyCache.has(symbol)) return detail.historyCache.get(symbol);
+  const res = await fetch(`/api/history?symbol=${encodeURIComponent(symbol)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed: ${res.status}`);
+  }
+  const data = await res.json();
+  detail.historyCache.set(symbol, data);
+  return data;
+}
+
+function sliceForRange(series, rangeKey) {
+  const range = CHART_RANGES.find((r) => r.key === rangeKey);
+  const now = new Date();
+  let cutoff;
+  if (rangeKey === 'ytd') {
+    cutoff = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  } else {
+    cutoff = new Date(now.getTime() - range.days * 86400000);
+  }
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return series.filter((p) => p.date >= cutoffStr);
+}
+
+// ── chart: SVG line + area, colored by direction, with a touch-scrub crosshair
+const CHART_W = 400;
+const CHART_H = 160;
+const CHART_PAD = 10;
+
+function renderChart() {
+  const wrap = document.getElementById('chart-wrap');
+  const cached = detail.historyCache.get(detail.symbol);
+  if (!cached || cached.series.length < 2) {
+    wrap.innerHTML = `<div class="chart-error">No chart data available for ${detail.symbol}.</div>`;
+    return;
+  }
+
+  const slice = sliceForRange(cached.series, detail.range);
+  if (slice.length < 2) {
+    wrap.innerHTML = `<div class="chart-error">Not enough trading history yet for this range.</div>`;
+    return;
+  }
+  detail.slice = slice;
+
+  const closes = slice.map((p) => p.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const span = max - min || 1;
+  const innerH = CHART_H - CHART_PAD * 2;
+
+  const coords = slice.map((p, i) => ({
+    x: slice.length === 1 ? CHART_PAD : CHART_PAD + (i / (slice.length - 1)) * (CHART_W - CHART_PAD * 2),
+    y: CHART_PAD + innerH - ((p.close - min) / span) * innerH,
+    date: p.date,
+    close: p.close,
+  }));
+
+  const isGain = closes[closes.length - 1] >= closes[0];
+  const dir = isGain ? 'gain' : 'loss';
+
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+  const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(2)},${CHART_H} L0,${CHART_H} Z`;
+  const baselineY = coords[0].y.toFixed(2);
+  const last = coords[coords.length - 1];
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
+      <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${CHART_W}" y2="${baselineY}" />
+      <path class="chart-area ${dir}" d="${areaPath}" />
+      <path class="chart-line ${dir}" d="${linePath}" />
+      <circle class="chart-endpoint ${dir}" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
+      <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${CHART_H}" />
+      <circle class="chart-crosshair-dot" id="crosshair-dot" r="4.5" />
+      <rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="transparent" id="chart-hit" />
+    </svg>
+    <div class="chart-tooltip" id="chart-tooltip"></div>
+  `;
+
+  attachChartScrub(wrap, coords);
+}
+
+function attachChartScrub(wrap, coords) {
+  const svg = wrap.querySelector('svg');
+  const hit = wrap.querySelector('#chart-hit');
+  const crosshairLine = wrap.querySelector('#crosshair-line');
+  const crosshairDot = wrap.querySelector('#crosshair-dot');
+  const tooltip = wrap.querySelector('#chart-tooltip');
+
+  function nearestIndex(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((clientX - rect.left) / rect.width) * CHART_W;
+    const idx = Math.round((relX / CHART_W) * (coords.length - 1));
+    return Math.min(coords.length - 1, Math.max(0, idx));
+  }
+
+  function showAt(clientX) {
+    const i = nearestIndex(clientX);
+    const c = coords[i];
+    crosshairLine.setAttribute('x1', c.x);
+    crosshairLine.setAttribute('x2', c.x);
+    crosshairLine.style.opacity = '1';
+    crosshairDot.setAttribute('cx', c.x);
+    crosshairDot.setAttribute('cy', c.y);
+    crosshairDot.style.opacity = '1';
+
+    const rect = svg.getBoundingClientRect();
+    const pxRatio = rect.width / CHART_W;
+    const leftPx = Math.min(Math.max(c.x * pxRatio, 28), rect.width - 28);
+    tooltip.style.left = `${leftPx}px`;
+    tooltip.style.opacity = '1';
+    tooltip.innerHTML = '';
+    const dateEl = document.createElement('span');
+    dateEl.textContent = fmtChartDate(c.date) + ' — ';
+    const priceEl = document.createElement('b');
+    priceEl.textContent = fmtPrice(c.close);
+    tooltip.appendChild(dateEl);
+    tooltip.appendChild(priceEl);
+  }
+
+  function hide() {
+    crosshairLine.style.opacity = '0';
+    crosshairDot.style.opacity = '0';
+    tooltip.style.opacity = '0';
+  }
+
+  hit.addEventListener('pointerdown', (e) => { showAt(e.clientX); hit.setPointerCapture(e.pointerId); });
+  hit.addEventListener('pointermove', (e) => { if (e.pressure > 0 || e.pointerType === 'mouse') showAt(e.clientX); });
+  hit.addEventListener('pointerup', hide);
+  hit.addEventListener('pointercancel', hide);
+  hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hide(); });
+}
+
+function fmtChartDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function initDetailSheet() {
+  document.getElementById('sheet-close').addEventListener('click', closeDetail);
+  document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !document.getElementById('detail-sheet').hidden) closeDetail();
+  });
 }
 
 // ── settings tab ─────────────────────────────────────────────────────
@@ -368,6 +649,7 @@ async function loadLeaderboard() {
 
 async function init() {
   initTabBar();
+  initDetailSheet();
   renderSettings();
   updateWatchlistBadge();
 

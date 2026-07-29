@@ -50,4 +50,8 @@ async function getProfile(symbol) {
   return rows[0];
 }
 
-module.exports = { screenLargestCompanies, getPriceChange, getProfile };
+function getHistoricalPrices(symbol, from, to) {
+  return fmpGet('historical-price-eod/full', { symbol, from, to });
+}
+
+module.exports = { screenLargestCompanies, getPriceChange, getProfile, getHistoricalPrices };
