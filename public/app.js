@@ -19,9 +19,12 @@ const SETTINGS = [
   },
 ];
 
-// Stepper bounds for the ranking date range. Step is in days; the max keeps
+// Stepper bounds for the ranking date range, in days. "Start" moves in
+// coarser steps since it usually ranges over months; "end" moves in finer
+// steps since it's typically being nudged near the present. The max keeps
 // "start" within the 5-year history the backend fetches per symbol.
-const DATE_RANGE_STEP = 10;
+const DATE_RANGE_STEP_START = 10;
+const DATE_RANGE_STEP_END = 2;
 const DATE_RANGE_MAX_DAYS_AGO = 1800;
 const DATE_RANGE_MIN_GAP = 10;
 
@@ -691,8 +694,8 @@ function renderDateRangeSetting() {
         <div class="stepper-days">${startDaysAgo} days ago</div>
       </div>
       <div class="stepper" role="group" aria-label="Start date">
-        <button type="button" class="stepper-btn" data-field="start" data-dir="-1" aria-label="Move start date later"${startDaysAgo - DATE_RANGE_STEP < endDaysAgo + DATE_RANGE_MIN_GAP ? ' disabled' : ''}>&minus;</button>
-        <button type="button" class="stepper-btn" data-field="start" data-dir="1" aria-label="Move start date earlier"${startDaysAgo + DATE_RANGE_STEP > DATE_RANGE_MAX_DAYS_AGO ? ' disabled' : ''}>+</button>
+        <button type="button" class="stepper-btn" data-field="start" data-dir="-1" aria-label="Move start date later"${startDaysAgo - DATE_RANGE_STEP_START < endDaysAgo + DATE_RANGE_MIN_GAP ? ' disabled' : ''}>&minus;</button>
+        <button type="button" class="stepper-btn" data-field="start" data-dir="1" aria-label="Move start date earlier"${startDaysAgo + DATE_RANGE_STEP_START > DATE_RANGE_MAX_DAYS_AGO ? ' disabled' : ''}>+</button>
       </div>
     </div>
     <div class="settings-row">
@@ -702,8 +705,8 @@ function renderDateRangeSetting() {
         <div class="stepper-days">${endDaysAgo} days ago</div>
       </div>
       <div class="stepper" role="group" aria-label="End date">
-        <button type="button" class="stepper-btn" data-field="end" data-dir="-1" aria-label="Move end date later"${endDaysAgo - DATE_RANGE_STEP < 0 ? ' disabled' : ''}>&minus;</button>
-        <button type="button" class="stepper-btn" data-field="end" data-dir="1" aria-label="Move end date earlier"${endDaysAgo + DATE_RANGE_STEP > startDaysAgo - DATE_RANGE_MIN_GAP ? ' disabled' : ''}>+</button>
+        <button type="button" class="stepper-btn" data-field="end" data-dir="-1" aria-label="Move end date later"${endDaysAgo - DATE_RANGE_STEP_END < 0 ? ' disabled' : ''}>&minus;</button>
+        <button type="button" class="stepper-btn" data-field="end" data-dir="1" aria-label="Move end date earlier"${endDaysAgo + DATE_RANGE_STEP_END > startDaysAgo - DATE_RANGE_MIN_GAP ? ' disabled' : ''}>+</button>
       </div>
     </div>
   `;
@@ -714,10 +717,10 @@ function renderDateRangeSetting() {
       const dir = Number(btn.dataset.dir);
       const range = state.settings.rankDateRange;
       if (field === 'start') {
-        const next = range.startDaysAgo + dir * DATE_RANGE_STEP;
+        const next = range.startDaysAgo + dir * DATE_RANGE_STEP_START;
         range.startDaysAgo = Math.max(range.endDaysAgo + DATE_RANGE_MIN_GAP, Math.min(next, DATE_RANGE_MAX_DAYS_AGO));
       } else {
-        const next = range.endDaysAgo + dir * DATE_RANGE_STEP;
+        const next = range.endDaysAgo + dir * DATE_RANGE_STEP_END;
         range.endDaysAgo = Math.max(0, Math.min(next, range.startDaysAgo - DATE_RANGE_MIN_GAP));
       }
       saveSettings();
