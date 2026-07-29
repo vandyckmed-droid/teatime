@@ -810,6 +810,21 @@ function renderDateRangeSetting() {
 }
 
 // ── boot ─────────────────────────────────────────────────────────────
+// Skeleton placeholder rows shaped like a real row (rank/chip/name/sector/value),
+// shown while the leaderboard and its price history are still loading — reads
+// as "content is on its way" rather than a bare loading message.
+function skeletonRowsHTML(count) {
+  return Array.from({ length: count }, () => `
+    <div class="skeleton-row">
+      <span class="skeleton-block skeleton-chip"></span>
+      <span class="skeleton-lines">
+        <span class="skeleton-block skeleton-line long"></span>
+        <span class="skeleton-block skeleton-line short"></span>
+      </span>
+      <span class="skeleton-block skeleton-trailing"></span>
+    </div>`).join('');
+}
+
 async function loadLeaderboard() {
   const res = await fetch('/api/leaderboard');
   if (!res.ok) {
@@ -825,12 +840,14 @@ async function init() {
   renderSettings();
   updateWatchlistBadge();
 
+  document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
+
   try {
     const data = await loadLeaderboard();
     state.leaderboard = data;
     document.getElementById('as-of').innerHTML = `As of <b>${fmtDate(data.asOf)}</b> · Financial Modeling Prep`;
 
-    document.getElementById('ranks-rows').innerHTML = '<div class="loading">Loading price history&hellip;</div>';
+    document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
     await loadAllHistories(data.companies.map((c) => c.symbol));
     state.historiesLoaded = true;
 
