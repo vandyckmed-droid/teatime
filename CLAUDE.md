@@ -65,7 +65,12 @@ Trigger: the owner says `/unleash` or "unleash my constraints."
   instructions in plain language.
 - Rank by likely unintentional cost (friction, overhead, blocked
   improvements) — most costly first, one line of reasoning each.
-- Do not propose fixes or changes unless asked.
+- For each one, also give its maximally flexible alternative: the simplest
+  approach in direct opposition to the constraint, stated plainly in a
+  sentence or two — not a middle-ground compromise, the actual opposite
+  extreme.
+- Do not propose fixes or changes unless asked — listing the flexible
+  alternative is part of the read, not a recommendation to adopt it.
 
 Same spirit as `/quote`: this is a read, not a commitment. It doesn't
 authorize dropping or changing any constraint on its own.
