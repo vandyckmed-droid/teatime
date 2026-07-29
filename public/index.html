@@ -110,6 +110,42 @@
         <span class="tab-label">Settings</span>
       </button>
     </nav>
+
+    <!-- ─────────────────────── Detail sheet ────────────────────── -->
+    <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+    <div class="sheet" id="detail-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="detail-name">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <button type="button" class="sheet-close" id="sheet-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+
+      <div class="sheet-scroll">
+        <div class="detail-header">
+          <span class="ticker-chip" id="detail-chip">AAPL</span>
+          <div>
+            <div class="detail-name" id="detail-name">Company</div>
+            <div class="sector-line" id="detail-sector">Sector</div>
+          </div>
+        </div>
+
+        <div class="detail-stat">
+          <span class="detail-price" id="detail-price">$0.00</span>
+          <span class="detail-return" id="detail-return">+0.0%</span>
+        </div>
+
+        <div class="controls">
+          <div class="segmented" role="group" aria-label="Chart range" data-segmented="detail"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-wrap" id="chart-wrap">
+            <div class="chart-loading" id="chart-loading">Loading chart&hellip;</div>
+          </div>
+        </div>
+
+        <div class="detail-facts" id="detail-facts"></div>
+      </div>
+    </div>
   </main>
 
   <script src="/app.js"></script>
