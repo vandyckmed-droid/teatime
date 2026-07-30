@@ -18,13 +18,10 @@ on:
     # trading day, whichever side of daylight saving we're on. FMP's data is
     # end-of-day, so there is nothing to gain from running nearer the bell.
     - cron: '0 9 * * *'
-  # So a missed or failed day can be filled in by hand.
+  # So a missed or failed day can be filled in by hand. A manual run always
+  # recaptures (see the --force below) — no inputs to set, which also means it
+  # works from the GitHub mobile app.
   workflow_dispatch:
-    inputs:
-      force:
-        description: 'Recapture even if today already has a file (use to test the run end to end)'
-        type: boolean
-        default: false
 
 # Weekend and holiday runs still fire; they just re-record the last trading
 # day's closes, which each file states via historyAsOf and lastClose.
@@ -49,10 +46,11 @@ jobs:
       - name: Capture today's board
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-        # Without --force the script exits before it fetches anything when the
-        # day already has a file, which is right for a retried cron but would
-        # make a manual test run prove nothing.
-        run: node scripts/snapshot.js ${{ inputs.force && '--force' || '' }}
+        # A manual run always recaptures. Skipping when the day already has a
+        # file is right for a retried cron, but someone clicking "Run workflow"
+        # is asking for it to run *now* — and without --force that click would
+        # exit before fetching anything and prove nothing about the API key.
+        run: node scripts/snapshot.js ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
 
       - name: Commit it if there's something new
         run: |
