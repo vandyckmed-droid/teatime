@@ -54,7 +54,14 @@ module.exports = {
   // of how big the universe gets, at the cost of the fetch taking a bit
   // longer wall-clock. Raise it if refreshes feel slow and the FMP plan has
   // headroom; lower it if requests start getting rate-limited.
-  fmpConcurrency: 10,
+  //
+  // Dropped 10 -> 6 at universeSize 250: a cycle is ~3 calls per company
+  // (profile, price change, history), so 250 names is ~750 requests, and at 10
+  // in flight that burst started drawing 429s where 200 names hadn't. The
+  // refresh runs once a day, so the extra wall-clock costs nothing anyone
+  // sees. fmpClient also retries 429/5xx with backoff now, which is the real
+  // safety net — this just stops provoking it.
+  fmpConcurrency: 6,
 
   // $30B leaves ~335 candidates after dedupe, i.e. real headroom above
   // universeSize: 250 rather than the 234 a $50B floor could supply.

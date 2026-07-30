@@ -10,6 +10,17 @@ function getApiKey() {
   return key;
 }
 
+// Transient on FMP's side: 429 is the per-minute rate ceiling, 5xx is a blip.
+// Both are worth waiting out rather than failing the caller, because a refresh
+// cycle is all-or-nothing (see src/dataStore.js) — one unlucky request out of
+// the ~3 per company would otherwise discard the whole universe's fetch and
+// leave the store serving yesterday's data for another day.
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 5;
+const BASE_BACKOFF_MS = 1500;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function fmpGet(endpoint, params = {}) {
   const url = new URL(`${BASE_URL}/${endpoint}`);
   for (const [k, v] of Object.entries(params)) {
@@ -17,15 +28,24 @@ async function fmpGet(endpoint, params = {}) {
   }
   url.searchParams.set('apikey', getApiKey());
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`FMP ${endpoint} request failed: ${res.status} ${res.statusText}`);
+  let lastStatus = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(url);
+    if (res.ok) {
+      const body = await res.json();
+      if (body && !Array.isArray(body) && body['Error Message']) {
+        throw new Error(`FMP ${endpoint} error: ${body['Error Message']}`);
+      }
+      return body;
+    }
+    lastStatus = `${res.status} ${res.statusText}`;
+    if (!RETRY_STATUSES.has(res.status) || attempt === MAX_ATTEMPTS) break;
+    // Exponential, with jitter so a burst of concurrent callers that all got
+    // rate-limited together don't march back in lockstep and trip it again.
+    const wait = BASE_BACKOFF_MS * 2 ** (attempt - 1) * (1 + Math.random() * 0.4);
+    await sleep(wait);
   }
-  const body = await res.json();
-  if (body && !Array.isArray(body) && body['Error Message']) {
-    throw new Error(`FMP ${endpoint} error: ${body['Error Message']}`);
-  }
-  return body;
+  throw new Error(`FMP ${endpoint} request failed: ${lastStatus}`);
 }
 
 function screenLargestCompanies({ limit, minMarketCap, country, exchanges }) {

@@ -1,10 +1,10 @@
 {
  "schemaVersion": 1,
  "date": "2026-07-30",
- "capturedAt": "2026-07-30T08:23:24.729Z",
- "historyAsOf": "2026-07-30T08:23:19.465Z",
+ "capturedAt": "2026-07-30T08:38:10.523Z",
+ "historyAsOf": "2026-07-30T08:38:04.181Z",
  "universeSize": 250,
- "capturedCompanies": 234,
+ "capturedCompanies": 250,
  "rankWindow": {
   "startDaysAgo": 250,
   "endDaysAgo": 20,
@@ -12,8 +12,8 @@
   "endDate": "2026-07-10"
  },
  "rankedCount": {
-  "byReturn": 232,
-  "byVolAdjusted": 232
+  "byReturn": 248,
+  "byVolAdjusted": 248
  },
  "companies": [
   {
@@ -65,15 +65,15 @@
    "low52": 103.38,
    "high52": 1255,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": -9.9363,
+    "5D": -22.943,
+    "1M": -35.978,
+    "3M": 42.8958,
+    "6M": 78.1238,
+    "ytd": 158.9258,
+    "1Y": 544.0648,
+    "3Y": 935.159,
+    "5Y": 852.5651
    },
    "availability": {
     "1D": true,
@@ -165,7 +165,7 @@
    "score": 255.048567,
    "rank": 4,
    "volScore": 2.945823,
-   "volRank": 5,
+   "volRank": 6,
    "lastClose": "2026-07-29"
   },
   {
@@ -203,7 +203,45 @@
    "score": 218.376812,
    "rank": 5,
    "volScore": 2.578487,
-   "volRank": 13,
+   "volRank": 14,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "LITE",
+   "name": "Lumentum Holdings Inc.",
+   "sector": "Technology",
+   "price": 602.35,
+   "marketCap": 46862830000,
+   "beta": 1.482,
+   "ipoDate": "2015-07-23",
+   "low52": 101.61,
+   "high52": 1085.68,
+   "returns": {
+    "1D": -7.6051,
+    "5D": -25.6817,
+    "1M": -29.801,
+    "3M": -33.2443,
+    "6M": 53.7235,
+    "ytd": 63.4201,
+    "1Y": 448.3386,
+    "3Y": 1050.4011,
+    "5Y": 617.1687
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 213.787707,
+   "rank": 6,
+   "volScore": 2.154941,
+   "volRank": 31,
    "lastClose": "2026-07-29"
   },
   {
@@ -239,9 +277,9 @@
     "ytd": true
    },
    "score": 204.467398,
-   "rank": 6,
+   "rank": 7,
    "volScore": 2.416127,
-   "volRank": 17,
+   "volRank": 18,
    "lastClose": "2026-07-29"
   },
   {
@@ -277,9 +315,47 @@
     "ytd": true
    },
    "score": 173.770733,
-   "rank": 7,
+   "rank": 8,
    "volScore": 2.562051,
-   "volRank": 14,
+   "volRank": 15,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "BE",
+   "name": "Bloom Energy Corporation",
+   "sector": "Industrials",
+   "price": 163.75,
+   "marketCap": 48228796250,
+   "beta": 3.737,
+   "ipoDate": "2018-07-25",
+   "low52": 32.52,
+   "high52": 351.28,
+   "returns": {
+    "1D": -1.8521,
+    "5D": -23.5492,
+    "1M": -45.9035,
+    "3M": -42.2113,
+    "6M": 8.1786,
+    "ytd": 88.4567,
+    "1Y": 335.2738,
+    "3Y": 816.8533,
+    "5Y": 651.1468
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 171.819091,
+   "rank": 9,
+   "volScore": 1.917217,
+   "volRank": 42,
    "lastClose": "2026-07-29"
   },
   {
@@ -315,9 +391,47 @@
     "ytd": true
    },
    "score": 168.961207,
-   "rank": 8,
+   "rank": 10,
    "volScore": 2.870402,
-   "volRank": 6,
+   "volRank": 7,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "CIEN",
+   "name": "Ciena Corporation",
+   "sector": "Technology",
+   "price": 330.37,
+   "marketCap": 46764838841,
+   "beta": 1.274,
+   "ipoDate": "1997-02-07",
+   "low52": 84.41,
+   "high52": 637.51,
+   "returns": {
+    "1D": -5.7459,
+    "5D": -17.7877,
+    "1M": -32.6545,
+    "3M": -37.3801,
+    "6M": 31.1981,
+    "ytd": 41.2622,
+    "1Y": 255.4276,
+    "3Y": 682.8673,
+    "5Y": 468.2319
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 158.453944,
+   "rank": 11,
+   "volScore": 2.241627,
+   "volRank": 25,
    "lastClose": "2026-07-29"
   },
   {
@@ -353,9 +467,9 @@
     "ytd": true
    },
    "score": 145.587101,
-   "rank": 9,
+   "rank": 12,
    "volScore": 2.435979,
-   "volRank": 16,
+   "volRank": 17,
    "lastClose": "2026-07-29"
   },
   {
@@ -391,9 +505,9 @@
     "ytd": true
    },
    "score": 140.23408,
-   "rank": 10,
+   "rank": 13,
    "volScore": 2.141881,
-   "volRank": 29,
+   "volRank": 33,
    "lastClose": "2026-07-29"
   },
   {
@@ -429,9 +543,9 @@
     "ytd": true
    },
    "score": 136.549708,
-   "rank": 11,
+   "rank": 14,
    "volScore": 2.661093,
-   "volRank": 10,
+   "volRank": 11,
    "lastClose": "2026-07-29"
   },
   {
@@ -467,9 +581,9 @@
     "ytd": true
    },
    "score": 126.291612,
-   "rank": 12,
+   "rank": 15,
    "volScore": 2.008449,
-   "volRank": 33,
+   "volRank": 37,
    "lastClose": "2026-07-29"
   },
   {
@@ -505,9 +619,9 @@
     "ytd": true
    },
    "score": 111.029077,
-   "rank": 13,
+   "rank": 16,
    "volScore": 2.094379,
-   "volRank": 31,
+   "volRank": 35,
    "lastClose": "2026-07-29"
   },
   {
@@ -543,9 +657,9 @@
     "ytd": true
    },
    "score": 99.733705,
-   "rank": 14,
+   "rank": 17,
    "volScore": 2.698849,
-   "volRank": 8,
+   "volRank": 9,
    "lastClose": "2026-07-29"
   },
   {
@@ -581,9 +695,9 @@
     "ytd": true
    },
    "score": 99.499468,
-   "rank": 15,
+   "rank": 18,
    "volScore": 1.859865,
-   "volRank": 43,
+   "volRank": 48,
    "lastClose": "2026-07-29"
   },
   {
@@ -619,9 +733,9 @@
     "ytd": true
    },
    "score": 96.413073,
-   "rank": 16,
+   "rank": 19,
    "volScore": 2.088516,
-   "volRank": 32,
+   "volRank": 36,
    "lastClose": "2026-07-29"
   },
   {
@@ -657,9 +771,9 @@
     "ytd": true
    },
    "score": 96.382052,
-   "rank": 17,
+   "rank": 20,
    "volScore": 2.155653,
-   "volRank": 27,
+   "volRank": 30,
    "lastClose": "2026-07-29"
   },
   {
@@ -695,9 +809,9 @@
     "ytd": true
    },
    "score": 95.395232,
-   "rank": 18,
+   "rank": 21,
    "volScore": 2.47722,
-   "volRank": 15,
+   "volRank": 16,
    "lastClose": "2026-07-29"
   },
   {
@@ -733,9 +847,9 @@
     "ytd": true
    },
    "score": 86.468647,
-   "rank": 19,
+   "rank": 22,
    "volScore": 2.216701,
-   "volRank": 24,
+   "volRank": 27,
    "lastClose": "2026-07-29"
   },
   {
@@ -771,9 +885,9 @@
     "ytd": true
    },
    "score": 78.190268,
-   "rank": 20,
+   "rank": 23,
    "volScore": 2.247456,
-   "volRank": 22,
+   "volRank": 24,
    "lastClose": "2026-07-29"
   },
   {
@@ -809,9 +923,9 @@
     "ytd": true
    },
    "score": 73.030176,
-   "rank": 21,
+   "rank": 24,
    "volScore": 2.297809,
-   "volRank": 19,
+   "volRank": 21,
    "lastClose": "2026-07-29"
   },
   {
@@ -847,9 +961,47 @@
     "ytd": true
    },
    "score": 70.303891,
-   "rank": 22,
+   "rank": 25,
    "volScore": 2.310812,
-   "volRank": 18,
+   "volRank": 20,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "ODFL",
+   "name": "Old Dominion Freight Line, Inc.",
+   "sector": "Industrials",
+   "price": 222.79,
+   "marketCap": 46333253770,
+   "beta": 1.184,
+   "ipoDate": "1991-10-24",
+   "low52": 126.01,
+   "high52": 252.03,
+   "returns": {
+    "1D": -1.5423,
+    "5D": -3.303,
+    "1M": 2.8578,
+    "3M": 4.8769,
+    "6M": 28.6316,
+    "ytd": 42.0855,
+    "1Y": 52.1166,
+    "3Y": 6.2169,
+    "5Y": 65.557
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 69.518916,
+   "rank": 26,
+   "volScore": 2.363866,
+   "volRank": 19,
    "lastClose": "2026-07-29"
   },
   {
@@ -885,9 +1037,9 @@
     "ytd": true
    },
    "score": 63.465566,
-   "rank": 23,
+   "rank": 27,
    "volScore": 1.462851,
-   "volRank": 70,
+   "volRank": 76,
    "lastClose": "2026-07-29"
   },
   {
@@ -923,9 +1075,9 @@
     "ytd": true
    },
    "score": 61.827616,
-   "rank": 24,
+   "rank": 28,
    "volScore": 2.208592,
-   "volRank": 25,
+   "volRank": 28,
    "lastClose": "2026-07-29"
   },
   {
@@ -961,7 +1113,7 @@
     "ytd": true
    },
    "score": 60.284977,
-   "rank": 25,
+   "rank": 29,
    "volScore": 3.017336,
    "volRank": 4,
    "lastClose": "2026-07-29"
@@ -999,9 +1151,9 @@
     "ytd": true
    },
    "score": 59.408673,
-   "rank": 26,
+   "rank": 30,
    "volScore": 2.230753,
-   "volRank": 23,
+   "volRank": 26,
    "lastClose": "2026-07-29"
   },
   {
@@ -1037,9 +1189,47 @@
     "ytd": true
    },
    "score": 59.209742,
-   "rank": 27,
+   "rank": 31,
    "volScore": 1.503462,
-   "volRank": 61,
+   "volRank": 67,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "STT",
+   "name": "State Street Corporation",
+   "sector": "Financial Services",
+   "price": 176.04,
+   "marketCap": 48722062680,
+   "beta": 1.433,
+   "ipoDate": "1980-03-17",
+   "low52": 104.64,
+   "high52": 192.51,
+   "returns": {
+    "1D": -3.5767,
+    "5D": -4.5957,
+    "1M": 3.7972,
+    "3M": 15.1793,
+    "6M": 34.5254,
+    "ytd": 36.4545,
+    "1Y": 55.6361,
+    "3Y": 143.0149,
+    "5Y": 102.0197
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 57.590066,
+   "rank": 32,
+   "volScore": 3.006879,
+   "volRank": 5,
    "lastClose": "2026-07-29"
   },
   {
@@ -1075,9 +1265,9 @@
     "ytd": true
    },
    "score": 55.068493,
-   "rank": 28,
+   "rank": 33,
    "volScore": 1.495046,
-   "volRank": 62,
+   "volRank": 68,
    "lastClose": "2026-07-29"
   },
   {
@@ -1113,9 +1303,9 @@
     "ytd": true
    },
    "score": 54.30148,
-   "rank": 29,
+   "rank": 34,
    "volScore": 1.577486,
-   "volRank": 54,
+   "volRank": 60,
    "lastClose": "2026-07-29"
   },
   {
@@ -1151,9 +1341,9 @@
     "ytd": true
    },
    "score": 54.234193,
-   "rank": 30,
+   "rank": 35,
    "volScore": 2.590987,
-   "volRank": 12,
+   "volRank": 13,
    "lastClose": "2026-07-29"
   },
   {
@@ -1189,9 +1379,9 @@
     "ytd": true
    },
    "score": 54.119574,
-   "rank": 31,
+   "rank": 36,
    "volScore": 1.905014,
-   "volRank": 39,
+   "volRank": 44,
    "lastClose": "2026-07-29"
   },
   {
@@ -1227,9 +1417,9 @@
     "ytd": true
    },
    "score": 53.100081,
-   "rank": 32,
+   "rank": 37,
    "volScore": 1.709631,
-   "volRank": 48,
+   "volRank": 54,
    "lastClose": "2026-07-29"
   },
   {
@@ -1265,9 +1455,9 @@
     "ytd": true
    },
    "score": 52.588245,
-   "rank": 33,
+   "rank": 38,
    "volScore": 1.515218,
-   "volRank": 60,
+   "volRank": 66,
    "lastClose": "2026-07-29"
   },
   {
@@ -1303,9 +1493,9 @@
     "ytd": true
    },
    "score": 49.241877,
-   "rank": 34,
+   "rank": 39,
    "volScore": 2.252839,
-   "volRank": 21,
+   "volRank": 23,
    "lastClose": "2026-07-29"
   },
   {
@@ -1341,9 +1531,9 @@
     "ytd": true
    },
    "score": 49.206078,
-   "rank": 35,
+   "rank": 40,
    "volScore": 1.660989,
-   "volRank": 49,
+   "volRank": 55,
    "lastClose": "2026-07-29"
   },
   {
@@ -1379,9 +1569,9 @@
     "ytd": true
    },
    "score": 48.851117,
-   "rank": 36,
+   "rank": 41,
    "volScore": 2.000933,
-   "volRank": 35,
+   "volRank": 39,
    "lastClose": "2026-07-29"
   },
   {
@@ -1417,9 +1607,9 @@
     "ytd": true
    },
    "score": 45.04517,
-   "rank": 37,
+   "rank": 42,
    "volScore": 2.183775,
-   "volRank": 26,
+   "volRank": 29,
    "lastClose": "2026-07-29"
   },
   {
@@ -1455,9 +1645,9 @@
     "ytd": true
    },
    "score": 44.977734,
-   "rank": 38,
+   "rank": 43,
    "volScore": 2.003467,
-   "volRank": 34,
+   "volRank": 38,
    "lastClose": "2026-07-29"
   },
   {
@@ -1493,9 +1683,9 @@
     "ytd": true
    },
    "score": 44.489839,
-   "rank": 39,
+   "rank": 44,
    "volScore": 2.672448,
-   "volRank": 9,
+   "volRank": 10,
    "lastClose": "2026-07-29"
   },
   {
@@ -1531,9 +1721,9 @@
     "ytd": true
    },
    "score": 44.136523,
-   "rank": 40,
+   "rank": 45,
    "volScore": 2.753777,
-   "volRank": 7,
+   "volRank": 8,
    "lastClose": "2026-07-29"
   },
   {
@@ -1569,9 +1759,9 @@
     "ytd": true
    },
    "score": 44.006868,
-   "rank": 41,
+   "rank": 46,
    "volScore": 1.12355,
-   "volRank": 101,
+   "volRank": 109,
    "lastClose": "2026-07-29"
   },
   {
@@ -1581,9 +1771,9 @@
    "price": 606,
    "marketCap": 83621374602,
    "beta": 1.222,
-   "ipoDate": null,
-   "low52": 355.84,
-   "high52": 727.59,
+   "ipoDate": "1947-10-03",
+   "low52": 354.68,
+   "high52": 737.76,
    "returns": {
     "1D": -5.5486,
     "5D": -8.8763,
@@ -1607,9 +1797,9 @@
     "ytd": true
    },
    "score": 43.055173,
-   "rank": 42,
+   "rank": 47,
    "volScore": 1.549999,
-   "volRank": 57,
+   "volRank": 63,
    "lastClose": "2026-07-29"
   },
   {
@@ -1619,9 +1809,9 @@
    "price": 152.52,
    "marketCap": 104686525080,
    "beta": 1.058,
-   "ipoDate": null,
-   "low52": 99.81,
-   "high52": 162.35,
+   "ipoDate": "2007-07-01",
+   "low52": 98.4,
+   "high52": 163.77,
    "returns": {
     "1D": -2.5369,
     "5D": -4.003,
@@ -1645,9 +1835,9 @@
     "ytd": true
    },
    "score": 42.741708,
-   "rank": 43,
+   "rank": 48,
    "volScore": 2.596036,
-   "volRank": 11,
+   "volRank": 12,
    "lastClose": "2026-07-29"
   },
   {
@@ -1683,9 +1873,9 @@
     "ytd": true
    },
    "score": 42.644377,
-   "rank": 44,
+   "rank": 49,
    "volScore": 1.964892,
-   "volRank": 37,
+   "volRank": 41,
    "lastClose": "2026-07-29"
   },
   {
@@ -1721,9 +1911,9 @@
     "ytd": true
    },
    "score": 42.153772,
-   "rank": 45,
+   "rank": 50,
    "volScore": 1.23784,
-   "volRank": 89,
+   "volRank": 96,
    "lastClose": "2026-07-29"
   },
   {
@@ -1759,9 +1949,9 @@
     "ytd": true
    },
    "score": 40.861502,
-   "rank": 46,
+   "rank": 51,
    "volScore": 1.887802,
-   "volRank": 40,
+   "volRank": 45,
    "lastClose": "2026-07-29"
   },
   {
@@ -1771,9 +1961,9 @@
    "price": 203.19,
    "marketCap": 320487523200,
    "beta": 1.218,
-   "ipoDate": null,
-   "low52": 139.09,
-   "high52": 228.55,
+   "ipoDate": "1993-02-23",
+   "low52": 136.17,
+   "high52": 232.25,
    "returns": {
     "1D": -3.9654,
     "5D": -6.1044,
@@ -1797,9 +1987,9 @@
     "ytd": true
    },
    "score": 40.532339,
-   "rank": 47,
+   "rank": 52,
    "volScore": 1.868625,
-   "volRank": 42,
+   "volRank": 47,
    "lastClose": "2026-07-29"
   },
   {
@@ -1835,9 +2025,9 @@
     "ytd": true
    },
    "score": 39.29215,
-   "rank": 48,
+   "rank": 53,
    "volScore": 2.257329,
-   "volRank": 20,
+   "volRank": 22,
    "lastClose": "2026-07-29"
   },
   {
@@ -1873,9 +2063,9 @@
     "ytd": true
    },
    "score": 37.292174,
-   "rank": 49,
+   "rank": 54,
    "volScore": 1.620028,
-   "volRank": 52,
+   "volRank": 58,
    "lastClose": "2026-07-29"
   },
   {
@@ -1911,9 +2101,9 @@
     "ytd": true
    },
    "score": 36.94375,
-   "rank": 50,
+   "rank": 55,
    "volScore": 1.258245,
-   "volRank": 83,
+   "volRank": 90,
    "lastClose": "2026-07-29"
   },
   {
@@ -1949,9 +2139,9 @@
     "ytd": true
    },
    "score": 36.322882,
-   "rank": 51,
+   "rank": 56,
    "volScore": 1.636869,
-   "volRank": 51,
+   "volRank": 57,
    "lastClose": "2026-07-29"
   },
   {
@@ -1987,9 +2177,9 @@
     "ytd": true
    },
    "score": 35.188784,
-   "rank": 52,
+   "rank": 57,
    "volScore": 1.83857,
-   "volRank": 44,
+   "volRank": 49,
    "lastClose": "2026-07-29"
   },
   {
@@ -2025,9 +2215,9 @@
     "ytd": true
    },
    "score": 34.718434,
-   "rank": 53,
+   "rank": 58,
    "volScore": 2.146199,
-   "volRank": 28,
+   "volRank": 32,
    "lastClose": "2026-07-29"
   },
   {
@@ -2063,9 +2253,9 @@
     "ytd": true
    },
    "score": 34.535596,
-   "rank": 54,
+   "rank": 59,
    "volScore": 1.882244,
-   "volRank": 41,
+   "volRank": 46,
    "lastClose": "2026-07-29"
   },
   {
@@ -2101,9 +2291,9 @@
     "ytd": true
    },
    "score": 33.474305,
-   "rank": 55,
+   "rank": 60,
    "volScore": 1.562294,
-   "volRank": 56,
+   "volRank": 62,
    "lastClose": "2026-07-29"
   },
   {
@@ -2139,9 +2329,47 @@
     "ytd": true
    },
    "score": 32.706191,
-   "rank": 56,
+   "rank": 61,
    "volScore": 1.383457,
-   "volRank": 74,
+   "volRank": 81,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "CARR",
+   "name": "Carrier Global Corporation",
+   "sector": "Industrials",
+   "price": 59.92,
+   "marketCap": 49768353600,
+   "beta": 1.309,
+   "ipoDate": "2020-03-19",
+   "low52": 50.24,
+   "high52": 76.76,
+   "returns": {
+    "1D": -5.1298,
+    "5D": -12.8436,
+    "1M": -18.3095,
+    "3M": -10.7935,
+    "6M": 0.5707,
+    "ytd": 13.3989,
+    "1Y": -12.1408,
+    "3Y": 0.6213,
+    "5Y": 8.4525
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 32.302996,
+   "rank": 62,
+   "volScore": 1.442399,
+   "volRank": 77,
    "lastClose": "2026-07-29"
   },
   {
@@ -2177,9 +2405,9 @@
     "ytd": true
    },
    "score": 31.970158,
-   "rank": 57,
+   "rank": 63,
    "volScore": 1.489498,
-   "volRank": 65,
+   "volRank": 71,
    "lastClose": "2026-07-29"
   },
   {
@@ -2215,9 +2443,9 @@
     "ytd": true
    },
    "score": 30.729326,
-   "rank": 58,
+   "rank": 64,
    "volScore": 2.116989,
-   "volRank": 30,
+   "volRank": 34,
    "lastClose": "2026-07-29"
   },
   {
@@ -2253,9 +2481,47 @@
     "ytd": true
    },
    "score": 30.619506,
-   "rank": 59,
+   "rank": 65,
    "volScore": 1.967139,
-   "volRank": 36,
+   "volRank": 40,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "WAB",
+   "name": "Westinghouse Air Brake Technologies Corporation",
+   "sector": "Industrials",
+   "price": 291.76,
+   "marketCap": 49281473360,
+   "beta": 0.937,
+   "ipoDate": "1995-06-16",
+   "low52": 184.26,
+   "high52": 306.64,
+   "returns": {
+    "1D": -4.5881,
+    "5D": -2.3495,
+    "1M": 8.2196,
+    "3M": 8.1033,
+    "6M": 26.775,
+    "ytd": 36.6878,
+    "1Y": 53.0424,
+    "3Y": 146.3357,
+    "5Y": 243.7728
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 30.461492,
+   "rank": 66,
+   "volScore": 1.806274,
+   "volRank": 50,
    "lastClose": "2026-07-29"
   },
   {
@@ -2291,9 +2557,9 @@
     "ytd": true
    },
    "score": 30.071766,
-   "rank": 60,
+   "rank": 67,
    "volScore": 1.485771,
-   "volRank": 67,
+   "volRank": 73,
    "lastClose": "2026-07-29"
   },
   {
@@ -2329,9 +2595,9 @@
     "ytd": true
    },
    "score": 29.372455,
-   "rank": 61,
+   "rank": 68,
    "volScore": 1.212758,
-   "volRank": 90,
+   "volRank": 97,
    "lastClose": "2026-07-29"
   },
   {
@@ -2341,9 +2607,9 @@
    "price": 251.96,
    "marketCap": 80823999909,
    "beta": 0.879,
-   "ipoDate": null,
-   "low52": 136.54,
-   "high52": 251.96,
+   "ipoDate": "1985-08-08",
+   "low52": 134.37,
+   "high52": 255.3,
    "returns": {
     "1D": 0.3705,
     "5D": 8.2767,
@@ -2367,9 +2633,9 @@
     "ytd": true
    },
    "score": 28.091954,
-   "rank": 62,
+   "rank": 69,
    "volScore": 1.639326,
-   "volRank": 50,
+   "volRank": 56,
    "lastClose": "2026-07-29"
   },
   {
@@ -2405,9 +2671,9 @@
     "ytd": true
    },
    "score": 27.809568,
-   "rank": 63,
+   "rank": 70,
    "volScore": 1.103659,
-   "volRank": 103,
+   "volRank": 111,
    "lastClose": "2026-07-29"
   },
   {
@@ -2443,9 +2709,9 @@
     "ytd": true
    },
    "score": 27.630309,
-   "rank": 64,
+   "rank": 71,
    "volScore": 1.238102,
-   "volRank": 88,
+   "volRank": 95,
    "lastClose": "2026-07-29"
   },
   {
@@ -2481,9 +2747,9 @@
     "ytd": true
    },
    "score": 27.491847,
-   "rank": 65,
+   "rank": 72,
    "volScore": 1.531058,
-   "volRank": 59,
+   "volRank": 65,
    "lastClose": "2026-07-29"
   },
   {
@@ -2519,9 +2785,9 @@
     "ytd": true
    },
    "score": 27.13291,
-   "rank": 66,
+   "rank": 73,
    "volScore": 1.545843,
-   "volRank": 58,
+   "volRank": 64,
    "lastClose": "2026-07-29"
   },
   {
@@ -2557,9 +2823,9 @@
     "ytd": true
    },
    "score": 26.849969,
-   "rank": 67,
+   "rank": 74,
    "volScore": 1.770477,
-   "volRank": 45,
+   "volRank": 51,
    "lastClose": "2026-07-29"
   },
   {
@@ -2595,9 +2861,9 @@
     "ytd": true
    },
    "score": 26.370704,
-   "rank": 68,
+   "rank": 75,
    "volScore": 1.36903,
-   "volRank": 76,
+   "volRank": 83,
    "lastClose": "2026-07-29"
   },
   {
@@ -2633,9 +2899,9 @@
     "ytd": true
    },
    "score": 26.032369,
-   "rank": 69,
+   "rank": 76,
    "volScore": 1.91244,
-   "volRank": 38,
+   "volRank": 43,
    "lastClose": "2026-07-29"
   },
   {
@@ -2671,9 +2937,9 @@
     "ytd": true
    },
    "score": 25.858881,
-   "rank": 70,
+   "rank": 77,
    "volScore": 1.428396,
-   "volRank": 72,
+   "volRank": 79,
    "lastClose": "2026-07-29"
   },
   {
@@ -2709,9 +2975,9 @@
     "ytd": true
    },
    "score": 25.851367,
-   "rank": 71,
+   "rank": 78,
    "volScore": 1.761427,
-   "volRank": 46,
+   "volRank": 52,
    "lastClose": "2026-07-29"
   },
   {
@@ -2747,9 +3013,9 @@
     "ytd": true
    },
    "score": 25.362251,
-   "rank": 72,
+   "rank": 79,
    "volScore": 1.419191,
-   "volRank": 73,
+   "volRank": 80,
    "lastClose": "2026-07-29"
   },
   {
@@ -2785,9 +3051,9 @@
     "ytd": true
    },
    "score": 25.232177,
-   "rank": 73,
+   "rank": 80,
    "volScore": 1.239661,
-   "volRank": 87,
+   "volRank": 94,
    "lastClose": "2026-07-29"
   },
   {
@@ -2823,9 +3089,9 @@
     "ytd": true
    },
    "score": 24.989563,
-   "rank": 74,
+   "rank": 81,
    "volScore": 1.077698,
-   "volRank": 104,
+   "volRank": 112,
    "lastClose": "2026-07-29"
   },
   {
@@ -2861,9 +3127,47 @@
     "ytd": true
    },
    "score": 24.802564,
-   "rank": 75,
+   "rank": 82,
    "volScore": 1.269285,
-   "volRank": 80,
+   "volRank": 87,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "XYZ",
+   "name": "Block, Inc.",
+   "sector": "Technology",
+   "price": 82.18,
+   "marketCap": 48911973429,
+   "beta": 2.541,
+   "ipoDate": "2015-11-19",
+   "low52": 48.21,
+   "high52": 84.08,
+   "returns": {
+    "1D": -1.1071,
+    "5D": 6.7273,
+    "1M": 8.1316,
+    "3M": 16.5508,
+    "6M": 35.9921,
+    "ytd": 26.2559,
+    "1Y": 5.9157,
+    "3Y": 2.0489,
+    "5Y": -66.7637
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 24.778047,
+   "rank": 83,
+   "volScore": 0.974214,
+   "volRank": 120,
    "lastClose": "2026-07-29"
   },
   {
@@ -2899,9 +3203,9 @@
     "ytd": true
    },
    "score": 24.658728,
-   "rank": 76,
+   "rank": 84,
    "volScore": 1.16427,
-   "volRank": 96,
+   "volRank": 104,
    "lastClose": "2026-07-29"
   },
   {
@@ -2937,9 +3241,9 @@
     "ytd": true
    },
    "score": 24.497297,
-   "rank": 77,
+   "rank": 85,
    "volScore": 1.25568,
-   "volRank": 84,
+   "volRank": 91,
    "lastClose": "2026-07-29"
   },
   {
@@ -2975,9 +3279,9 @@
     "ytd": true
    },
    "score": 24.20621,
-   "rank": 78,
+   "rank": 86,
    "volScore": 1.483824,
-   "volRank": 68,
+   "volRank": 74,
    "lastClose": "2026-07-29"
   },
   {
@@ -3013,9 +3317,9 @@
     "ytd": true
    },
    "score": 23.695047,
-   "rank": 79,
+   "rank": 87,
    "volScore": 1.177259,
-   "volRank": 94,
+   "volRank": 101,
    "lastClose": "2026-07-29"
   },
   {
@@ -3051,9 +3355,9 @@
     "ytd": true
    },
    "score": 23.371713,
-   "rank": 80,
+   "rank": 88,
    "volScore": 1.614995,
-   "volRank": 53,
+   "volRank": 59,
    "lastClose": "2026-07-29"
   },
   {
@@ -3089,9 +3393,9 @@
     "ytd": true
    },
    "score": 22.785486,
-   "rank": 81,
+   "rank": 89,
    "volScore": 1.489641,
-   "volRank": 64,
+   "volRank": 70,
    "lastClose": "2026-07-29"
   },
   {
@@ -3101,9 +3405,9 @@
    "price": 321.72,
    "marketCap": 72407911800,
    "beta": 1.0514,
-   "ipoDate": null,
-   "low52": 256.75,
-   "high52": 350.22,
+   "ipoDate": "2013-12-12",
+   "low52": 253.54,
+   "high52": 358,
    "returns": {
     "1D": -0.2202,
     "5D": 0.3775,
@@ -3127,9 +3431,9 @@
     "ytd": true
    },
    "score": 22.223841,
-   "rank": 82,
+   "rank": 90,
    "volScore": 1.48817,
-   "volRank": 66,
+   "volRank": 72,
    "lastClose": "2026-07-29"
   },
   {
@@ -3165,9 +3469,9 @@
     "ytd": true
    },
    "score": 22.086053,
-   "rank": 83,
+   "rank": 91,
    "volScore": 1.429183,
-   "volRank": 71,
+   "volRank": 78,
    "lastClose": "2026-07-29"
   },
   {
@@ -3203,9 +3507,9 @@
     "ytd": true
    },
    "score": 20.953491,
-   "rank": 84,
+   "rank": 92,
    "volScore": 1.273197,
-   "volRank": 79,
+   "volRank": 86,
    "lastClose": "2026-07-29"
   },
   {
@@ -3241,9 +3545,9 @@
     "ytd": true
    },
    "score": 20.866261,
-   "rank": 85,
+   "rank": 93,
    "volScore": 0.718042,
-   "volRank": 131,
+   "volRank": 142,
    "lastClose": "2026-07-29"
   },
   {
@@ -3279,9 +3583,9 @@
     "ytd": true
    },
    "score": 20.445776,
-   "rank": 86,
+   "rank": 94,
    "volScore": 1.035632,
-   "volRank": 106,
+   "volRank": 114,
    "lastClose": "2026-07-29"
   },
   {
@@ -3317,9 +3621,9 @@
     "ytd": true
    },
    "score": 19.977438,
-   "rank": 87,
+   "rank": 95,
    "volScore": 1.369179,
-   "volRank": 75,
+   "volRank": 82,
    "lastClose": "2026-07-29"
   },
   {
@@ -3355,9 +3659,9 @@
     "ytd": true
    },
    "score": 19.49421,
-   "rank": 88,
+   "rank": 96,
    "volScore": 1.577271,
-   "volRank": 55,
+   "volRank": 61,
    "lastClose": "2026-07-29"
   },
   {
@@ -3393,9 +3697,9 @@
     "ytd": true
    },
    "score": 19.155878,
-   "rank": 89,
+   "rank": 97,
    "volScore": 1.250521,
-   "volRank": 85,
+   "volRank": 92,
    "lastClose": "2026-07-29"
   },
   {
@@ -3431,9 +3735,9 @@
     "ytd": true
    },
    "score": 19.079346,
-   "rank": 90,
+   "rank": 98,
    "volScore": 1.728069,
-   "volRank": 47,
+   "volRank": 53,
    "lastClose": "2026-07-29"
   },
   {
@@ -3469,9 +3773,9 @@
     "ytd": true
    },
    "score": 19.051149,
-   "rank": 91,
+   "rank": 99,
    "volScore": 1.491097,
-   "volRank": 63,
+   "volRank": 69,
    "lastClose": "2026-07-29"
   },
   {
@@ -3481,9 +3785,9 @@
    "price": 329.44,
    "marketCap": 61432653440,
    "beta": 0.952,
-   "ipoDate": null,
-   "low52": 258.44,
-   "high52": 330.47,
+   "ipoDate": "1980-11-18",
+   "low52": 256.54,
+   "high52": 335.55,
    "returns": {
     "1D": -0.3117,
     "5D": 3.8555,
@@ -3507,9 +3811,9 @@
     "ytd": true
    },
    "score": 18.941783,
-   "rank": 92,
+   "rank": 100,
    "volScore": 1.275484,
-   "volRank": 78,
+   "volRank": 85,
    "lastClose": "2026-07-29"
   },
   {
@@ -3545,9 +3849,9 @@
     "ytd": true
    },
    "score": 18.814705,
-   "rank": 93,
+   "rank": 101,
    "volScore": 1.146581,
-   "volRank": 98,
+   "volRank": 106,
    "lastClose": "2026-07-29"
   },
   {
@@ -3583,9 +3887,9 @@
     "ytd": true
    },
    "score": 18.619747,
-   "rank": 94,
+   "rank": 102,
    "volScore": 1.183164,
-   "volRank": 92,
+   "volRank": 99,
    "lastClose": "2026-07-29"
   },
   {
@@ -3621,9 +3925,9 @@
     "ytd": true
    },
    "score": 18.481562,
-   "rank": 95,
+   "rank": 103,
    "volScore": 0.745888,
-   "volRank": 129,
+   "volRank": 140,
    "lastClose": "2026-07-29"
   },
   {
@@ -3659,9 +3963,9 @@
     "ytd": true
    },
    "score": 17.93381,
-   "rank": 96,
+   "rank": 104,
    "volScore": 0.821879,
-   "volRank": 125,
+   "volRank": 135,
    "lastClose": "2026-07-29"
   },
   {
@@ -3697,9 +4001,9 @@
     "ytd": true
    },
    "score": 17.757774,
-   "rank": 97,
+   "rank": 105,
    "volScore": 0.889698,
-   "volRank": 121,
+   "volRank": 130,
    "lastClose": "2026-07-29"
   },
   {
@@ -3735,9 +4039,9 @@
     "ytd": true
    },
    "score": 17.615682,
-   "rank": 98,
+   "rank": 106,
    "volScore": 1.1849,
-   "volRank": 91,
+   "volRank": 98,
    "lastClose": "2026-07-29"
   },
   {
@@ -3773,9 +4077,9 @@
     "ytd": true
    },
    "score": 17.569077,
-   "rank": 99,
+   "rank": 107,
    "volScore": 0.434118,
-   "volRank": 151,
+   "volRank": 164,
    "lastClose": "2026-07-29"
   },
   {
@@ -3811,9 +4115,9 @@
     "ytd": true
    },
    "score": 17.399216,
-   "rank": 100,
+   "rank": 108,
    "volScore": 1.265844,
-   "volRank": 81,
+   "volRank": 88,
    "lastClose": "2026-07-29"
   },
   {
@@ -3849,9 +4153,9 @@
     "ytd": true
    },
    "score": 16.993043,
-   "rank": 101,
+   "rank": 109,
    "volScore": 1.160364,
-   "volRank": 97,
+   "volRank": 105,
    "lastClose": "2026-07-29"
   },
   {
@@ -3887,9 +4191,9 @@
     "ytd": true
    },
    "score": 16.840763,
-   "rank": 102,
+   "rank": 110,
    "volScore": 1.478479,
-   "volRank": 69,
+   "volRank": 75,
    "lastClose": "2026-07-29"
   },
   {
@@ -3925,9 +4229,9 @@
     "ytd": true
    },
    "score": 16.487096,
-   "rank": 103,
+   "rank": 111,
    "volScore": 1.129943,
-   "volRank": 100,
+   "volRank": 108,
    "lastClose": "2026-07-29"
   },
   {
@@ -3963,9 +4267,9 @@
     "ytd": true
    },
    "score": 16.381086,
-   "rank": 104,
+   "rank": 112,
    "volScore": 1.038098,
-   "volRank": 105,
+   "volRank": 113,
    "lastClose": "2026-07-29"
   },
   {
@@ -3975,9 +4279,9 @@
    "price": 338.19,
    "marketCap": 4967116925640,
    "beta": 1.097,
-   "ipoDate": null,
-   "low52": 202.38,
-   "high52": 340.08,
+   "ipoDate": "1980-12-12",
+   "low52": 201.5,
+   "high52": 344.57,
    "returns": {
     "1D": -0.5557,
     "5D": 5.0965,
@@ -4001,9 +4305,9 @@
     "ytd": true
    },
    "score": 16.144241,
-   "rank": 105,
+   "rank": 113,
    "volScore": 1.006007,
-   "volRank": 110,
+   "volRank": 118,
    "lastClose": "2026-07-29"
   },
   {
@@ -4039,9 +4343,9 @@
     "ytd": true
    },
    "score": 15.835885,
-   "rank": 106,
+   "rank": 114,
    "volScore": 0.667046,
-   "volRank": 134,
+   "volRank": 145,
    "lastClose": "2026-07-29"
   },
   {
@@ -4077,9 +4381,47 @@
     "ytd": true
    },
    "score": 15.835542,
-   "rank": 107,
+   "rank": 115,
    "volScore": 1.022954,
-   "volRank": 109,
+   "volRank": 117,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "HEI",
+   "name": "HEICO Corporation",
+   "sector": "Industrials",
+   "price": 355.23,
+   "marketCap": 49490526374,
+   "beta": 1.03,
+   "ipoDate": "1980-03-17",
+   "low52": 256.11,
+   "high52": 369.48,
+   "returns": {
+    "1D": -2.259,
+    "5D": 3.8593,
+    "1M": -0.2695,
+    "3M": 31.6057,
+    "6M": 7.3494,
+    "ytd": 9.7778,
+    "1Y": 9.2209,
+    "3Y": 101.8582,
+    "5Y": 162.647
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 15.731152,
+   "rank": 116,
+   "volScore": 0.786156,
+   "volRank": 138,
    "lastClose": "2026-07-29"
   },
   {
@@ -4115,9 +4457,9 @@
     "ytd": true
    },
    "score": 15.729247,
-   "rank": 108,
+   "rank": 117,
    "volScore": 1.114485,
-   "volRank": 102,
+   "volRank": 110,
    "lastClose": "2026-07-29"
   },
   {
@@ -4153,9 +4495,9 @@
     "ytd": true
    },
    "score": 15.470297,
-   "rank": 109,
+   "rank": 118,
    "volScore": 0.891217,
-   "volRank": 120,
+   "volRank": 129,
    "lastClose": "2026-07-29"
   },
   {
@@ -4191,9 +4533,9 @@
     "ytd": true
    },
    "score": 14.889026,
-   "rank": 110,
+   "rank": 119,
    "volScore": 1.244009,
-   "volRank": 86,
+   "volRank": 93,
    "lastClose": "2026-07-29"
   },
   {
@@ -4207,15 +4549,15 @@
    "low52": 146.23,
    "high52": 208.14,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": -2.5883,
+    "5D": -0.9579,
+    "1M": 4.7889,
+    "3M": -6.3502,
+    "6M": 13.3956,
+    "ytd": 21.634,
+    "1Y": 6.1365,
+    "3Y": 51.0031,
+    "5Y": 22.068
    },
    "availability": {
     "1D": true,
@@ -4229,9 +4571,9 @@
     "ytd": true
    },
    "score": 14.779234,
-   "rank": 111,
+   "rank": 120,
    "volScore": 0.96266,
-   "volRank": 115,
+   "volRank": 124,
    "lastClose": "2026-07-29"
   },
   {
@@ -4267,9 +4609,9 @@
     "ytd": true
    },
    "score": 14.760466,
-   "rank": 112,
+   "rank": 121,
    "volScore": 1.26581,
-   "volRank": 82,
+   "volRank": 89,
    "lastClose": "2026-07-29"
   },
   {
@@ -4305,9 +4647,9 @@
     "ytd": true
    },
    "score": 14.713153,
-   "rank": 113,
+   "rank": 122,
    "volScore": 0.584644,
-   "volRank": 142,
+   "volRank": 155,
    "lastClose": "2026-07-29"
   },
   {
@@ -4343,9 +4685,9 @@
     "ytd": true
    },
    "score": 14.604732,
-   "rank": 114,
+   "rank": 123,
    "volScore": 1.000107,
-   "volRank": 111,
+   "volRank": 119,
    "lastClose": "2026-07-29"
   },
   {
@@ -4381,9 +4723,9 @@
     "ytd": true
    },
    "score": 14.495516,
-   "rank": 115,
+   "rank": 124,
    "volScore": 0.969723,
-   "volRank": 114,
+   "volRank": 123,
    "lastClose": "2026-07-29"
   },
   {
@@ -4419,9 +4761,47 @@
     "ytd": true
    },
    "score": 14.448252,
-   "rank": 116,
+   "rank": 125,
    "volScore": 1.322422,
-   "volRank": 77,
+   "volRank": 84,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "VTR",
+   "name": "Ventas, Inc.",
+   "sector": "Real Estate",
+   "price": 97.72,
+   "marketCap": 47508532400,
+   "beta": 0.724,
+   "ipoDate": "1997-05-05",
+   "low52": 65.82,
+   "high52": 101.6,
+   "returns": {
+    "1D": -0.428,
+    "5D": -0.7617,
+    "1M": 10.045,
+    "3M": 11.2224,
+    "6M": 25.8143,
+    "ytd": 26.2859,
+    "1Y": 46.9916,
+    "3Y": 101.4015,
+    "5Y": 63.466
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 14.411913,
+   "rank": 126,
+   "volScore": 1.174827,
+   "volRank": 102,
    "lastClose": "2026-07-29"
   },
   {
@@ -4431,9 +4811,9 @@
    "price": 335.74,
    "marketCap": 75409889920,
    "beta": 1.263,
-   "ipoDate": null,
-   "low52": 272.35,
-   "high52": 350.66,
+   "ipoDate": "1982-06-02",
+   "low52": 268.23,
+   "high52": 358.6,
    "returns": {
     "1D": -0.9149,
     "5D": -4.5081,
@@ -4457,9 +4837,9 @@
     "ytd": true
    },
    "score": 14.384016,
-   "rank": 117,
+   "rank": 127,
    "volScore": 1.182006,
-   "volRank": 93,
+   "volRank": 100,
    "lastClose": "2026-07-29"
   },
   {
@@ -4495,9 +4875,9 @@
     "ytd": true
    },
    "score": 14.133429,
-   "rank": 118,
+   "rank": 128,
    "volScore": 0.564104,
-   "volRank": 143,
+   "volRank": 156,
    "lastClose": "2026-07-29"
   },
   {
@@ -4533,9 +4913,9 @@
     "ytd": true
    },
    "score": 14.006833,
-   "rank": 119,
+   "rank": 129,
    "volScore": 1.027577,
-   "volRank": 108,
+   "volRank": 116,
    "lastClose": "2026-07-29"
   },
   {
@@ -4571,9 +4951,9 @@
     "ytd": true
    },
    "score": 13.97504,
-   "rank": 120,
+   "rank": 130,
    "volScore": 1.146197,
-   "volRank": 99,
+   "volRank": 107,
    "lastClose": "2026-07-29"
   },
   {
@@ -4609,9 +4989,9 @@
     "ytd": true
    },
    "score": 13.932162,
-   "rank": 121,
+   "rank": 131,
    "volScore": 0.910795,
-   "volRank": 119,
+   "volRank": 128,
    "lastClose": "2026-07-29"
   },
   {
@@ -4647,9 +5027,9 @@
     "ytd": true
    },
    "score": 13.738401,
-   "rank": 122,
+   "rank": 132,
    "volScore": 0.857211,
-   "volRank": 124,
+   "volRank": 134,
    "lastClose": "2026-07-29"
   },
   {
@@ -4685,9 +5065,9 @@
     "ytd": true
    },
    "score": 13.610378,
-   "rank": 123,
+   "rank": 133,
    "volScore": 0.938882,
-   "volRank": 116,
+   "volRank": 125,
    "lastClose": "2026-07-29"
   },
   {
@@ -4697,9 +5077,9 @@
    "price": 569.4,
    "marketCap": 131412395400,
    "beta": 0.113,
-   "ipoDate": null,
-   "low52": 418.68,
-   "high52": 676.7,
+   "ipoDate": "1977-01-03",
+   "low52": 412.55,
+   "high52": 692,
    "returns": {
     "1D": -2.0488,
     "5D": 0.1425,
@@ -4723,9 +5103,47 @@
     "ytd": true
    },
    "score": 13.550935,
-   "rank": 124,
+   "rank": 134,
    "volScore": 0.974094,
-   "volRank": 112,
+   "volRank": 121,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "AMP",
+   "name": "Ameriprise Financial, Inc.",
+   "sector": "Financial Services",
+   "price": 540.29,
+   "marketCap": 48570504159,
+   "beta": 1.159,
+   "ipoDate": "2005-09-15",
+   "low52": 422.37,
+   "high52": 553.46,
+   "returns": {
+    "1D": -1.158,
+    "5D": 4.0199,
+    "1M": 17.7718,
+    "3M": 13.7956,
+    "6M": 2.4849,
+    "ytd": 10.1868,
+    "1Y": 3.9519,
+    "3Y": 55.0552,
+    "5Y": 109.7725
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 13.227277,
+   "rank": 135,
+   "volScore": 0.886769,
+   "volRank": 131,
    "lastClose": "2026-07-29"
   },
   {
@@ -4761,9 +5179,9 @@
     "ytd": true
    },
    "score": 12.901819,
-   "rank": 125,
+   "rank": 136,
    "volScore": 0.933119,
-   "volRank": 118,
+   "volRank": 127,
    "lastClose": "2026-07-29"
   },
   {
@@ -4799,9 +5217,9 @@
     "ytd": true
    },
    "score": 12.61422,
-   "rank": 126,
+   "rank": 137,
    "volScore": 0.550844,
-   "volRank": 144,
+   "volRank": 157,
    "lastClose": "2026-07-29"
   },
   {
@@ -4837,9 +5255,9 @@
     "ytd": true
    },
    "score": 12.564445,
-   "rank": 127,
+   "rank": 138,
    "volScore": 0.790019,
-   "volRank": 127,
+   "volRank": 137,
    "lastClose": "2026-07-29"
   },
   {
@@ -4875,9 +5293,9 @@
     "ytd": true
    },
    "score": 12.161933,
-   "rank": 128,
+   "rank": 139,
    "volScore": 0.637444,
-   "volRank": 135,
+   "volRank": 147,
    "lastClose": "2026-07-29"
   },
   {
@@ -4913,9 +5331,9 @@
     "ytd": true
    },
    "score": 12.073817,
-   "rank": 129,
+   "rank": 140,
    "volScore": 0.96983,
-   "volRank": 113,
+   "volRank": 122,
    "lastClose": "2026-07-29"
   },
   {
@@ -4951,9 +5369,9 @@
     "ytd": true
    },
    "score": 11.988234,
-   "rank": 130,
+   "rank": 141,
    "volScore": 0.938232,
-   "volRank": 117,
+   "volRank": 126,
    "lastClose": "2026-07-29"
   },
   {
@@ -4989,9 +5407,9 @@
     "ytd": true
    },
    "score": 11.716958,
-   "rank": 131,
+   "rank": 142,
    "volScore": 1.16656,
-   "volRank": 95,
+   "volRank": 103,
    "lastClose": "2026-07-29"
   },
   {
@@ -5027,9 +5445,9 @@
     "ytd": true
    },
    "score": 11.716447,
-   "rank": 132,
+   "rank": 143,
    "volScore": 0.51383,
-   "volRank": 146,
+   "volRank": 159,
    "lastClose": "2026-07-29"
   },
   {
@@ -5065,9 +5483,9 @@
     "ytd": true
    },
    "score": 11.169514,
-   "rank": 133,
+   "rank": 144,
    "volScore": 0.594587,
-   "volRank": 141,
+   "volRank": 153,
    "lastClose": "2026-07-29"
   },
   {
@@ -5103,9 +5521,9 @@
     "ytd": true
    },
    "score": 10.69245,
-   "rank": 134,
+   "rank": 145,
    "volScore": 0.617836,
-   "volRank": 138,
+   "volRank": 150,
    "lastClose": "2026-07-29"
   },
   {
@@ -5141,9 +5559,9 @@
     "ytd": true
    },
    "score": 10.201563,
-   "rank": 135,
+   "rank": 146,
    "volScore": 0.796273,
-   "volRank": 126,
+   "volRank": 136,
    "lastClose": "2026-07-29"
   },
   {
@@ -5179,9 +5597,47 @@
     "ytd": true
    },
    "score": 9.848621,
-   "rank": 136,
+   "rank": 147,
    "volScore": 1.028651,
-   "volRank": 107,
+   "volRank": 115,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "PCG",
+   "name": "PG&E Corporation",
+   "sector": "Utilities",
+   "price": 17.71,
+   "marketCap": 47464756884,
+   "beta": 0.268,
+   "ipoDate": "1972-06-01",
+   "low52": 13.32,
+   "high52": 19.16,
+   "returns": {
+    "1D": -0.3937,
+    "5D": 0.2831,
+    "1M": 5.2913,
+    "3M": 6.5584,
+    "6M": 14.8508,
+    "ytd": 10.2053,
+    "1Y": 26.3195,
+    "3Y": 0.5679,
+    "5Y": 101.4789
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 9.572431,
+   "rank": 148,
+   "volScore": 0.594151,
+   "volRank": 154,
    "lastClose": "2026-07-29"
   },
   {
@@ -5217,9 +5673,9 @@
     "ytd": true
    },
    "score": 9.119252,
-   "rank": 137,
+   "rank": 149,
    "volScore": 0.509199,
-   "volRank": 148,
+   "volRank": 161,
    "lastClose": "2026-07-29"
   },
   {
@@ -5255,9 +5711,47 @@
     "ytd": true
    },
    "score": 8.491746,
-   "rank": 138,
+   "rank": 150,
    "volScore": 0.868025,
-   "volRank": 123,
+   "volRank": 133,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "EW",
+   "name": "Edwards Lifesciences Corporation",
+   "sector": "Healthcare",
+   "price": 85.76,
+   "marketCap": 49380608000,
+   "beta": 0.855,
+   "ipoDate": "2000-03-27",
+   "low52": 72.3,
+   "high52": 96.29,
+   "returns": {
+    "1D": 2.4857,
+    "5D": -2.5455,
+    "1M": -5.1957,
+    "3M": 2.7066,
+    "6M": 5.4081,
+    "ytd": 0.5982,
+    "1Y": 5.6678,
+    "3Y": 4.4962,
+    "5Y": -23.6127
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 8.316692,
+   "rank": 151,
+   "volScore": 0.656382,
+   "volRank": 146,
    "lastClose": "2026-07-29"
   },
   {
@@ -5293,9 +5787,9 @@
     "ytd": true
    },
    "score": 8.313836,
-   "rank": 139,
+   "rank": 152,
    "volScore": 0.534721,
-   "volRank": 145,
+   "volRank": 158,
    "lastClose": "2026-07-29"
   },
   {
@@ -5309,15 +5803,15 @@
    "low52": 95.42,
    "high52": 135.16,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": 0.9903,
+    "5D": 5.6419,
+    "1M": 0.8476,
+    "3M": -13.4238,
+    "6M": -4.1296,
+    "ytd": 2.5222,
+    "1Y": 17.0407,
+    "3Y": 114.3367,
+    "5Y": 140.362
    },
    "availability": {
     "1D": true,
@@ -5331,9 +5825,9 @@
     "ytd": true
    },
    "score": 8.146601,
-   "rank": 140,
+   "rank": 153,
    "volScore": 0.696403,
-   "volRank": 133,
+   "volRank": 144,
    "lastClose": "2026-07-29"
   },
   {
@@ -5369,9 +5863,9 @@
     "ytd": true
    },
    "score": 8.057859,
-   "rank": 141,
+   "rank": 154,
    "volScore": 0.595016,
-   "volRank": 140,
+   "volRank": 152,
    "lastClose": "2026-07-29"
   },
   {
@@ -5407,9 +5901,9 @@
     "ytd": true
    },
    "score": 7.713969,
-   "rank": 142,
+   "rank": 155,
    "volScore": 0.881524,
-   "volRank": 122,
+   "volRank": 132,
    "lastClose": "2026-07-29"
   },
   {
@@ -5445,9 +5939,9 @@
     "ytd": true
    },
    "score": 7.658352,
-   "rank": 143,
+   "rank": 156,
    "volScore": 0.633933,
-   "volRank": 136,
+   "volRank": 148,
    "lastClose": "2026-07-29"
   },
   {
@@ -5483,9 +5977,9 @@
     "ytd": true
    },
    "score": 7.378855,
-   "rank": 144,
+   "rank": 157,
    "volScore": 0.480259,
-   "volRank": 149,
+   "volRank": 162,
    "lastClose": "2026-07-29"
   },
   {
@@ -5499,15 +5993,15 @@
    "low52": 83.8,
    "high52": 100.84,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": -0.7543,
+    "5D": -0.9896,
+    "1M": 0.3552,
+    "3M": -0.6722,
+    "6M": 7.5468,
+    "ytd": 10.1491,
+    "1Y": 1.2118,
+    "3Y": 32.7758,
+    "5Y": 50.3836
    },
    "availability": {
     "1D": true,
@@ -5521,9 +6015,9 @@
     "ytd": true
    },
    "score": 7.10205,
-   "rank": 145,
+   "rank": 158,
    "volScore": 0.700627,
-   "volRank": 132,
+   "volRank": 143,
    "lastClose": "2026-07-29"
   },
   {
@@ -5559,9 +6053,9 @@
     "ytd": true
    },
    "score": 6.39978,
-   "rank": 146,
+   "rank": 159,
    "volScore": 0.509207,
-   "volRank": 147,
+   "volRank": 160,
    "lastClose": "2026-07-29"
   },
   {
@@ -5597,9 +6091,9 @@
     "ytd": true
    },
    "score": 6.211681,
-   "rank": 147,
+   "rank": 160,
    "volScore": 0.291928,
-   "volRank": 161,
+   "volRank": 174,
    "lastClose": "2026-07-29"
   },
   {
@@ -5635,9 +6129,9 @@
     "ytd": true
    },
    "score": 5.526988,
-   "rank": 148,
+   "rank": 161,
    "volScore": 0.618092,
-   "volRank": 137,
+   "volRank": 149,
    "lastClose": "2026-07-29"
   },
   {
@@ -5645,7 +6139,7 @@
    "name": "NextEra Energy, Inc.",
    "sector": "Utilities",
    "price": 88.46,
-   "marketCap": 184493060600,
+   "marketCap": 184509868000,
    "beta": 0.667,
    "ipoDate": "2014-06-19",
    "low52": 69.24,
@@ -5673,9 +6167,9 @@
     "ytd": true
    },
    "score": 5.366555,
-   "rank": 149,
+   "rank": 162,
    "volScore": 0.421524,
-   "volRank": 153,
+   "volRank": 166,
    "lastClose": "2026-07-29"
   },
   {
@@ -5711,9 +6205,9 @@
     "ytd": true
    },
    "score": 5.345912,
-   "rank": 150,
+   "rank": 163,
    "volScore": 0.723543,
-   "volRank": 130,
+   "volRank": 141,
    "lastClose": "2026-07-29"
   },
   {
@@ -5749,9 +6243,9 @@
     "ytd": true
    },
    "score": 4.994075,
-   "rank": 151,
+   "rank": 164,
    "volScore": 0.602703,
-   "volRank": 139,
+   "volRank": 151,
    "lastClose": "2026-07-29"
   },
   {
@@ -5787,9 +6281,9 @@
     "ytd": true
    },
    "score": 4.87306,
-   "rank": 152,
+   "rank": 165,
    "volScore": 0.309624,
-   "volRank": 158,
+   "volRank": 171,
    "lastClose": "2026-07-29"
   },
   {
@@ -5825,9 +6319,9 @@
     "ytd": true
    },
    "score": 4.676363,
-   "rank": 153,
+   "rank": 166,
    "volScore": 0.451346,
-   "volRank": 150,
+   "volRank": 163,
    "lastClose": "2026-07-29"
   },
   {
@@ -5863,9 +6357,9 @@
     "ytd": true
    },
    "score": 4.352283,
-   "rank": 154,
+   "rank": 167,
    "volScore": 0.293516,
-   "volRank": 160,
+   "volRank": 173,
    "lastClose": "2026-07-29"
   },
   {
@@ -5901,9 +6395,9 @@
     "ytd": true
    },
    "score": 4.262446,
-   "rank": 155,
+   "rank": 168,
    "volScore": 0.119553,
-   "volRank": 174,
+   "volRank": 188,
    "lastClose": "2026-07-29"
   },
   {
@@ -5939,9 +6433,9 @@
     "ytd": true
    },
    "score": 3.210526,
-   "rank": 156,
+   "rank": 169,
    "volScore": 0.430267,
-   "volRank": 152,
+   "volRank": 165,
    "lastClose": "2026-07-29"
   },
   {
@@ -5977,9 +6471,9 @@
     "ytd": true
    },
    "score": 2.850167,
-   "rank": 157,
+   "rank": 170,
    "volScore": 0.776722,
-   "volRank": 128,
+   "volRank": 139,
    "lastClose": "2026-07-29"
   },
   {
@@ -6015,9 +6509,9 @@
     "ytd": true
    },
    "score": 2.7109,
-   "rank": 158,
+   "rank": 171,
    "volScore": 0.258414,
-   "volRank": 163,
+   "volRank": 176,
    "lastClose": "2026-07-29"
   },
   {
@@ -6053,9 +6547,47 @@
     "ytd": true
    },
    "score": 2.518951,
-   "rank": 159,
+   "rank": 172,
    "volScore": 0.347051,
-   "volRank": 157,
+   "volRank": 170,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "EXC",
+   "name": "Exelon Corporation",
+   "sector": "Utilities",
+   "price": 47.03,
+   "marketCap": 48121566300,
+   "beta": 0.405,
+   "ipoDate": "1973-05-02",
+   "low52": 42.58,
+   "high52": 50.65,
+   "returns": {
+    "1D": -0.5918,
+    "5D": -0.5918,
+    "1M": 0.8795,
+    "3M": 2.2614,
+    "6M": 5.0246,
+    "ytd": 7.8917,
+    "1Y": 6.2585,
+    "3Y": 12.3507,
+    "5Y": 40.935
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 2.295082,
+   "rank": 173,
+   "volScore": 0.198527,
+   "volRank": 184,
    "lastClose": "2026-07-29"
   },
   {
@@ -6091,9 +6623,9 @@
     "ytd": true
    },
    "score": 2.18241,
-   "rank": 160,
+   "rank": 174,
    "volScore": 0.349327,
-   "volRank": 156,
+   "volRank": 169,
    "lastClose": "2026-07-29"
   },
   {
@@ -6129,9 +6661,9 @@
     "ytd": true
    },
    "score": 2.158622,
-   "rank": 161,
+   "rank": 175,
    "volScore": 0.412088,
-   "volRank": 154,
+   "volRank": 167,
    "lastClose": "2026-07-29"
   },
   {
@@ -6167,9 +6699,9 @@
     "ytd": true
    },
    "score": 2.107971,
-   "rank": 162,
+   "rank": 176,
    "volScore": 0.235022,
-   "volRank": 168,
+   "volRank": 181,
    "lastClose": "2026-07-29"
   },
   {
@@ -6205,9 +6737,9 @@
     "ytd": true
    },
    "score": 1.917665,
-   "rank": 163,
+   "rank": 177,
    "volScore": 0.363351,
-   "volRank": 155,
+   "volRank": 168,
    "lastClose": "2026-07-29"
   },
   {
@@ -6217,9 +6749,9 @@
    "price": 88.82,
    "marketCap": 58062255740,
    "beta": 0.568,
-   "ipoDate": null,
-   "low52": 79.41,
-   "high52": 99.75,
+   "ipoDate": "1998-06-29",
+   "low52": 78.97,
+   "high52": 101.04,
    "returns": {
     "1D": -1.9214,
     "5D": -5.3394,
@@ -6243,9 +6775,9 @@
     "ytd": true
    },
    "score": 1.837838,
-   "rank": 164,
+   "rank": 178,
    "volScore": 0.125641,
-   "volRank": 173,
+   "volRank": 187,
    "lastClose": "2026-07-29"
   },
   {
@@ -6281,9 +6813,9 @@
     "ytd": true
    },
    "score": 1.67908,
-   "rank": 165,
+   "rank": 179,
    "volScore": 0.28445,
-   "volRank": 162,
+   "volRank": 175,
    "lastClose": "2026-07-29"
   },
   {
@@ -6319,9 +6851,9 @@
     "ytd": true
    },
    "score": 1.590743,
-   "rank": 166,
+   "rank": 180,
    "volScore": 0.246724,
-   "volRank": 167,
+   "volRank": 180,
    "lastClose": "2026-07-29"
   },
   {
@@ -6357,9 +6889,9 @@
     "ytd": true
    },
    "score": 1.154881,
-   "rank": 167,
+   "rank": 181,
    "volScore": 0.299622,
-   "volRank": 159,
+   "volRank": 172,
    "lastClose": "2026-07-29"
   },
   {
@@ -6395,9 +6927,47 @@
     "ytd": true
    },
    "score": 0.668231,
-   "rank": 168,
+   "rank": 182,
    "volScore": 0.257797,
-   "volRank": 164,
+   "volRank": 177,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "XEL",
+   "name": "Xcel Energy Inc.",
+   "sector": "Utilities",
+   "price": 78.75,
+   "marketCap": 49161227850,
+   "beta": 0.405,
+   "ipoDate": "2001-03-13",
+   "low52": 69.16,
+   "high52": 84.23,
+   "returns": {
+    "1D": -1.9669,
+    "5D": -3.0769,
+    "1M": -1.9303,
+    "3M": -5.0633,
+    "6M": 3.5367,
+    "ytd": 6.6206,
+    "1Y": 8.7857,
+    "3Y": 25.538,
+    "5Y": 15.3846
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": 0.489519,
+   "rank": 183,
+   "volScore": 0.081942,
+   "volRank": 191,
    "lastClose": "2026-07-29"
   },
   {
@@ -6407,9 +6977,9 @@
    "price": 95.55,
    "marketCap": 53410287895,
    "beta": 0.997,
-   "ipoDate": null,
-   "low52": 76.85,
-   "high52": 100.98,
+   "ipoDate": "2002-07-01",
+   "low52": 76.55,
+   "high52": 101.79,
    "returns": {
     "1D": -0.4273,
     "5D": 4.4491,
@@ -6433,9 +7003,9 @@
     "ytd": true
    },
    "score": 0.479124,
-   "rank": 169,
+   "rank": 184,
    "volScore": 0.133689,
-   "volRank": 172,
+   "volRank": 186,
    "lastClose": "2026-07-29"
   },
   {
@@ -6471,9 +7041,9 @@
     "ytd": true
    },
    "score": 0.28381,
-   "rank": 170,
+   "rank": 185,
    "volScore": 0.204769,
-   "volRank": 170,
+   "volRank": 183,
    "lastClose": "2026-07-29"
   },
   {
@@ -6509,9 +7079,9 @@
     "ytd": true
    },
    "score": 0.091324,
-   "rank": 171,
+   "rank": 186,
    "volScore": 0.251261,
-   "volRank": 166,
+   "volRank": 179,
    "lastClose": "2026-07-29"
   },
   {
@@ -6547,9 +7117,9 @@
     "ytd": true
    },
    "score": -0.005825,
-   "rank": 172,
+   "rank": 187,
    "volScore": 0.252292,
-   "volRank": 165,
+   "volRank": 178,
    "lastClose": "2026-07-29"
   },
   {
@@ -6585,9 +7155,9 @@
     "ytd": true
    },
    "score": -0.059433,
-   "rank": 173,
+   "rank": 188,
    "volScore": 0.23194,
-   "volRank": 169,
+   "volRank": 182,
    "lastClose": "2026-07-29"
   },
   {
@@ -6623,9 +7193,9 @@
     "ytd": true
    },
    "score": -0.654595,
-   "rank": 174,
+   "rank": 189,
    "volScore": 0.050547,
-   "volRank": 178,
+   "volRank": 193,
    "lastClose": "2026-07-29"
   },
   {
@@ -6661,9 +7231,9 @@
     "ytd": true
    },
    "score": -0.910817,
-   "rank": 175,
+   "rank": 190,
    "volScore": 0.060707,
-   "volRank": 177,
+   "volRank": 192,
    "lastClose": "2026-07-29"
   },
   {
@@ -6699,9 +7269,9 @@
     "ytd": true
    },
    "score": -1.442627,
-   "rank": 176,
+   "rank": 191,
    "volScore": 0.088331,
-   "volRank": 176,
+   "volRank": 190,
    "lastClose": "2026-07-29"
   },
   {
@@ -6737,9 +7307,9 @@
     "ytd": true
    },
    "score": -2.049441,
-   "rank": 177,
+   "rank": 192,
    "volScore": -0.230536,
-   "volRank": 191,
+   "volRank": 207,
    "lastClose": "2026-07-29"
   },
   {
@@ -6775,9 +7345,9 @@
     "ytd": true
    },
    "score": -2.527757,
-   "rank": 178,
+   "rank": 193,
    "volScore": -0.019109,
-   "volRank": 182,
+   "volRank": 197,
    "lastClose": "2026-07-29"
   },
   {
@@ -6813,9 +7383,9 @@
     "ytd": true
    },
    "score": -2.55257,
-   "rank": 179,
+   "rank": 194,
    "volScore": 0.192806,
-   "volRank": 171,
+   "volRank": 185,
    "lastClose": "2026-07-29"
   },
   {
@@ -6851,9 +7421,9 @@
     "ytd": true
    },
    "score": -2.570898,
-   "rank": 180,
+   "rank": 195,
    "volScore": 0.109974,
-   "volRank": 175,
+   "volRank": 189,
    "lastClose": "2026-07-29"
   },
   {
@@ -6889,9 +7459,9 @@
     "ytd": true
    },
    "score": -3.054794,
-   "rank": 181,
+   "rank": 196,
    "volScore": 0.007446,
-   "volRank": 181,
+   "volRank": 196,
    "lastClose": "2026-07-29"
   },
   {
@@ -6905,15 +7475,15 @@
    "low52": 161.16,
    "high52": 226.75,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": 0.7585,
+    "5D": 7.0447,
+    "1M": 27.3107,
+    "3M": 23.9368,
+    "6M": 13.1355,
+    "ytd": 15.1327,
+    "1Y": -2.9579,
+    "3Y": 72.5201,
+    "5Y": 119.7159
    },
    "availability": {
     "1D": true,
@@ -6927,9 +7497,9 @@
     "ytd": true
    },
    "score": -3.315393,
-   "rank": 182,
+   "rank": 197,
    "volScore": 0.013672,
-   "volRank": 180,
+   "volRank": 195,
    "lastClose": "2026-07-29"
   },
   {
@@ -6965,9 +7535,9 @@
     "ytd": true
    },
    "score": -3.321678,
-   "rank": 183,
+   "rank": 198,
    "volScore": 0.037512,
-   "volRank": 179,
+   "volRank": 194,
    "lastClose": "2026-07-29"
   },
   {
@@ -6981,15 +7551,15 @@
    "low52": 23.11,
    "high52": 28.75,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": -0.396,
+    "5D": 2.1527,
+    "1M": 4.4435,
+    "3M": -5.8052,
+    "6M": -4.879,
+    "ytd": 1.004,
+    "1Y": 5.6279,
+    "3Y": -30.2551,
+    "5Y": -41.252
    },
    "availability": {
     "1D": true,
@@ -7003,9 +7573,9 @@
     "ytd": true
    },
    "score": -3.474441,
-   "rank": 184,
+   "rank": 199,
    "volScore": -0.213578,
-   "volRank": 188,
+   "volRank": 204,
    "lastClose": "2026-07-29"
   },
   {
@@ -7041,9 +7611,9 @@
     "ytd": true
    },
    "score": -4.147058,
-   "rank": 185,
+   "rank": 200,
    "volScore": -0.042326,
-   "volRank": 183,
+   "volRank": 198,
    "lastClose": "2026-07-29"
   },
   {
@@ -7079,9 +7649,9 @@
     "ytd": true
    },
    "score": -4.302103,
-   "rank": 186,
+   "rank": 201,
    "volScore": -0.978327,
-   "volRank": 221,
+   "volRank": 237,
    "lastClose": "2026-07-29"
   },
   {
@@ -7117,9 +7687,9 @@
     "ytd": true
    },
    "score": -4.424779,
-   "rank": 187,
+   "rank": 202,
    "volScore": -0.045987,
-   "volRank": 184,
+   "volRank": 199,
    "lastClose": "2026-07-29"
   },
   {
@@ -7155,9 +7725,9 @@
     "ytd": true
    },
    "score": -4.624929,
-   "rank": 188,
+   "rank": 203,
    "volScore": -0.966964,
-   "volRank": 218,
+   "volRank": 234,
    "lastClose": "2026-07-29"
   },
   {
@@ -7193,9 +7763,47 @@
     "ytd": true
    },
    "score": -4.776778,
-   "rank": 189,
+   "rank": 204,
    "volScore": -0.09731,
-   "volRank": 185,
+   "volRank": 201,
+   "lastClose": "2026-07-29"
+  },
+  {
+   "symbol": "VST",
+   "name": "Vistra Corp.",
+   "sector": "Utilities",
+   "price": 142.81,
+   "marketCap": 48153028255,
+   "beta": 1.409,
+   "ipoDate": "2016-10-05",
+   "low52": 132.66,
+   "high52": 219.82,
+   "returns": {
+    "1D": -3.9222,
+    "5D": -15.3468,
+    "1M": -9.9729,
+    "3M": -9.5223,
+    "6M": -9.8137,
+    "ytd": -11.4796,
+    "1Y": -31.0263,
+    "3Y": 408.9451,
+    "5Y": 645.7441
+   },
+   "availability": {
+    "1D": true,
+    "5D": true,
+    "1M": true,
+    "3M": true,
+    "6M": true,
+    "1Y": true,
+    "3Y": true,
+    "5Y": true,
+    "ytd": true
+   },
+   "score": -5.771398,
+   "rank": 205,
+   "volScore": -0.057428,
+   "volRank": 200,
    "lastClose": "2026-07-29"
   },
   {
@@ -7231,9 +7839,9 @@
     "ytd": true
    },
    "score": -6.109378,
-   "rank": 190,
+   "rank": 206,
    "volScore": -0.220949,
-   "volRank": 189,
+   "volRank": 205,
    "lastClose": "2026-07-29"
   },
   {
@@ -7269,9 +7877,9 @@
     "ytd": true
    },
    "score": -6.116312,
-   "rank": 191,
+   "rank": 207,
    "volScore": -0.314341,
-   "volRank": 195,
+   "volRank": 211,
    "lastClose": "2026-07-29"
   },
   {
@@ -7307,9 +7915,9 @@
     "ytd": true
    },
    "score": -6.288298,
-   "rank": 192,
+   "rank": 208,
    "volScore": -0.328506,
-   "volRank": 196,
+   "volRank": 212,
    "lastClose": "2026-07-29"
   },
   {
@@ -7345,9 +7953,9 @@
     "ytd": true
    },
    "score": -6.464975,
-   "rank": 193,
+   "rank": 209,
    "volScore": -0.185902,
-   "volRank": 187,
+   "volRank": 203,
    "lastClose": "2026-07-29"
   },
   {
@@ -7383,9 +7991,9 @@
     "ytd": true
    },
    "score": -6.772009,
-   "rank": 194,
+   "rank": 210,
    "volScore": -1.666144,
-   "volRank": 228,
+   "volRank": 244,
    "lastClose": "2026-07-29"
   },
   {
@@ -7421,9 +8029,9 @@
     "ytd": true
    },
    "score": -6.936249,
-   "rank": 195,
+   "rank": 211,
    "volScore": -0.227476,
-   "volRank": 190,
+   "volRank": 206,
    "lastClose": "2026-07-29"
   },
   {
@@ -7433,9 +8041,9 @@
    "price": 47.35,
    "marketCap": 75607833388,
    "beta": 1.259,
-   "ipoDate": null,
-   "low52": 42.87,
-   "high52": 62.93,
+   "ipoDate": "2022-12-01",
+   "low52": 42.2,
+   "high52": 64.1,
    "returns": {
     "1D": -1.4568,
     "5D": 3.0692,
@@ -7455,13 +8063,13 @@
     "6M": true,
     "1Y": true,
     "3Y": true,
-    "5Y": true,
+    "5Y": false,
     "ytd": true
    },
    "score": -7.430157,
-   "rank": 196,
+   "rank": 212,
    "volScore": -0.280973,
-   "volRank": 193,
+   "volRank": 209,
    "lastClose": "2026-07-29"
   },
   {
@@ -7497,9 +8105,9 @@
     "ytd": true
    },
    "score": -7.445008,
-   "rank": 197,
+   "rank": 213,
    "volScore": -0.149162,
-   "volRank": 186,
+   "volRank": 202,
    "lastClose": "2026-07-29"
   },
   {
@@ -7535,9 +8143,9 @@
     "ytd": true
    },
    "score": -8.304565,
-   "rank": 198,
+   "rank": 214,
    "volScore": -0.250676,
-   "volRank": 192,
+   "volRank": 208,
    "lastClose": "2026-07-29"
   },
   {
@@ -7573,9 +8181,9 @@
     "ytd": true
    },
    "score": -9.671774,
-   "rank": 199,
+   "rank": 215,
    "volScore": -0.292186,
-   "volRank": 194,
+   "volRank": 210,
    "lastClose": "2026-07-29"
   },
   {
@@ -7611,9 +8219,9 @@
     "ytd": true
    },
    "score": -10.286308,
-   "rank": 200,
+   "rank": 216,
    "volScore": -0.415147,
-   "volRank": 201,
+   "volRank": 217,
    "lastClose": "2026-07-29"
   },
   {
@@ -7649,9 +8257,9 @@
     "ytd": true
    },
    "score": -10.440137,
-   "rank": 201,
+   "rank": 217,
    "volScore": -0.437577,
-   "volRank": 202,
+   "volRank": 218,
    "lastClose": "2026-07-29"
   },
   {
@@ -7687,9 +8295,9 @@
     "ytd": true
    },
    "score": -10.451571,
-   "rank": 202,
+   "rank": 218,
    "volScore": -0.560932,
-   "volRank": 205,
+   "volRank": 221,
    "lastClose": "2026-07-29"
   },
   {
@@ -7725,9 +8333,9 @@
     "ytd": true
    },
    "score": -11.124359,
-   "rank": 203,
+   "rank": 219,
    "volScore": -0.350344,
-   "volRank": 197,
+   "volRank": 213,
    "lastClose": "2026-07-29"
   },
   {
@@ -7763,9 +8371,9 @@
     "ytd": true
    },
    "score": -11.233231,
-   "rank": 204,
+   "rank": 220,
    "volScore": -0.800301,
-   "volRank": 214,
+   "volRank": 230,
    "lastClose": "2026-07-29"
   },
   {
@@ -7801,9 +8409,9 @@
     "ytd": true
    },
    "score": -12.018016,
-   "rank": 205,
+   "rank": 221,
    "volScore": -0.732266,
-   "volRank": 211,
+   "volRank": 227,
    "lastClose": "2026-07-29"
   },
   {
@@ -7813,9 +8421,9 @@
    "price": 695.42,
    "marketCap": 71643559240,
    "beta": 0.236,
-   "ipoDate": null,
-   "low52": 545.46,
-   "high52": 812.27,
+   "ipoDate": "1991-04-02",
+   "low52": 541,
+   "high52": 821.11,
    "returns": {
     "1D": 0.0345,
     "5D": 5.6404,
@@ -7839,9 +8447,9 @@
     "ytd": true
    },
    "score": -12.088901,
-   "rank": 206,
+   "rank": 222,
    "volScore": -0.553943,
-   "volRank": 204,
+   "volRank": 220,
    "lastClose": "2026-07-29"
   },
   {
@@ -7877,9 +8485,9 @@
     "ytd": true
    },
    "score": -12.413391,
-   "rank": 207,
+   "rank": 223,
    "volScore": -0.609119,
-   "volRank": 207,
+   "volRank": 223,
    "lastClose": "2026-07-29"
   },
   {
@@ -7915,9 +8523,9 @@
     "ytd": true
    },
    "score": -12.463169,
-   "rank": 208,
+   "rank": 224,
    "volScore": -0.628923,
-   "volRank": 208,
+   "volRank": 224,
    "lastClose": "2026-07-29"
   },
   {
@@ -7953,9 +8561,9 @@
     "ytd": true
    },
    "score": -12.78363,
-   "rank": 209,
+   "rank": 225,
    "volScore": -0.409922,
-   "volRank": 200,
+   "volRank": 216,
    "lastClose": "2026-07-29"
   },
   {
@@ -7991,9 +8599,9 @@
     "ytd": true
    },
    "score": -13.723978,
-   "rank": 210,
+   "rank": 226,
    "volScore": -0.387606,
-   "volRank": 199,
+   "volRank": 215,
    "lastClose": "2026-07-29"
   },
   {
@@ -8029,9 +8637,9 @@
     "ytd": true
    },
    "score": -13.820841,
-   "rank": 211,
+   "rank": 227,
    "volScore": -0.379092,
-   "volRank": 198,
+   "volRank": 214,
    "lastClose": "2026-07-29"
   },
   {
@@ -8067,9 +8675,9 @@
     "ytd": true
    },
    "score": -14.089416,
-   "rank": 212,
+   "rank": 228,
    "volScore": -0.696746,
-   "volRank": 210,
+   "volRank": 226,
    "lastClose": "2026-07-29"
   },
   {
@@ -8105,9 +8713,9 @@
     "ytd": true
    },
    "score": -17.020346,
-   "rank": 213,
+   "rank": 229,
    "volScore": -0.772645,
-   "volRank": 213,
+   "volRank": 229,
    "lastClose": "2026-07-29"
   },
   {
@@ -8143,9 +8751,9 @@
     "ytd": true
    },
    "score": -17.191446,
-   "rank": 214,
+   "rank": 230,
    "volScore": -0.972241,
-   "volRank": 220,
+   "volRank": 236,
    "lastClose": "2026-07-29"
   },
   {
@@ -8181,9 +8789,9 @@
     "ytd": true
    },
    "score": -18.120762,
-   "rank": 215,
+   "rank": 231,
    "volScore": -0.487038,
-   "volRank": 203,
+   "volRank": 219,
    "lastClose": "2026-07-29"
   },
   {
@@ -8219,9 +8827,9 @@
     "ytd": true
    },
    "score": -18.311283,
-   "rank": 216,
+   "rank": 232,
    "volScore": -0.598413,
-   "volRank": 206,
+   "volRank": 222,
    "lastClose": "2026-07-29"
   },
   {
@@ -8257,9 +8865,9 @@
     "ytd": true
    },
    "score": -18.431755,
-   "rank": 217,
+   "rank": 233,
    "volScore": -0.90889,
-   "volRank": 217,
+   "volRank": 233,
    "lastClose": "2026-07-29"
   },
   {
@@ -8295,9 +8903,9 @@
     "ytd": true
    },
    "score": -18.511377,
-   "rank": 218,
+   "rank": 234,
    "volScore": -1.085103,
-   "volRank": 223,
+   "volRank": 239,
    "lastClose": "2026-07-29"
   },
   {
@@ -8333,9 +8941,9 @@
     "ytd": true
    },
    "score": -21.171509,
-   "rank": 219,
+   "rank": 235,
    "volScore": -0.968794,
-   "volRank": 219,
+   "volRank": 235,
    "lastClose": "2026-07-29"
   },
   {
@@ -8371,9 +8979,9 @@
     "ytd": true
    },
    "score": -23.526498,
-   "rank": 220,
+   "rank": 236,
    "volScore": -0.856888,
-   "volRank": 215,
+   "volRank": 231,
    "lastClose": "2026-07-29"
   },
   {
@@ -8409,9 +9017,9 @@
     "ytd": true
    },
    "score": -25.651415,
-   "rank": 221,
+   "rank": 237,
    "volScore": -0.869092,
-   "volRank": 216,
+   "volRank": 232,
    "lastClose": "2026-07-29"
   },
   {
@@ -8425,15 +9033,15 @@
    "low52": 81.97,
    "high52": 137.49,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": 0.7038,
+    "5D": 6.4286,
+    "1M": 19.0489,
+    "3M": 18.9834,
+    "6M": -1.1665,
+    "ytd": -13.78,
+    "1Y": -15.9665,
+    "3Y": -2.9686,
+    "5Y": -10.7084
    },
    "availability": {
     "1D": true,
@@ -8447,9 +9055,9 @@
     "ytd": true
    },
    "score": -26.680197,
-   "rank": 222,
+   "rank": 238,
    "volScore": -1.71906,
-   "volRank": 229,
+   "volRank": 245,
    "lastClose": "2026-07-29"
   },
   {
@@ -8485,9 +9093,9 @@
     "ytd": true
    },
    "score": -27.568954,
-   "rank": 223,
+   "rank": 239,
    "volScore": -1.737303,
-   "volRank": 230,
+   "volRank": 246,
    "lastClose": "2026-07-29"
   },
   {
@@ -8523,9 +9131,9 @@
     "ytd": true
    },
    "score": -28.087711,
-   "rank": 224,
+   "rank": 240,
    "volScore": -1.006644,
-   "volRank": 222,
+   "volRank": 238,
    "lastClose": "2026-07-29"
   },
   {
@@ -8561,9 +9169,9 @@
     "ytd": true
    },
    "score": -28.318432,
-   "rank": 225,
+   "rank": 241,
    "volScore": -1.225892,
-   "volRank": 225,
+   "volRank": 241,
    "lastClose": "2026-07-29"
   },
   {
@@ -8599,9 +9207,9 @@
     "ytd": true
    },
    "score": -29.241296,
-   "rank": 226,
+   "rank": 242,
    "volScore": -0.69129,
-   "volRank": 209,
+   "volRank": 225,
    "lastClose": "2026-07-29"
   },
   {
@@ -8637,9 +9245,9 @@
     "ytd": true
    },
    "score": -29.347134,
-   "rank": 227,
+   "rank": 243,
    "volScore": -1.176273,
-   "volRank": 224,
+   "volRank": 240,
    "lastClose": "2026-07-29"
   },
   {
@@ -8675,9 +9283,9 @@
     "ytd": true
    },
    "score": -29.661586,
-   "rank": 228,
+   "rank": 244,
    "volScore": -1.494911,
-   "volRank": 227,
+   "volRank": 243,
    "lastClose": "2026-07-29"
   },
   {
@@ -8713,9 +9321,9 @@
     "ytd": true
    },
    "score": -31.015762,
-   "rank": 229,
+   "rank": 245,
    "volScore": -1.241108,
-   "volRank": 226,
+   "volRank": 242,
    "lastClose": "2026-07-29"
   },
   {
@@ -8751,9 +9359,9 @@
     "ytd": true
    },
    "score": -33.794333,
-   "rank": 230,
+   "rank": 246,
    "volScore": -0.760552,
-   "volRank": 212,
+   "volRank": 228,
    "lastClose": "2026-07-29"
   },
   {
@@ -8789,9 +9397,9 @@
     "ytd": true
    },
    "score": -53.788192,
-   "rank": 231,
+   "rank": 247,
    "volScore": -2.79401,
-   "volRank": 232,
+   "volRank": 248,
    "lastClose": "2026-07-29"
   },
   {
@@ -8827,9 +9435,9 @@
     "ytd": true
    },
    "score": -58.537284,
-   "rank": 232,
+   "rank": 248,
    "volScore": -2.280763,
-   "volRank": 231,
+   "volRank": 247,
    "lastClose": "2026-07-29"
   },
   {
@@ -8843,15 +9451,15 @@
    "low52": 107.01,
    "high52": 225.64,
    "returns": {
-    "1D": null,
-    "5D": null,
-    "1M": null,
-    "3M": null,
-    "6M": null,
-    "ytd": null,
-    "1Y": null,
-    "3Y": null,
-    "5Y": null
+    "1D": -3.3159,
+    "5D": -2.9825,
+    "1M": -34.1274,
+    "3M": -30.0714,
+    "6M": -30.0714,
+    "ytd": -30.0714,
+    "1Y": -30.0714,
+    "3Y": -30.0714,
+    "5Y": -30.0714
    },
    "availability": {
     "1D": true,
