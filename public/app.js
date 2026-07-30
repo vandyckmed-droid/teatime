@@ -152,12 +152,26 @@ function fmtPct(v) {
   const sign = v > 0 ? '+' : '';
   return `${sign}${v.toFixed(1)}%`;
 }
-// Four decimals: vol-adjusted scores cluster tightly (most of the board lands
-// between 0 and 1.5), and at two decimals a 200-name list produces visible ties
-// that the ordering then can't justify.
+// Two decimals. Four was tried, to resolve ties on a 200-name board, and it
+// simply doesn't fit: "+4.0070" overruns the 54px value column and spills left
+// over the 52-week range labels. An occasional visible tie beats a permanently
+// crowded row.
 function fmtScore(v) {
   const sign = v > 0 ? '+' : '';
-  return `${sign}${v.toFixed(4)}`;
+  return `${sign}${v.toFixed(2)}`;
+}
+
+// ── compact forms for the row, where the value column is 54px ────────
+// The detail sheet and the chart tooltip deliberately keep full precision —
+// they have the room, and the tooltip exists to be read exactly. This is only
+// for the board, where a four-digit return would otherwise overlap its
+// neighbour. Precision is traded for a stable layout on purpose.
+function fmtPctCompact(v) {
+  const sign = v > 0 ? '+' : v < 0 ? '-' : '';
+  const abs = Math.abs(v);
+  if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)}k%`;
+  if (abs >= 100) return `${sign}${Math.round(abs)}%`;
+  return `${sign}${abs.toFixed(1)}%`;
 }
 function fmtPrice(v) {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -205,6 +219,30 @@ function fmtCompactDate(daysAgo) {
 // "Sandisk" buys back five characters of actual name). Row lists only — the
 // detail sheet still shows the full name as returned by the API.
 const NAME_SUFFIX = /[\s,]+(?:and\s+|&\s*)?(?:Incorporated|Inc|Corporation|Corp|Company|Co|Holdings|Holding|Group|plc|Ltd|Limited|N\.?V|S\.?A|SE|AG)\.?$/i;
+
+// Word-level abbreviations, applied after the suffix strip. Stripping the legal
+// suffix alone still left most names ellipsed in a ~72px column ("Dell
+// Technol…", "Marathon P…"); shortening the handful of long words that recur
+// across the universe gets many of them to fit whole. Deliberately trading a
+// little specificity for a row that doesn't ragged out — the detail sheet still
+// carries the full legal name.
+const NAME_WORDS = [
+  [/\bTechnologies\b/gi, 'Tech'],
+  [/\bTechnology\b/gi, 'Tech'],
+  [/\bInternational\b/gi, 'Intl'],
+  [/\bCommunications\b/gi, 'Comms'],
+  [/\bSemiconductors?\b/gi, 'Semi'],
+  [/\bPharmaceuticals?\b/gi, 'Pharma'],
+  [/\bLaboratories\b/gi, 'Labs'],
+  [/\bPetroleum\b/gi, 'Petro'],
+  [/\bIndustries\b/gi, 'Ind'],
+  [/\bEnterprises\b/gi, 'Ent'],
+  [/\bResources\b/gi, 'Res'],
+  [/\bServices\b/gi, 'Svcs'],
+  [/\bManagement\b/gi, 'Mgmt'],
+  [/\bAerospace\b/gi, 'Aero'],
+  [/\band\b/gi, '&'],
+];
 function shortName(name) {
   let s = String(name).replace(/^The\s+/i, '');
   for (let i = 0; i < 3; i++) {
@@ -212,7 +250,8 @@ function shortName(name) {
     if (next === s) break;
     s = next;
   }
-  s = s.trim().replace(/[,&]$/, '').trim();
+  for (const [pattern, replacement] of NAME_WORDS) s = s.replace(pattern, replacement);
+  s = s.trim().replace(/\s{2,}/g, ' ').replace(/[,&]$/, '').trim();
   return s || String(name);
 }
 
@@ -598,11 +637,11 @@ function rowEl(c, rank, value) {
     ${rangeCell(c)}
     <span class="trailing-cell">
       <span class="return-val ${isGain ? 'gain' : 'loss'}"></span>
-      <span class="price-mini">${fmtPrice(c.price)}</span>
+      <span class="price-mini">${fmtRangePrice(c.price)}</span>
     </span>
     ${addButton(c)}
   `;
-  row.querySelector('.return-val').textContent = state.settings.volAdjusted ? fmtScore(value) : fmtPct(value);
+  row.querySelector('.return-val').textContent = state.settings.volAdjusted ? fmtScore(value) : fmtPctCompact(value);
   return row;
 }
 
@@ -616,7 +655,7 @@ function buildUnavailableRow(c) {
     ${rangeCell(c)}
     <span class="trailing-cell">
       <span class="return-val na">N/A</span>
-      <span class="price-mini">${fmtPrice(c.price)}</span>
+      <span class="price-mini">${fmtRangePrice(c.price)}</span>
     </span>
     ${addButton(c)}
   `;
