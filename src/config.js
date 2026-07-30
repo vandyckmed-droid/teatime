@@ -38,8 +38,8 @@ module.exports = {
   // changes with no other code to touch up to a few hundred companies; past
   // that, the fetch-everything-on-load architecture itself needs to change
   // (see CLAUDE.md's Extensibility patterns section).
-  universeSize: 150,
-  screenerCandidatePool: 450,
+  universeSize: 200,
+  screenerCandidatePool: 600,
   // Caps how many FMP requests this server has in flight at once (leaderboard
   // per-company calls, and batch history fetches). Keeps growth in
   // universeSize from turning into a burst of N simultaneous outbound

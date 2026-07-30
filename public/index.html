@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Ranks" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#000000" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23000000'/%3E%3Cpath d='M22 68 L42 46 L57 58 L79 27' stroke='%2300D97E' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='79' cy='27' r='7.5' fill='%2300D97E'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23000000'/%3E%3Cpath d='M20 70 L42 46 L58 59 L80 30' stroke='%237BD63F' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M62 30 H80 V48' stroke='%237BD63F' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -29,6 +29,13 @@
 
         <div class="section-label" id="ranks-score-label">
           <span class="section-label-key">Largest by market cap</span>
+        </div>
+
+        <!-- Column headers, sharing the row's exact column widths (see
+             .board-head in styles.css) so they stay aligned by construction. -->
+        <div class="board-head" aria-hidden="true">
+          <span class="board-head-range">52-week range</span>
+          <span class="board-head-score">Return</span>
         </div>
 
         <div class="board">
@@ -57,6 +64,11 @@
 
         <div class="section-label" id="watchlist-score-label" hidden>
           <span class="section-label-key">Saved</span>
+        </div>
+
+        <div class="board-head" id="watchlist-board-head" aria-hidden="true" hidden>
+          <span class="board-head-range">52-week range</span>
+          <span class="board-head-score">Return</span>
         </div>
 
         <div class="board">
@@ -88,18 +100,20 @@
 
     <!-- ────────────────────── Tab bar chrome ─────────────────── -->
     <nav class="tabbar" role="tablist" aria-label="Primary">
-      <!-- Descending bars: a leaderboard, not a generic bar chart. -->
+      <!-- Rising trend line: this board is about return, not tallies. -->
       <button class="tab-btn" data-tab="ranks" role="tab" aria-selected="true">
         <span class="tab-icon">
-          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.25" y="3.5" width="5.5" height="17" rx="2"/><rect x="9.25" y="8.5" width="5.5" height="12" rx="2"/><rect x="15.25" y="13.5" width="5.5" height="7" rx="2"/></svg>
-          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><rect x="3.25" y="3.5" width="5.5" height="17" rx="2"/><rect x="9.25" y="8.5" width="5.5" height="12" rx="2"/><rect x="15.25" y="13.5" width="5.5" height="7" rx="2"/></svg>
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17.5l5.5-6 4 3.2 7-8.2"/><path d="M15.4 5.6H21v5.3"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17.5l5.5-6 4 3.2 7-8.2"/><path d="M15.4 5.6H21v5.3"/></svg>
         </span>
         <span class="tab-label">Ranks</span>
       </button>
+      <!-- Bookmark, not a star: the row control is a plus/check now, and a
+           bookmark reads as "saved list" without implying a rating. -->
       <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
         <span class="tab-icon">
-          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z"/></svg>
-          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z"/></svg>
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6.5 3.6h11a1 1 0 011 1v15.3l-6.5-4.4-6.5 4.4V4.6a1 1 0 011-1z"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6.5 3.6h11a1 1 0 011 1v15.3l-6.5-4.4-6.5 4.4V4.6a1 1 0 011-1z"/></svg>
         </span>
         <span class="tab-label">Watchlist</span>
         <span class="tab-badge" id="watchlist-badge" hidden>0</span>
@@ -125,8 +139,9 @@
 
       <div class="sheet-scroll">
         <div class="detail-header">
-          <span class="ticker-chip" id="detail-chip">AAPL</span>
+          <span class="logo" id="detail-logo"></span>
           <div>
+            <div class="detail-ticker" id="detail-ticker">AAPL</div>
             <div class="detail-name" id="detail-name">Company</div>
             <div class="sector-line" id="detail-sector">Sector</div>
           </div>

@@ -50,6 +50,22 @@ const SECTOR_VAR = {
   'Real Estate': '--sector-real-estate',
 };
 
+// Row-width labels for the same sectors. FMP's full strings ("Communication
+// Services") don't fit the narrow name column beside the logo.
+const SECTOR_SHORT = {
+  Technology: 'Tech',
+  'Communication Services': 'Comm',
+  'Consumer Cyclical': 'Cyclical',
+  Healthcare: 'Health',
+  'Financial Services': 'Finance',
+  'Consumer Defensive': 'Defensive',
+  Industrials: 'Industrials',
+  Energy: 'Energy',
+  Utilities: 'Utilities',
+  'Basic Materials': 'Materials',
+  'Real Estate': 'Real Estate',
+};
+
 const STORAGE_KEYS = { watchlist: 'teatime.watchlist', settings: 'teatime.settings' };
 
 // Chart ranges are a subset of METRICS — 1D/5D are dropped because a chart
@@ -117,12 +133,23 @@ function fmtPct(v) {
   const sign = v > 0 ? '+' : '';
   return `${sign}${v.toFixed(1)}%`;
 }
+// Four decimals: vol-adjusted scores cluster tightly (most of the board lands
+// between 0 and 1.5), and at two decimals a 200-name list produces visible ties
+// that the ordering then can't justify.
 function fmtScore(v) {
   const sign = v > 0 ? '+' : '';
-  return `${sign}${v.toFixed(2)}`;
+  return `${sign}${v.toFixed(4)}`;
 }
 function fmtPrice(v) {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// The 52-week low/high labels sit under an 88px track, two to a line, so they
+// have to stay around six characters. Cents matter at $40.10 and are noise at
+// $2,354 — drop them once the figure is big enough not to need them.
+function fmtRangePrice(v) {
+  return v >= 1000
+    ? '$' + Math.round(v).toLocaleString('en-US')
+    : '$' + v.toFixed(2);
 }
 function fmtCap(v) {
   if (v >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
@@ -319,31 +346,72 @@ function rankDateRangeShort() {
 // the right. Split like that it fits one line, which the old single run of
 // uppercased text did not.
 function updateScoreLabels() {
-  const value = state.settings.volAdjusted
-    ? `${rankDateRangeShort()} · vol-adj`
-    : rankDateRangeShort();
+  const key = state.settings.volAdjusted ? 'Ranked by vol-adj return' : 'Ranked by return';
   const html =
-    '<span class="section-label-key">Ranked by return</span>' +
-    `<span class="section-label-value">${value}</span>`;
+    `<span class="section-label-key">${key}</span>` +
+    `<span class="section-label-value">${rankDateRangeShort()}</span>`;
   const ranksLabel = document.getElementById('ranks-score-label');
   if (ranksLabel) ranksLabel.innerHTML = html;
   const watchlistLabel = document.getElementById('watchlist-score-label');
   if (watchlistLabel) watchlistLabel.innerHTML = html;
+  // The score column's header names whichever metric is live.
+  document.querySelectorAll('.board-head-score').forEach((el) => {
+    el.textContent = state.settings.volAdjusted ? 'Vol-adj return' : 'Return';
+  });
 }
 
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
-// The chip carries two things at once: the ticker (identity) and the sector
-// (category, as its tint). --chip-color is the only styling JS sets — the
-// tint/text/inset-border math all lives in .ticker-chip in styles.css.
-function sectorChip(c) {
-  const sectorVar = SECTOR_VAR[c.sector] || '--sector-default';
-  const secondary = [fmtCap(c.marketCap), c.sector || 'Uncategorized'].join(' · ');
+// Brand logo in a circular avatar. The <img> sits over ticker initials; a
+// failed load is dropped by pruneBrokenLogos below, revealing the sector-tinted
+// initials underneath rather than a broken-image frame.
+function logoAvatar(c, sectorVar) {
+  const initials = c.symbol.slice(0, 2);
+  const img = c.logo
+    ? `<img src="${c.logo}" alt="" loading="lazy" decoding="async">`
+    : '';
+  // logoOnDark is set by the snapshot builder for the handful of marks that are
+  // white-on-transparent and would disappear against the white disc.
+  const onDark = c.logoOnDark ? ' on-dark' : '';
+  return `<span class="logo${onDark}" style="--chip-color: var(${sectorVar})"><span class="logo-fallback">${initials}</span>${img}</span>`;
+}
+
+// Where today's price sits inside the 52-week range, as a percentage. Clamped
+// because `price` is the latest close while the range can be intraday, so a
+// fresh high/low can put the price a hair outside its own range.
+function rangePct(c) {
+  if (!Number.isFinite(c.low52) || !Number.isFinite(c.high52) || c.high52 <= c.low52) return null;
+  const pct = ((c.price - c.low52) / (c.high52 - c.low52)) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+function rangeCell(c) {
+  const pct = rangePct(c);
+  if (pct === null) return '<span class="range-cell range-cell-empty">&mdash;</span>';
+  return `
+    <span class="range-cell">
+      <span class="range-now" style="left: ${pct}%">${fmtRangePrice(c.price)}</span>
+      <span class="range-track">
+        <span class="range-cap lo"></span>
+        <span class="range-cap hi"></span>
+        <span class="range-thumb" style="left: ${pct}%"></span>
+      </span>
+      <span class="range-ends">
+        <span>${fmtRangePrice(c.low52)}</span>
+        <span>${fmtRangePrice(c.high52)}</span>
+      </span>
+    </span>`;
+}
+
+// Ticker is the identity now (big, first); the legal name is the subtitle and
+// the sector is a colored dot plus a short label, so the whole block stays one
+// narrow column beside the logo.
+function nameCell(c, sectorVar) {
   return `
     <span class="name-cell">
-      <span class="ticker-chip" style="--chip-color: var(${sectorVar})">${c.symbol}</span>
-      <span class="name-text">
-        <div class="company-name">${shortName(c.name)}</div>
-        <div class="sector-line">${secondary}</div>
+      <span class="ticker">${c.symbol}</span>
+      <span class="company-name">${shortName(c.name)}</span>
+      <span class="sector-line">
+        <span class="sector-dot" style="background: var(${sectorVar})"></span>${SECTOR_SHORT[c.sector] || c.sector || 'Other'}
       </span>
     </span>`;
 }
@@ -372,21 +440,31 @@ function addButton(c) {
     </span>`;
 }
 
-function rowEl(c, rank, value) {
-  const isGain = value >= 0;
+// Both row builders share one column order — rank, logo, name block, 52-week
+// range, score/price, add control — which is also what the .board-head labels
+// sit over, so the two stay aligned by construction.
+function baseRow(c, extraClass) {
   const row = document.createElement('div');
-  row.className = `row${rank === 1 ? ' ranked-1' : ''}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
+  row.className = `row${extraClass}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
   row.setAttribute('aria-label', `${c.name}: view chart`);
+  return row;
+}
+
+function rowEl(c, rank, value) {
+  const isGain = value >= 0;
+  const sectorVar = SECTOR_VAR[c.sector] || '--sector-default';
+  const row = baseRow(c, rank === 1 ? ' ranked-1' : '');
   row.innerHTML = `
     <span class="rank">${rank}</span>
-    ${sectorChip(c)}
+    ${logoAvatar(c, sectorVar)}
+    ${nameCell(c, sectorVar)}
+    ${rangeCell(c)}
     <span class="trailing-cell">
       <span class="return-val ${isGain ? 'gain' : 'loss'}"></span>
       <span class="price-mini">${fmtPrice(c.price)}</span>
-      <span class="mini-bar"><span class="mini-bar-mid"></span><span class="mini-bar-fill"></span></span>
     </span>
     ${addButton(c)}
   `;
@@ -395,23 +473,31 @@ function rowEl(c, rank, value) {
 }
 
 function buildUnavailableRow(c) {
-  const row = document.createElement('div');
-  row.className = `row unavailable${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
-  row.dataset.symbol = c.symbol;
-  row.tabIndex = 0;
-  row.setAttribute('role', 'button');
-  row.setAttribute('aria-label', `${c.name}: view chart`);
+  const sectorVar = SECTOR_VAR[c.sector] || '--sector-default';
+  const row = baseRow(c, ' unavailable');
   row.innerHTML = `
     <span class="rank">&mdash;</span>
-    ${sectorChip(c)}
+    ${logoAvatar(c, sectorVar)}
+    ${nameCell(c, sectorVar)}
+    ${rangeCell(c)}
     <span class="trailing-cell">
       <span class="return-val na">N/A</span>
       <span class="price-mini">${fmtPrice(c.price)}</span>
-      <span class="mini-bar"><span class="mini-bar-mid"></span></span>
     </span>
     ${addButton(c)}
   `;
   return row;
+}
+
+// Bound after insertion rather than as an inline onerror attribute — an inline
+// handler written through innerHTML never fired. Covers images that already
+// failed before this ran (img.complete with no intrinsic width) as well as ones
+// still in flight.
+function pruneBrokenLogos(container) {
+  container.querySelectorAll('.logo img').forEach((img) => {
+    if (img.complete && img.naturalWidth === 0) img.remove();
+    else img.addEventListener('error', () => img.remove(), { once: true });
+  });
 }
 
 function attachSelectHandlers(container) {
@@ -442,41 +528,20 @@ function attachRowHandlers(container) {
   });
 }
 
-// The diverging mini-bar used to be linear against max|value|, which meant one
-// outlier set the scale for everyone: with a +856% run at the top, every row
-// from about 10th down collapsed to a 2px dot. Compressing with a square root
-// keeps the ordering strictly monotonic (no clamping, unlike a percentile cap,
-// which instead flattens the whole top of the list) while still leaving small
-// values visibly non-zero. Returns half-width percent, since the bar diverges
-// from the centre.
-function barPct(value, maxAbs) {
-  if (!(maxAbs > 0)) return 0;
-  return Math.min(Math.sqrt(Math.abs(value) / maxAbs) * 50, 50);
-}
-
 // Renders one board (Ranks or Watchlist) from scored companies: ranked rows
 // first, then the ones with too little history to score. Returns the
 // unavailable list so callers can explain it.
 function fillBoard(rowsEl, scored) {
   const available = scored.filter((x) => x.value !== null).sort((a, b) => b.value - a.value);
   const unavailable = scored.filter((x) => x.value === null).map((x) => x.c);
-  const maxAbs = Math.max(...available.map((x) => Math.abs(x.value)), 0);
 
   rowsEl.innerHTML = '';
-  available.forEach(({ c, value }, i) => {
-    const el = rowEl(c, i + 1, value);
-    const pct = barPct(value, maxAbs);
-    const fill = el.querySelector('.mini-bar-fill');
-    const isGain = value >= 0;
-    fill.classList.add(isGain ? 'gain' : 'loss');
-    fill.style.left = isGain ? '50%' : `${50 - pct}%`;
-    fill.style.width = `${pct}%`;
-    rowsEl.appendChild(el);
-  });
+  available.forEach(({ c, value }, i) => rowsEl.appendChild(rowEl(c, i + 1, value)));
   unavailable.forEach((c) => rowsEl.appendChild(buildUnavailableRow(c)));
 
   attachSelectHandlers(rowsEl);
   attachRowHandlers(rowsEl);
+  pruneBrokenLogos(rowsEl);
   return unavailable;
 }
 
@@ -502,11 +567,13 @@ function renderRanksCallout(unavailable) {
 
 function renderWatchlistBoard() {
   const label = document.getElementById('watchlist-score-label');
+  const head = document.getElementById('watchlist-board-head');
   const rowsEl = document.getElementById('watchlist-rows');
   const companies = state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol));
 
   if (companies.length === 0) {
     label.hidden = true;
+    head.hidden = true;
     rowsEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-glyph" aria-hidden="true">
@@ -518,6 +585,7 @@ function renderWatchlistBoard() {
   }
 
   label.hidden = false;
+  head.hidden = false;
   fillBoard(rowsEl, companies.map((c) => ({ c, value: scoreFor(c) })));
 }
 
@@ -552,9 +620,9 @@ function openDetail(symbol) {
   detail.range = DEFAULT_CHART_RANGE;
 
   const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
-  const chip = document.getElementById('detail-chip');
-  chip.textContent = company.symbol;
-  chip.style.setProperty('--chip-color', `var(${sectorVar})`);
+  document.getElementById('detail-logo').outerHTML =
+    logoAvatar(company, sectorVar).replace('class="logo"', 'class="logo" id="detail-logo"');
+  document.getElementById('detail-ticker').textContent = company.symbol;
   // Full legal name here, unlike the rows, which trim the corporate suffix.
   document.getElementById('detail-name').textContent = company.name;
   document.getElementById('detail-sector').textContent = company.sector || 'Uncategorized';

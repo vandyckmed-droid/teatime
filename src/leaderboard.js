@@ -38,6 +38,17 @@ function metricAvailability(ipoDate, asOf) {
   return availability;
 }
 
+// FMP's profile carries the 52-week range as a "low-high" string. It's the real
+// intraday range, so it beats deriving one from our daily closes — but it comes
+// from a free-text field, so parse defensively and let dataStore fall back to
+// the close-based range when this can't be trusted.
+function parse52WeekRange(range) {
+  if (typeof range !== 'string') return null;
+  const [low, high] = range.split('-').map((part) => Number(part.trim()));
+  if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high <= low) return null;
+  return { low52: low, high52: high };
+}
+
 function extractReturns(priceChange) {
   const out = {};
   for (const metric of config.metrics) {
@@ -66,6 +77,9 @@ async function getLeaderboard() {
       fmp.getProfile(c.symbol).catch(() => null),
     ]);
     const ipoDate = profile ? profile.ipoDate : null;
+    // The logo and the 52-week range ride along on the profile call we already
+    // make for ipoDate — both cost zero extra requests.
+    const range = parse52WeekRange(profile ? profile.range : null);
     return {
       symbol: c.symbol,
       name: c.companyName,
@@ -73,6 +87,9 @@ async function getLeaderboard() {
       price: c.price,
       marketCap: c.marketCap,
       beta: typeof c.beta === 'number' ? c.beta : null,
+      logo: profile && profile.image ? profile.image : null,
+      low52: range ? range.low52 : null,
+      high52: range ? range.high52 : null,
       ipoDate,
       returns: extractReturns(priceChange),
       availability: metricAvailability(ipoDate, asOf),

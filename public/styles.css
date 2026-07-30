@@ -7,10 +7,10 @@
    The locked look: a true-black canvas with restrained charcoal surfaces,
    so one green is the loudest thing on screen — and that green is shared,
    deliberately, by gains AND key actions (active tab, selected segment,
-   rank 1, watchlisted star, switch on). "Green = good / yours / act here"
+   rank 1, watchlist check, switch on). "Green = good / yours / act here"
    is one learnable rule, the same unification finance apps like Robinhood
    make on purpose. Red stays reserved for loss. Those two protected bands
-   (green ~157°, red ~24°) are what the sector palette is designed around.
+   (green ~135°, red ~24°) are what the sector palette is designed around.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
   /* ── ground / surface ladder. True black canvas; charcoal steps are
@@ -33,17 +33,19 @@
   --text-3: #737880;
 
   /* ── semantics: two protected hue bands ──
-     One green for both gain and action (oklch ≈ 0.78 0.19 157): saturated
-     enough to carry the whole interface, short of acid-neon so it stays
-     calm on an OLED black. Dark-green ink for text on a green fill. */
-  --accent: #00D97E;
-  --accent-ink: #01271A;
-  --gain: #00D97E;
+     One green for both gain and action (oklch ≈ 0.79 0.20 135) — a lime, not
+     a mint: brighter and more yellow than an emerald, which is what makes it
+     read as "up" against a true black without tipping into acid neon.
+     Dark-green ink for text on a lime fill. */
+  --accent: #7BD63F;
+  --accent-ink: #10230A;
+  --gain: #7BD63F;
   --loss: #F95E5D;          /* oklch(0.685 0.19 24) */
 
   /* ── sector palette ─────────────────────────────────────────────────
-     Referenced by SECTOR_VAR in app.js, surfaced as the ticker chip's tint
-     and a dot on the detail sheet's Sector fact. Hues are spread around the
+     Referenced by SECTOR_VAR in app.js, surfaced as the row's sector dot, the
+     logo fallback tint, and a dot on the detail sheet's Sector fact. Hues are
+     spread around the
      wheel, but lightness AND chroma vary deliberately too, so neighbouring
      hues also differ in punch. Everything here sits a step quieter than the
      action green — the sector coding is legible on inspection but never
@@ -56,8 +58,8 @@
      gain/action green's hue.
 
      Not validated against a colorblind-safety floor (single sighted owner),
-     and identity never depends on hue anyway: the chip carries the ticker
-     and the row's second line spells the sector out. */
+     and identity never depends on hue anyway: every row spells its sector out
+     in text beside the dot. */
   --sector-tech: #6AAFFF;                /* oklch(0.745 0.145 255) azure */
   --sector-real-estate: #9F95F0;         /* oklch(0.710 0.130 288) periwinkle */
   --sector-comm: #CE89EC;                /* oklch(0.735 0.155 315) violet */
@@ -82,10 +84,9 @@
   --tabbar-bg: rgba(0, 0, 0, 0.72);
   --sheet-scrim: rgba(0, 0, 0, 0.60);
 
-  /* ── type: bold modern sans everywhere data speaks; mono survives only in
-        the ticker chips (a deliberate instrument accent) and literal
-        code/error text. All numeric sans runs tabular-nums so columns of
-        figures still align. ── */
+  /* ── type: bold modern sans everywhere, including every number; mono is
+        down to literal code/error text only. All numeric sans runs
+        tabular-nums so columns of figures still align. ── */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --fs-title: 32px;
@@ -240,9 +241,9 @@ button { font: inherit; color: inherit; }
 /* ── rows (one card each) ─────────────────────────────────────────────── */
 .row {
   position: relative;
-  display: flex; align-items: center; gap: var(--s2);
-  padding: 14px var(--s4);
-  min-height: 66px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px var(--s3);
+  min-height: 62px;
   cursor: pointer;
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -289,73 +290,158 @@ button { font: inherit; color: inherit; }
    floating mid-gutter, and big enough to be the row's index at a glance.
    Fixed width still holds the chip column steady from rank 1 to 150. */
 .rank {
-  width: 32px; flex-shrink: 0; text-align: left;
-  font-weight: 700; font-size: 20px;
+  width: 27px; flex-shrink: 0; text-align: left;
+  font-weight: 700; font-size: 18px;
   color: var(--text-3); font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
 }
 .row.ranked-1 .rank { color: var(--accent); }
 .row.unavailable .rank { font-size: var(--fs-body); }
 
-.name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-
-/* The chip does double duty: ticker identity + sector category. A fixed
-   min-width keeps every company name starting on the same x, which is what
-   makes the list scannable as a column rather than a ragged stack. */
-.ticker-chip {
-  font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-micro);
-  letter-spacing: 0.02em; white-space: nowrap; text-align: center;
-  min-width: 44px; padding: 4px 5px; border-radius: 7px; flex-shrink: 0;
-  background: color-mix(in oklab, var(--chip-color, var(--text-3)) 16%, transparent);
-  color: var(--chip-color, var(--text-2));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--chip-color, var(--text-3)) 13%, transparent);
+/* ── brand logo avatar ────────────────────────────────────────────────
+   White disc because FMP's logos are brand marks on transparent ground —
+   most are dark-on-light and vanish on a black card without it. The
+   initials sit underneath the <img>, so removing a failed image (see
+   logoAvatar in app.js) reveals a sector-tinted fallback rather than a
+   broken-image frame. */
+.logo {
+  position: relative; flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
+.logo img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain; padding: 3px;
+}
+.logo-fallback {
+  font-size: 11px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--accent-ink);
+}
+/* White-on-transparent marks need a dark disc or they vanish; the snapshot
+   builder measures each logo's ink and flags these (see logoAvatar in app.js). */
+.logo.on-dark { background: var(--surface-3); }
 
-.name-text { min-width: 0; }
+/* A real logo occludes the initials — object-fit: contain leaves transparent
+   gaps, so the text has to be hidden outright rather than merely layered under. */
+.logo:has(img) .logo-fallback { display: none; }
+/* No logo (never had one, or it failed and was pruned): drop the white disc and
+   tint by sector instead. */
+.logo:not(:has(img)) { background: color-mix(in oklab, var(--chip-color, var(--text-3)) 22%, var(--surface-2)); }
+.logo:not(:has(img)) .logo-fallback { color: var(--chip-color, var(--text-2)); }
+
+/* ── name block: ticker is the identity, name is the subtitle ────────── */
+.name-cell {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.ticker {
+  font-size: var(--fs-body); font-weight: 700; color: var(--text);
+  letter-spacing: -0.01em; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .company-name {
-  font-size: var(--fs-body); font-weight: 600; color: var(--text);
-  letter-spacing: -0.01em; line-height: 1.2;
+  font-size: 11.5px; font-weight: 500; color: var(--text-2);
+  line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sector-line {
-  font-size: 11.5px; color: var(--text-3); margin-top: 2px; line-height: 1.25;
+  display: flex; align-items: center; gap: 5px;
+  font-size: var(--fs-nano); font-weight: 500; color: var(--text-3);
+  line-height: 1.3;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.sector-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── 52-week range: where today's close sits between the year's extremes ── */
+.range-cell {
+  flex: 0 0 auto; width: 88px;
+  position: relative; padding-top: 11px;
+}
+.range-cell-empty {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-3); font-size: var(--fs-cap); padding-top: 0; height: 34px;
+}
+.range-now {
+  position: absolute; top: 0;
+  transform: translateX(-50%);
+  font-size: 9px; font-weight: 700; color: var(--accent);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.range-track { position: relative; display: block; height: 9px; }
+/* Inset by the cap half-width so the line meets the caps, not the edges. */
+.range-track::before {
+  content: ''; position: absolute; left: 3px; right: 3px; top: 50%;
+  height: 1px; transform: translateY(-50%);
+  background: var(--hairline-strong);
+}
+.range-cap {
+  position: absolute; top: 50%;
+  width: 5px; height: 5px;
+  border: 1px solid var(--text-3);
+  transform: translateY(-50%) rotate(45deg);
+}
+.range-cap.lo { left: 0; }
+.range-cap.hi { right: 0; }
+.range-thumb {
+  position: absolute; top: 50%;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2.5px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.range-ends {
+  display: flex; justify-content: space-between;
+  margin-top: 2px;
+  font-size: 9px; color: var(--text-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* ── column headers, mirroring the row's column widths ────────────────── */
+.board-head {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 0 calc(var(--s3) + 1px) var(--s2);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+/* Spacer matching rank + logo + name-cell, so the two labels land over the
+   columns they name. */
+.board-head::before {
+  content: ''; flex: 1 1 0; min-width: 0;
+}
+.board-head-range { flex: 0 0 auto; width: 88px; text-align: center; }
+.board-head-score {
+  flex: 0 0 auto; width: 54px; text-align: right;
+  color: var(--accent);
+}
+/* Reserve the add-control's width so 'Return' sits over the score, not over
+   the button. */
+.board-head::after { content: ''; flex: 0 0 auto; width: 26px; }
 
 /* min-width, not width: the right edge is what has to line up down the list,
    and a four-digit return (a 5Y window can produce one) needs to be allowed to
    take the space it needs out of the name column rather than spill over it. */
 .trailing-cell {
-  flex-shrink: 0; min-width: 68px;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  flex: 0 0 auto; width: 54px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
 }
 .return-val {
-  font-weight: 700; font-size: 16px;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.15;
+  font-weight: 700; font-size: 14px;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1.15;
   white-space: nowrap;
 }
 .return-val.gain { color: var(--gain); }
 .return-val.loss { color: var(--loss); }
 .return-val.na { color: var(--text-3); font-size: var(--fs-cap); font-weight: 500; }
 .price-mini {
-  font-size: 11px; color: var(--text-3);
+  font-size: 10px; color: var(--text-3);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
-/* Diverging bar, centre = zero. Square-root-compressed against the list's max
-   (see barPct in app.js) rather than linear, so one outlier can't flatten every
-   other row to a dot. */
-.mini-bar {
-  position: relative; width: 100%; height: 3px; margin-top: 3px;
-  background: var(--surface-2); border-radius: var(--r-full); overflow: hidden;
-}
-.mini-bar-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--hairline-strong); }
-.mini-bar-fill {
-  position: absolute; top: 0; bottom: 0; border-radius: var(--r-full);
-  transition: width 420ms var(--ease-out), left 420ms var(--ease-out);
-}
-.mini-bar-fill.gain { background: var(--gain); left: 50%; }
-.mini-bar-fill.loss { background: var(--loss); }
 
 /* ── watchlist add / added control ───────────────────────────────────
    Plus = "add this", check = "added". Unsaved is a hollow outlined key so
@@ -363,7 +449,7 @@ button { font: inherit; color: inherit; }
    as the card's outline glow, so the row and its control agree. */
 .select-cell { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .add-btn {
-  width: 28px; height: 28px; padding: 0; flex-shrink: 0; position: relative;
+  width: 26px; height: 26px; padding: 0; flex-shrink: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
   background: none; border: none; border-radius: 50%; cursor: pointer;
   color: var(--text-3);
@@ -371,7 +457,7 @@ button { font: inherit; color: inherit; }
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 .add-btn::after { content: ''; position: absolute; inset: -8px; } /* 44pt tap target */
-.add-btn svg { width: 16px; height: 16px; transition: transform 120ms var(--ease-out); }
+.add-btn svg { width: 15px; height: 15px; transition: transform 120ms var(--ease-out); }
 .add-btn svg path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .add-btn .icon-check { display: none; }
 .add-btn:active svg { transform: scale(0.78); }
@@ -399,7 +485,7 @@ button { font: inherit; color: inherit; }
 /* ── loading skeletons (shaped like a real row, shimmer sweep) ─────────── */
 .skeleton-row {
   display: flex; align-items: center; gap: var(--s2);
-  padding: 14px var(--s4); min-height: 66px;
+  padding: 12px var(--s3); min-height: 62px;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
@@ -412,7 +498,7 @@ button { font: inherit; color: inherit; }
   background-size: 280% 100%;
   animation: skeleton-sweep 1.5s ease-in-out infinite;
 }
-.skeleton-chip { width: 48px; height: 22px; flex-shrink: 0; }
+.skeleton-chip { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; }
 .skeleton-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .skeleton-line { height: 10px; }
 .skeleton-line.long { width: 62%; }
@@ -649,7 +735,9 @@ button { font: inherit; color: inherit; }
 }
 
 .detail-header { display: flex; align-items: center; gap: var(--s3); margin: var(--s1) 40px var(--s5) 0; }
-.detail-header .ticker-chip { font-size: var(--fs-sub); padding: 7px 8px; min-width: 56px; }
+.detail-header .logo { width: 46px; height: 46px; }
+.detail-header .logo-fallback { font-size: 15px; }
+.detail-ticker { font-size: var(--fs-h2); font-weight: 800; letter-spacing: -0.02em; color: var(--text); line-height: 1.15; }
 .detail-name { font-size: var(--fs-h2); font-weight: 700; letter-spacing: -0.02em; color: var(--text); line-height: 1.2; }
 #detail-sector { margin-top: 3px; font-size: var(--fs-sub); }
 
@@ -804,7 +892,6 @@ button { font: inherit; color: inherit; }
   .add-btn.just-checked { animation: none; }
   .skeleton-block { background: var(--surface-2); }
   .chart-skeleton { opacity: 0.4; }
-  .mini-bar-fill,
   .segmented-thumb,
   .segmented button,
   .ios-switch,
