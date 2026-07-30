@@ -252,6 +252,12 @@ button { font: inherit; color: inherit; }
   transition: background 180ms ease;
 }
 .row.unavailable { opacity: 0.45; }
+/* Too correlated with something already saved to be worth adding (see
+   correlationBlock in app.js). Faded rather than hidden — it's still a real
+   company you may want to open the chart for, it just can't be added. The row
+   itself stays tappable; only its add control is disabled. */
+.row.correlated { opacity: 0.4; }
+.row.correlated .add-btn { cursor: not-allowed; }
 .row:active { background: var(--surface-2); transition: none; }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
@@ -462,6 +468,12 @@ button { font: inherit; color: inherit; }
 .add-btn .icon-check { display: none; }
 .add-btn:active svg { transform: scale(0.78); }
 .add-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.add-btn:disabled {
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--text-3) 26%, transparent);
+}
+.add-btn:disabled:active svg { transform: none; }
+
 .add-btn.checked {
   background: var(--accent);
   color: var(--accent-ink);
@@ -584,6 +596,8 @@ button { font: inherit; color: inherit; }
   margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
 }
 .stepper-days { font-size: var(--fs-micro); color: var(--text-3); margin-top: 2px; }
+/* The diversification filter turned off reads as a state, not a value. */
+.stepper-date.is-off { color: var(--text-3); font-weight: 500; }
 
 .stepper {
   display: flex; align-items: stretch; flex-shrink: 0;

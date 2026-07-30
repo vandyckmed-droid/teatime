@@ -5,6 +5,7 @@ const path = require('path');
 const config = require('./src/config');
 const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
+const { correlationsAgainst } = require('./src/correlation');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -113,6 +114,27 @@ function handleRank(req, res, { startDaysAgo, endDaysAgo, volAdjusted }) {
   });
 }
 
+// Return correlation of every universe name against the caller's watchlist, so
+// the frontend can fade names that would duplicate exposure it already has. The
+// watchlist lives in the browser's localStorage, so it has to come in on the
+// query string — the server holds no per-user state.
+function handleCorrelations(req, res, { symbols, startDaysAgo, endDaysAgo }) {
+  const historyBySymbol = dataStore.getHistoryBySymbol();
+  if (!historyBySymbol) {
+    sendJSON(res, 503, { error: 'Data not ready yet, try again shortly.' });
+    return;
+  }
+  if (!Number.isFinite(startDaysAgo) || !Number.isFinite(endDaysAgo)) {
+    sendJSON(res, 400, { error: 'startDaysAgo and endDaysAgo must be numbers.' });
+    return;
+  }
+  sendJSON(res, 200, {
+    startDaysAgo,
+    endDaysAgo,
+    correlations: correlationsAgainst(historyBySymbol, symbols, startDaysAgo, endDaysAgo),
+  });
+}
+
 function serveStatic(req, res) {
   const reqPath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.normalize(path.join(PUBLIC_DIR, reqPath));
@@ -148,6 +170,18 @@ const server = http.createServer((req, res) => {
   if (req.url.startsWith('/api/history')) {
     const symbol = new URL(req.url, 'http://localhost').searchParams.get('symbol') || '';
     handleHistory(req, res, symbol.toUpperCase());
+    return;
+  }
+  if (req.url.startsWith('/api/correlations')) {
+    const params = new URL(req.url, 'http://localhost').searchParams;
+    handleCorrelations(req, res, {
+      symbols: (params.get('symbols') || '')
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean),
+      startDaysAgo: Number(params.get('startDaysAgo')),
+      endDaysAgo: Number(params.get('endDaysAgo')),
+    });
     return;
   }
   if (req.url.startsWith('/api/rank')) {

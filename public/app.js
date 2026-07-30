@@ -11,6 +11,13 @@ const SETTINGS = [
     default: false,
   },
   {
+    key: 'correlationThreshold',
+    type: 'threshold',
+    label: 'Diversification filter',
+    description: 'Fade out (and block adding) any company whose daily-return correlation with something already on your watchlist is at or above this, measured over the ranking date range. Strong negative correlation never blocks — that is diversification, not duplication.',
+    default: 0.7,
+  },
+  {
     key: 'rankDateRange',
     type: 'daterange',
     label: 'Ranking date range',
@@ -29,6 +36,15 @@ const DATE_RANGE_MAX_DAYS_AGO = 1800;
 const DATE_RANGE_MIN_GAP = 10;
 
 const TRADING_DAYS_PER_YEAR = 252;
+
+// Diversification-filter stepper. 1.00 means "off": a distinct name effectively
+// never reaches r = 1, so nothing gets blocked.
+const CORRELATION_STEP = 0.05;
+const CORRELATION_MIN = 0.3;
+const CORRELATION_MAX = 1;
+// A correlation over a handful of days is noise (mirrors MIN_OBSERVATIONS in
+// src/correlation.js, used by the snapshot-mode fallback below).
+const CORRELATION_MIN_OBSERVATIONS = 20;
 
 // Sectors actually seen in the top 100 by market cap as of the scale-up to
 // universeSize=100 (checked live against the screener). Add more here if a
@@ -91,6 +107,9 @@ const state = {
   // client-side fallback below when running as a static snapshot with no
   // backend to call).
   rankScores: null,
+  // symbol -> { value, against }: strongest positive return correlation with
+  // something already on the watchlist. Populated by refreshCorrelations().
+  correlations: {},
 };
 
 // symbol -> { symbol, asOf, series }, oldest first. Shared by the Ranks/Watchlist
@@ -263,6 +282,114 @@ function scoreFor(company) {
   return typeof v === 'number' ? v : null;
 }
 
+// ── diversification filter ───────────────────────────────────────────
+// Whether a name is blocked from being added: it correlates too tightly with
+// something already saved. Held names are never blocked (they're already in),
+// and a threshold of 1 turns the filter off.
+function correlationBlock(company) {
+  if (state.watchlist.has(company.symbol)) return null;
+  const threshold = state.settings.correlationThreshold;
+  if (!(threshold < CORRELATION_MAX)) return null;
+  const hit = state.correlations[company.symbol];
+  if (!hit || hit.value < threshold) return null;
+  return hit;
+}
+
+// Signed, not absolute — see the header comment in src/correlation.js.
+function correlationClientSide(seriesA, seriesB, startStr, endStr) {
+  if (!seriesA || !seriesB) return null;
+  const bByDate = new Map();
+  for (const p of seriesB) bByDate.set(p.date, p.close);
+  const pairs = [];
+  for (const p of seriesA) {
+    if (p.date < startStr || p.date > endStr) continue;
+    const b = bByDate.get(p.date);
+    if (b === undefined || !(p.close > 0) || !(b > 0)) continue;
+    pairs.push([p.close, b]);
+  }
+  const n = pairs.length - 1;
+  if (n < CORRELATION_MIN_OBSERVATIONS) return null;
+  const ra = [];
+  const rb = [];
+  for (let i = 1; i < pairs.length; i++) {
+    ra.push((pairs[i][0] - pairs[i - 1][0]) / pairs[i - 1][0]);
+    rb.push((pairs[i][1] - pairs[i - 1][1]) / pairs[i - 1][1]);
+  }
+  const meanA = ra.reduce((x, y) => x + y, 0) / n;
+  const meanB = rb.reduce((x, y) => x + y, 0) / n;
+  let cov = 0;
+  let varA = 0;
+  let varB = 0;
+  for (let i = 0; i < n; i++) {
+    const da = ra[i] - meanA;
+    const db = rb[i] - meanB;
+    cov += da * db;
+    varA += da * da;
+    varB += db * db;
+  }
+  if (!(varA > 0) || !(varB > 0)) return null;
+  return cov / Math.sqrt(varA * varB);
+}
+
+function computeCorrelationsClientSide(held) {
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const startStr = daysAgoToDateStr(startDaysAgo);
+  const endStr = daysAgoToDateStr(endDaysAgo);
+  const out = {};
+  for (const c of state.leaderboard.companies) {
+    if (held.includes(c.symbol)) continue;
+    const mine = historyCache.get(c.symbol);
+    if (!mine) continue;
+    let best = null;
+    for (const other of held) {
+      const theirs = historyCache.get(other);
+      if (!theirs) continue;
+      const r = correlationClientSide(mine.series, theirs.series, startStr, endStr);
+      if (r === null) continue;
+      if (best === null || r > best.value) best = { value: r, against: other };
+    }
+    if (best) out[c.symbol] = best;
+  }
+  return out;
+}
+
+// Same dual-path shape as refreshRankings: the live server computes this over
+// history the browser never has to download, and the static snapshot (no
+// backend) falls back to computing it from embedded history.
+let corrRequestSeq = 0;
+async function refreshCorrelations() {
+  const seq = ++corrRequestSeq;
+  const held = [...state.watchlist];
+  if (held.length === 0) {
+    state.correlations = {};
+    return;
+  }
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const params = new URLSearchParams({
+    symbols: held.join(','),
+    startDaysAgo: String(startDaysAgo),
+    endDaysAgo: String(endDaysAgo),
+  });
+
+  if (typeof EMBEDDED_LEADERBOARD !== 'undefined') {
+    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
+    if (seq !== corrRequestSeq) return;
+    state.correlations = computeCorrelationsClientSide(held);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/correlations?${params}`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    const data = await res.json();
+    if (seq !== corrRequestSeq) return;
+    state.correlations = data.correlations || {};
+  } catch {
+    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
+    if (seq !== corrRequestSeq) return;
+    state.correlations = computeCorrelationsClientSide(held);
+  }
+}
+
 function computeRankScoresClientSide() {
   const scores = {};
   for (const c of state.leaderboard.companies) {
@@ -429,11 +556,17 @@ const CHECK_PATH = 'M5 12.6l4.7 4.6L19 7.8';
 function addButton(c) {
   const checked = state.watchlist.has(c.symbol);
   const justChecked = checked && c.symbol === lastToggledSymbol;
+  const blocked = correlationBlock(c);
+  // The reason rides on the label rather than the row: at 393pt there is no
+  // room for a per-row note, and the count is explained in the callout instead.
+  const label = blocked
+    ? `Too correlated to add: ${c.name} moves with ${blocked.against} (r ${blocked.value.toFixed(2)})`
+    : `${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}`;
   return `
     <span class="select-cell">
       <button type="button" class="add-btn${checked ? ' checked' : ''}${justChecked ? ' just-checked' : ''}"
-        data-symbol="${c.symbol}" aria-pressed="${checked}"
-        aria-label="${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}">
+        data-symbol="${c.symbol}" aria-pressed="${checked}"${blocked ? ' disabled' : ''}
+        title="${blocked ? label : ''}" aria-label="${label}">
         <svg class="icon-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="${PLUS_PATH}"/></svg>
         <svg class="icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="${CHECK_PATH}"/></svg>
       </button>
@@ -445,7 +578,8 @@ function addButton(c) {
 // sit over, so the two stay aligned by construction.
 function baseRow(c, extraClass) {
   const row = document.createElement('div');
-  row.className = `row${extraClass}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
+  const blocked = correlationBlock(c) ? ' correlated' : '';
+  row.className = `row${extraClass}${blocked}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
@@ -512,6 +646,9 @@ function attachSelectHandlers(container) {
       updateWatchlistBadge(true);
       renderAll();
       lastToggledSymbol = null;
+      // The held set just changed, so every other name's correlation against it
+      // did too. Re-render once it lands.
+      refreshCorrelations().then(() => renderAll());
     });
   });
 }
@@ -554,14 +691,28 @@ function renderRanksBoard() {
 function renderRanksCallout(unavailable) {
   const box = document.getElementById('ranks-callout');
   const text = document.getElementById('ranks-callout-text');
-  if (unavailable.length === 0) {
+  const notes = [];
+
+  if (unavailable.length > 0) {
+    const names = unavailable
+      .map((c) => `<b>${c.name} (${c.symbol})</b>${c.ipoDate ? `, IPO'd ${c.ipoDate}` : ''}`)
+      .join('; ');
+    notes.push(`Not ranked over ${rankDateRangeLabel()}: ${names} &mdash; not enough trading history for a like-for-like score.`);
+  }
+
+  // A faded row with no stated reason is just a mysterious dim row, and there is
+  // no space for a per-row note at this width — so the count is explained once,
+  // here.
+  const faded = state.leaderboard.companies.filter((c) => correlationBlock(c)).length;
+  if (faded > 0) {
+    notes.push(`<b>${faded}</b> ${faded === 1 ? 'name is' : 'names are'} faded and can't be added &mdash; daily-return correlation of <b>${state.settings.correlationThreshold.toFixed(2)}</b> or more with something already on your watchlist. Adjust or switch this off in Settings.`);
+  }
+
+  if (notes.length === 0) {
     box.hidden = true;
     return;
   }
-  const names = unavailable
-    .map((c) => `<b>${c.name} (${c.symbol})</b>${c.ipoDate ? `, IPO'd ${c.ipoDate}` : ''}`)
-    .join('; ');
-  text.innerHTML = `Not ranked over ${rankDateRangeLabel()}: ${names} &mdash; not enough trading history for a like-for-like score.`;
+  text.innerHTML = notes.join('<br><br>');
   box.hidden = false;
 }
 
@@ -1073,6 +1224,39 @@ function renderSettings() {
         }
       });
     }
+    // Threshold stepper: 0.30–1.00 in 0.05 steps, 1.00 shown as "Off". Changing
+    // it needs no refetch — the correlations themselves don't depend on the
+    // threshold, only on the watchlist and the date range — so this just
+    // re-renders.
+    if (setting.type === 'threshold') {
+      const value = state.settings[setting.key];
+      const off = !(value < CORRELATION_MAX);
+      row.innerHTML = `
+        <div class="settings-row-text">
+          <div class="settings-row-label">${setting.label}</div>
+          <div class="settings-row-desc">${setting.description}</div>
+          <div class="stepper-date${off ? ' is-off' : ''}" id="threshold-value">${off ? 'Off' : value.toFixed(2)}</div>
+        </div>
+        <div class="stepper" role="group" aria-label="${setting.label}">
+          <button type="button" class="stepper-btn" data-key="${setting.key}" data-dir="-1" aria-label="Lower the correlation threshold"${value - CORRELATION_STEP < CORRELATION_MIN - 1e-9 ? ' disabled' : ''}>&minus;</button>
+          <button type="button" class="stepper-btn" data-key="${setting.key}" data-dir="1" aria-label="Raise the correlation threshold"${off ? ' disabled' : ''}>+</button>
+        </div>`;
+      list.appendChild(row);
+      row.querySelectorAll('.stepper-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const dir = Number(btn.dataset.dir);
+          const next = state.settings[setting.key] + dir * CORRELATION_STEP;
+          // Round to the step: repeated float addition drifts (0.7 + 0.05 …).
+          state.settings[setting.key] = Math.min(
+            CORRELATION_MAX,
+            Math.max(CORRELATION_MIN, Math.round(next / CORRELATION_STEP) * CORRELATION_STEP),
+          );
+          saveSettings();
+          renderSettings();
+          if (state.leaderboard && state.rankingsLoaded) renderAll();
+        });
+      });
+    }
   });
 
   if (!document.getElementById('settings-note')) {
@@ -1138,9 +1322,9 @@ function renderDateRangeSetting() {
       saveSettings();
       renderDateRangeSetting();
       if (state.leaderboard && state.rankingsLoaded) {
-        // refreshRankings() sequences requests itself, so rapid stepper
-        // clicks each fire a request but only the latest response applies.
-        await refreshRankings();
+        // Both of these sequence their own requests, so rapid stepper clicks
+        // each fire but only the latest response applies.
+        await Promise.all([refreshRankings(), refreshCorrelations()]);
         renderAll();
       }
     });
@@ -1188,6 +1372,7 @@ async function init() {
     document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
     await refreshRankings();
     state.rankingsLoaded = true;
+    await refreshCorrelations();
 
     renderAll();
   } catch (err) {
