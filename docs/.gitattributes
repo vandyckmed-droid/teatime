@@ -1,0 +1,3 @@
+# Snapshot artifacts, not reviewable source: keep them out of diffs.
+index.html -diff linguist-generated
+logos/*.png binary
