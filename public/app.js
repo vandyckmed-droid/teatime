@@ -122,6 +122,9 @@ const detail = {
   slice: null, // the currently-rendered range's [{date, close}], oldest first
   // {symbol, windowDays, points: [{date, rank, of, pct}]} from loadRankHistory.
   rankHistory: null,
+  // How far the sheet is parked below its full position: 0, or the half detent
+  // (see initDetailDismiss). Reset on every open.
+  detentOffset: 0,
   // The board order the sheet was opened from, and where we are in it — what
   // swiping left/right walks through.
   sequence: null,
@@ -1064,8 +1067,12 @@ function openDetail(symbol, sequence) {
     void scroll.offsetWidth; // flush, so restoring the transition doesn't animate the reset
     scroll.style.transition = '';
     scroll.scrollTop = 0;
+    scroll.style.setProperty('--detent-inset', '0px');
   }
-  // Same for the sheet itself, which the drag-to-dismiss gesture moves.
+  // Same for the sheet itself, which the drag gesture moves. Every open starts
+  // at the full detent — a sheet that reopened half-height because that's where
+  // it was left last time would read as a bug, not a memory.
+  detail.detentOffset = 0;
   const sheetEl = document.getElementById('detail-sheet');
   sheetEl.classList.remove('dragging');
   sheetEl.style.transition = '';
@@ -1273,16 +1280,31 @@ function closeDetail() {
   }, 320);
 }
 
-// ── drag the sheet back down ─────────────────────────────────────────
+// ── drag the sheet between resting positions ─────────────────────────
 // Pull down on the top strip (or on the content once it's scrolled to the top)
-// to push the sheet away and bring the board behind it back. Past the
-// threshold — or on a quick flick — it dismisses; short of that it springs
-// back, so a hesitant drag is never a decision.
+// and the sheet moves with the finger, then settles on the nearest of two
+// detents: full, or half-height with the board visible above it. Dismissing
+// takes a deliberate pull *past* the half detent, so the sheet no longer falls
+// out the bottom on a gesture that was only meant to peek behind it.
 const DISMISS_COMMIT_PX = 110;
 const DISMISS_FLICK_VELOCITY = 0.55; // px per ms
-// Pulling *up* has nowhere to go, so it's heavily damped rather than blocked:
-// the sheet still moves, which reads as "that's as far as this goes".
+// How far a release coasts before it settles, so a fast drag lands where it was
+// clearly heading rather than where the finger happened to stop.
+const DETENT_PROJECTION_MS = 130;
+// Pulling above the full position has nowhere to go, so it's heavily damped
+// rather than blocked: the sheet still moves, which reads as "that's the top".
 const DISMISS_UP_DAMPING = 0.18;
+
+// Offset that leaves the sheet's top edge at the middle of the screen. Measured
+// rather than hard-coded: the sheet's height is content-driven up to its 90vh
+// cap, so a short sheet has a correspondingly shallower half position (and none
+// at all if it's already under half a screen tall).
+function halfDetentOffset() {
+  const sheet = document.getElementById('detail-sheet');
+  if (!sheet) return 0;
+  const offset = Math.round(sheet.offsetHeight - window.innerHeight * 0.5);
+  return offset > 60 ? offset : 0;
+}
 
 function initDetailDismiss() {
   const sheet = document.getElementById('detail-sheet');
@@ -1298,6 +1320,7 @@ function initDetailDismiss() {
   let velocity = 0;
   let active = false;
   let engaged = false; // past the slop, and this gesture is ours
+  let baseOffset = 0;  // the detent the current drag started from
 
   const setY = (px) => {
     sheet.style.transform = `translateX(-50%) translateY(${px}px)`;
@@ -1307,13 +1330,27 @@ function initDetailDismiss() {
     backdrop.style.opacity = String(1 - reach * 0.85);
   };
 
-  const release = (dismiss) => {
+  // Park at a detent. The scroll container gets matching bottom padding, or the
+  // content sitting below the screen's edge would be unreachable: the sheet is
+  // translated down, not shortened, so its lower part is off-screen and
+  // scrolling alone can never bring the tail of the list into view.
+  const settleAt = (offset) => {
+    detail.detentOffset = offset;
+    sheet.style.transition = 'transform 300ms var(--ease-ios)';
+    if (offset > 0) {
+      setY(offset);
+    } else {
+      sheet.style.transform = '';
+      backdrop.style.opacity = '';
+    }
+    scroll.style.setProperty('--detent-inset', `${offset}px`);
+    setTimeout(() => { sheet.style.transition = ''; }, 320);
+  };
+
+  const release = (dismiss, offset) => {
     sheet.classList.remove('dragging');
     if (dismiss) { closeDetail(); return; }
-    sheet.style.transition = 'transform 280ms var(--ease-ios)';
-    sheet.style.transform = '';
-    backdrop.style.opacity = '';
-    setTimeout(() => { sheet.style.transition = ''; }, 300);
+    settleAt(offset);
   };
 
   const start = (e) => {
@@ -1324,6 +1361,7 @@ function initDetailDismiss() {
     velocity = 0;
     active = true;
     engaged = false;
+    baseOffset = detail.detentOffset || 0;
   };
 
   // The strip is unambiguous — anything starting there is a dismiss drag.
@@ -1350,8 +1388,9 @@ function initDetailDismiss() {
       // gesture, and initDetailSwipe owns it.
       if (Math.abs(dx) >= Math.abs(dy)) { active = false; return; }
       // A drag that starts by going *up* on the content is a scroll, not a
-      // dismiss — hand it back before we've moved anything.
-      if (dy < 0 && e.currentTarget === scroll) { active = false; return; }
+      // sheet move — hand it back before we've moved anything. Unless the sheet
+      // is parked below full, where dragging up is how you get back to full.
+      if (dy < 0 && e.currentTarget === scroll && baseOffset === 0) { active = false; return; }
       engaged = true;
       sheet.classList.add('dragging');
     }
@@ -1367,7 +1406,10 @@ function initDetailDismiss() {
       lastT = e.timeStamp;
     }
 
-    setY(dy > 0 ? dy : dy * DISMISS_UP_DAMPING);
+    // Damping applies only above the *full* position — between detents the
+    // sheet tracks the finger exactly.
+    const raw = baseOffset + dy;
+    setY(raw >= 0 ? raw : raw * DISMISS_UP_DAMPING);
     e.preventDefault();
   };
 
@@ -1376,8 +1418,31 @@ function initDetailDismiss() {
     active = false;
     if (!engaged) return;
     engaged = false;
-    const dy = e.clientY - startY;
-    release(dy > DISMISS_COMMIT_PX || velocity > DISMISS_FLICK_VELOCITY);
+
+    const offset = Math.max(0, baseOffset + (e.clientY - startY));
+    const half = halfDetentOffset();
+    // Where the drag was heading, not where the finger stopped — used to pick
+    // between detents, deliberately NOT to decide dismissal.
+    const projected = offset + velocity * DETENT_PROJECTION_MS;
+    const pastLowest = offset - half;
+
+    // Dismissal is decided by where the finger actually ended up, not by how
+    // fast it was moving when it got there. Letting velocity alone carry the
+    // sheet off-screen is what made a single firm drag from full blow straight
+    // past the detent — the sheet has to be dragged clearly below the detent,
+    // or flicked on from a stop already there.
+    const draggedPast = pastLowest > DISMISS_COMMIT_PX;
+    const flickedOnFromDetent = baseOffset >= half && half > 0
+      && pastLowest > 0 && velocity > DISMISS_FLICK_VELOCITY;
+    if (draggedPast || flickedOnFromDetent) { release(true); return; }
+
+    // Otherwise settle on whichever detent the throw was closest to.
+    const detents = half > 0 ? [0, half] : [0];
+    let nearest = detents[0];
+    for (const d of detents) {
+      if (Math.abs(projected - d) < Math.abs(projected - nearest)) nearest = d;
+    }
+    release(false, nearest);
   };
 
   for (const el of [grab, scroll]) {
@@ -1386,7 +1451,7 @@ function initDetailDismiss() {
     el.addEventListener('pointercancel', () => {
       if (!active) return;
       active = false;
-      if (engaged) { engaged = false; release(false); }
+      if (engaged) { engaged = false; release(false, baseOffset); }
     });
   }
 }

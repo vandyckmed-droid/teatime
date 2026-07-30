@@ -799,7 +799,11 @@ button { font: inherit; color: inherit; }
      drag-to-dismiss gesture instead. */
   overscroll-behavior: contain;
   will-change: transform;
-  padding: var(--s5) var(--s4) calc(var(--s7) + env(safe-area-inset-bottom));
+  /* --detent-inset matches how far the sheet is parked below full (see
+     initDetailDismiss). Without it the sheet's lower part sits off-screen and
+     the tail of the content can never be scrolled into view. */
+  padding: var(--s5) var(--s4)
+           calc(var(--s7) + env(safe-area-inset-bottom) + var(--detent-inset, 0px));
   -webkit-overflow-scrolling: touch;
 }
 
