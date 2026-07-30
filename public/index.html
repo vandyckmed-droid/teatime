@@ -96,11 +96,14 @@
         <div class="nav-title">Settings</div>
         <p class="sub">Tune how the board scores and ranks companies.</p>
 
-        <div class="section-label"><span class="section-label-key">Scoring</span></div>
-        <div class="settings-list" id="settings-list"></div>
-
+        <!-- Ranking window first: it's the setting that gets touched, and it
+             used to sit below a wall of scoring copy that had to be scrolled
+             past every time. -->
         <div class="section-label" id="daterange-label"><span class="section-label-key">Ranking window</span></div>
         <div class="settings-list" id="daterange-settings"></div>
+
+        <div class="section-label"><span class="section-label-key">Scoring</span></div>
+        <div class="settings-list" id="settings-list"></div>
       </div>
     </section>
 
@@ -138,7 +141,11 @@
     <!-- ─────────────────────── Detail sheet ────────────────────── -->
     <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
     <div class="sheet" id="detail-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="detail-name">
-      <div class="sheet-handle" aria-hidden="true"></div>
+      <!-- Generous grab strip, not just the 5px pill: this is the thumb target
+           for dragging the sheet back down (see initDetailDismiss in app.js). -->
+      <div class="sheet-grab" id="sheet-grab">
+        <div class="sheet-handle" aria-hidden="true"></div>
+      </div>
       <button type="button" class="sheet-close" id="sheet-close" aria-label="Close">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>

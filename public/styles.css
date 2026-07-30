@@ -762,10 +762,23 @@ button { font: inherit; color: inherit; }
 }
 .sheet.open { transform: translateX(-50%) translateY(0); }
 
+/* The pill is the affordance; this strip is the actual hit area. A 5px target
+   is not something you catch with a thumb, so the whole top band drags.
+   touch-action: none because the gesture is ours — without it the browser
+   claims the vertical pan before a pointermove ever arrives. */
+.sheet-grab {
+  flex-shrink: 0; padding-bottom: 6px;
+  touch-action: none; cursor: grab;
+}
+.sheet-grab:active { cursor: grabbing; }
 .sheet-handle {
   width: 38px; height: 5px; border-radius: var(--r-full); background: var(--surface-3);
   margin: var(--s2) auto 0; flex-shrink: 0;
+  transition: background 140ms ease, width 140ms var(--ease-out);
 }
+/* Grows and brightens while dragging, so the sheet reads as "held". */
+.sheet.dragging .sheet-handle { background: var(--text-3); width: 46px; }
+.sheet.dragging { transition: none; }
 .sheet-close {
   position: absolute; top: var(--s4); right: var(--s4); z-index: 1;
   width: 30px; height: 30px; border-radius: 50%; border: none;
@@ -781,6 +794,10 @@ button { font: inherit; color: inherit; }
   /* Vertical scrolling stays native; horizontal is claimed by the
      swipe-between-companies gesture (initDetailSwipe in app.js). */
   touch-action: pan-y;
+  /* Don't let an overscroll at the top of this list turn into a page-level
+     rubber-band behind the sheet — at scrollTop 0 that drag is the
+     drag-to-dismiss gesture instead. */
+  overscroll-behavior: contain;
   will-change: transform;
   padding: var(--s5) var(--s4) calc(var(--s7) + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;

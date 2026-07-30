@@ -185,8 +185,12 @@ function fmtPrice(v) {
 // The 52-week low/high labels sit under an 88px track, two to a line, so they
 // have to stay around six characters. Cents matter at $40.10 and are noise at
 // $2,354 — drop them once the figure is big enough not to need them.
+// Cents stop earning their space at three figures: on a 393pt row, "$469.47"
+// and "$469" say the same thing about where a stock sits in its 52-week range,
+// and the shorter one leaves room for the name. Under $100 the decimals still
+// carry real proportional weight, so they stay.
 function fmtRangePrice(v) {
-  return v >= 1000
+  return v >= 100
     ? '$' + Math.round(v).toLocaleString('en-US')
     : '$' + v.toFixed(2);
 }
@@ -1059,7 +1063,14 @@ function openDetail(symbol, sequence) {
     scroll.style.opacity = '';
     void scroll.offsetWidth; // flush, so restoring the transition doesn't animate the reset
     scroll.style.transition = '';
+    scroll.scrollTop = 0;
   }
+  // Same for the sheet itself, which the drag-to-dismiss gesture moves.
+  const sheetEl = document.getElementById('detail-sheet');
+  sheetEl.classList.remove('dragging');
+  sheetEl.style.transition = '';
+  sheetEl.style.transform = '';
+  document.getElementById('sheet-backdrop').style.opacity = '';
 
   // Last gap where a render error could still surface as an open-but-blank
   // sheet: showDetailAt catches its own, but this path had none.
@@ -1242,12 +1253,142 @@ function initDetailSwipe() {
 }
 
 function closeDetail() {
-  document.getElementById('sheet-backdrop').classList.remove('open');
-  document.getElementById('detail-sheet').classList.remove('open');
+  const sheet = document.getElementById('detail-sheet');
+  const backdrop = document.getElementById('sheet-backdrop');
+  sheet.classList.remove('dragging');
+  // Dismissed mid-drag: carry on down from wherever the finger left it rather
+  // than snapping back to rest first and then sliding away.
+  if (sheet.style.transform) {
+    sheet.style.transition = 'transform 300ms var(--ease-out)';
+    sheet.style.transform = 'translateX(-50%) translateY(100%)';
+  }
+  backdrop.style.opacity = '';
+  backdrop.classList.remove('open');
+  sheet.classList.remove('open');
   setTimeout(() => {
-    document.getElementById('sheet-backdrop').hidden = true;
-    document.getElementById('detail-sheet').hidden = true;
+    backdrop.hidden = true;
+    sheet.hidden = true;
+    sheet.style.transition = '';
+    sheet.style.transform = '';
   }, 320);
+}
+
+// ── drag the sheet back down ─────────────────────────────────────────
+// Pull down on the top strip (or on the content once it's scrolled to the top)
+// to push the sheet away and bring the board behind it back. Past the
+// threshold — or on a quick flick — it dismisses; short of that it springs
+// back, so a hesitant drag is never a decision.
+const DISMISS_COMMIT_PX = 110;
+const DISMISS_FLICK_VELOCITY = 0.55; // px per ms
+// Pulling *up* has nowhere to go, so it's heavily damped rather than blocked:
+// the sheet still moves, which reads as "that's as far as this goes".
+const DISMISS_UP_DAMPING = 0.18;
+
+function initDetailDismiss() {
+  const sheet = document.getElementById('detail-sheet');
+  const grab = document.getElementById('sheet-grab');
+  const scroll = document.querySelector('.sheet-scroll');
+  const backdrop = document.getElementById('sheet-backdrop');
+  if (!sheet || !grab || !scroll || !backdrop) return;
+
+  let startY = 0;
+  let startX = 0;
+  let lastY = 0;
+  let lastT = 0;
+  let velocity = 0;
+  let active = false;
+  let engaged = false; // past the slop, and this gesture is ours
+
+  const setY = (px) => {
+    sheet.style.transform = `translateX(-50%) translateY(${px}px)`;
+    // The backdrop lightens as the sheet drops, so the board behind comes back
+    // progressively instead of all at once on release.
+    const reach = Math.min(1, Math.max(0, px / (sheet.offsetHeight || 500)));
+    backdrop.style.opacity = String(1 - reach * 0.85);
+  };
+
+  const release = (dismiss) => {
+    sheet.classList.remove('dragging');
+    if (dismiss) { closeDetail(); return; }
+    sheet.style.transition = 'transform 280ms var(--ease-ios)';
+    sheet.style.transform = '';
+    backdrop.style.opacity = '';
+    setTimeout(() => { sheet.style.transition = ''; }, 300);
+  };
+
+  const start = (e) => {
+    startY = e.clientY;
+    startX = e.clientX;
+    lastY = e.clientY;
+    lastT = e.timeStamp;
+    velocity = 0;
+    active = true;
+    engaged = false;
+  };
+
+  // The strip is unambiguous — anything starting there is a dismiss drag.
+  grab.addEventListener('pointerdown', (e) => {
+    start(e);
+    try { grab.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+  });
+  // On the content it only counts when there's no scrolling left to do,
+  // which is the standard "pull the sheet down from the top of its list" move.
+  scroll.addEventListener('pointerdown', (e) => {
+    if (scroll.scrollTop > 0) return;
+    if (e.target.closest('#chart-wrap, #rank-wrap, [data-segmented="detail"], .info-btn, button')) return;
+    start(e);
+  });
+
+  const move = (e) => {
+    if (!active) return;
+    const dy = e.clientY - startY;
+    const dx = e.clientX - startX;
+
+    if (!engaged) {
+      if (Math.abs(dy) < SWIPE_AXIS_LOCK_PX && Math.abs(dx) < SWIPE_AXIS_LOCK_PX) return;
+      // Horizontal wins ties: paging between companies is the more-used
+      // gesture, and initDetailSwipe owns it.
+      if (Math.abs(dx) >= Math.abs(dy)) { active = false; return; }
+      // A drag that starts by going *up* on the content is a scroll, not a
+      // dismiss — hand it back before we've moved anything.
+      if (dy < 0 && e.currentTarget === scroll) { active = false; return; }
+      engaged = true;
+      sheet.classList.add('dragging');
+    }
+
+    // Only re-measure once there's a real interval to divide by: coalesced
+    // pointer events can arrive with identical timestamps, and dividing by a
+    // sub-millisecond dt turns a slow drag into a fake flick.
+    const dt = e.timeStamp - lastT;
+    if (dt >= 8) {
+      // Smoothed, so one jittery sample near the end doesn't decide it.
+      velocity = velocity * 0.4 + ((e.clientY - lastY) / dt) * 0.6;
+      lastY = e.clientY;
+      lastT = e.timeStamp;
+    }
+
+    setY(dy > 0 ? dy : dy * DISMISS_UP_DAMPING);
+    e.preventDefault();
+  };
+
+  const finish = (e) => {
+    if (!active) return;
+    active = false;
+    if (!engaged) return;
+    engaged = false;
+    const dy = e.clientY - startY;
+    release(dy > DISMISS_COMMIT_PX || velocity > DISMISS_FLICK_VELOCITY);
+  };
+
+  for (const el of [grab, scroll]) {
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', finish);
+    el.addEventListener('pointercancel', () => {
+      if (!active) return;
+      active = false;
+      if (engaged) { engaged = false; release(false); }
+    });
+  }
 }
 
 function renderDetailReturn(company) {
@@ -1476,9 +1617,9 @@ function renderChart() {
   ].join('');
 
   wrap.innerHTML = `
-    <div class="chart-axis-y max">${fmtPrice(max)}</div>
-    <div class="chart-axis-y mid">${fmtPrice(midPrice)}</div>
-    <div class="chart-axis-y min">${fmtPrice(min)}</div>
+    <div class="chart-axis-y max">${fmtRangePrice(max)}</div>
+    <div class="chart-axis-y mid">${fmtRangePrice(midPrice)}</div>
+    <div class="chart-axis-y min">${fmtRangePrice(min)}</div>
     <svg class="chart-svg ${dir}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
       <defs>
         <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
@@ -1832,6 +1973,7 @@ function initDetailSheet() {
   document.getElementById('sheet-close').addEventListener('click', closeDetail);
   document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
   initDetailSwipe();
+  initDetailDismiss();
   initClearWatchlist();
   initRankInfo();
   document.addEventListener('keydown', (e) => {
