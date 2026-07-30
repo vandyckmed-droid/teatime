@@ -43,13 +43,24 @@ Then open http://localhost:3000.
 - `src/ranking.js` — the custom-date-range return / volatility-adjusted score
   math, run server-side over the store's history so the browser only ever
   gets back a small `{symbol: score}` map, not raw daily-close arrays for the
-  whole universe.
+  whole universe. The formulas live in `returnBetween`/`volAdjustedBetween`,
+  which take explicit dates and a `prepareSeries`-flattened series so a window
+  can be scored thousands of times without re-filtering an array per call.
+- `src/rankHistory.js` — where one company sat in the pack over time, for the
+  detail sheet's "Rank Over Time" chart. Each plotted point re-scores the whole
+  universe over the ranking window slid back to end at that date, then ranks the
+  company among everyone who had a score, as a percentile (1 = best). The newest
+  point uses today's window, so it always equals the rank the boards are showing.
+  Heavier than `/api/rank` by the number of plotted points, hence per-symbol and
+  on-demand; capped at `MAX_POINTS` (the chart is ~340px wide).
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
-  `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`, and `GET /api/meta`,
-  all reading from `src/dataStore.js`'s scheduled-refresh store. History
-  endpoints only serve symbols in the current leaderboard universe — this is
-  a leaderboard companion, not an open proxy for arbitrary FMP queries.
+  `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
+  `GET /api/rankhistory?symbol=X&startDaysAgo=&endDaysAgo=&volAdjusted=&spanDays=`,
+  and `GET /api/meta`, all reading from `src/dataStore.js`'s scheduled-refresh
+  store. History endpoints only serve symbols in the current leaderboard
+  universe — this is a leaderboard companion, not an open proxy for arbitrary
+  FMP queries.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
   bottom sheet that opens a price chart when you tap a company. Ranks and
   Watchlist rank by a custom date range (set in Settings, adjustable via
@@ -57,8 +68,9 @@ Then open http://localhost:3000.
   in `state.rankScores`. The frontend falls back to the old client-side
   computation (over batch-fetched history) if `/api/rank` isn't reachable —
   this is what makes the static-snapshot preview channels (which have no
-  backend at all) still work unmodified. The per-company chart sheet has its
-  own independent window toggle (1D-5Y), unrelated to the ranking date range.
+  backend at all) still work unmodified — `/api/rankhistory` has the same
+  dual path. The per-company chart sheet has its own window toggle (1M-5Y),
+  unrelated to the ranking date range; it drives both charts in the sheet.
 
 ## Extending it
 

@@ -120,6 +120,8 @@ const detail = {
   symbol: null,
   range: DEFAULT_CHART_RANGE,
   slice: null, // the currently-rendered range's [{date, close}], oldest first
+  // {symbol, windowDays, points: [{date, rank, of, pct}]} from loadRankHistory.
+  rankHistory: null,
   // The board order the sheet was opened from, and where we are in it — what
   // swiping left/right walks through.
   sequence: null,
@@ -262,59 +264,125 @@ function shortName(name) {
 // ── scoring: point-to-point return over the custom date range, or an
 // annualized-return ÷ annualized-volatility (Sharpe-like) score over the
 // same range when volatility-adjusted ──
-function closeOnOrBefore(series, dateStr) {
-  let result = null;
-  for (const p of series) {
-    if (p.date <= dateStr) result = p.close;
-    else break;
+//
+// Mirrors src/ranking.js on the server, function for function — including the
+// split between the date-addressed *BetweenDates formulas and the settings-aware
+// wrappers below. The rank-over-time fallback scores the same window at ~120
+// past dates per company, so it needs a form of the series it can score that
+// many times without re-filtering an array each call. If the scoring math
+// changes, update both copies.
+
+// Splits a {date, close}[] into parallel arrays plus each day's change from the
+// day before. returns[0] is NaN — the first close has no prior day.
+function prepareSeries(series) {
+  const dates = [];
+  const closes = [];
+  for (const p of series || []) {
+    dates.push(p.date);
+    closes.push(p.close);
   }
-  return result;
+  const returns = new Float64Array(dates.length);
+  if (dates.length > 0) returns[0] = NaN;
+  for (let i = 1; i < closes.length; i++) {
+    const prev = closes[i - 1];
+    returns[i] = prev > 0 ? (closes[i] - prev) / prev : NaN;
+  }
+  return { dates, closes, returns };
 }
 
-function customRangeReturn(company) {
-  const cached = historyCache.get(company.symbol);
-  if (!cached || !cached.series || cached.series.length === 0) return null;
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const startClose = closeOnOrBefore(cached.series, daysAgoToDateStr(startDaysAgo));
-  const endClose = closeOnOrBefore(cached.series, daysAgoToDateStr(endDaysAgo));
-  if (startClose == null || endClose == null) return null;
-  return ((endClose - startClose) / startClose) * 100;
+function indexAtOrBefore(dates, dateStr) {
+  let lo = 0;
+  let hi = dates.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid] <= dateStr) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  return ans;
 }
 
-// Day-over-day % changes for the trading days that fall within [startStr, endStr].
-function dailyReturnsInRange(series, startStr, endStr) {
-  const inRange = series.filter((p) => p.date >= startStr && p.date <= endStr);
-  const returns = [];
-  for (let i = 1; i < inRange.length; i++) {
-    const prev = inRange[i - 1].close;
-    const cur = inRange[i].close;
-    if (prev > 0) returns.push((cur - prev) / prev);
+function indexAtOrAfter(dates, dateStr) {
+  let lo = 0;
+  let hi = dates.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid] >= dateStr) { ans = mid; hi = mid - 1; } else { lo = mid + 1; }
   }
-  return returns;
+  return ans;
+}
+
+// "On or before" at both edges, so a window edge landing on a weekend or holiday
+// uses that week's last real close instead of dropping the company.
+function returnBetweenDates(prepared, startStr, endStr) {
+  const { dates, closes } = prepared;
+  if (dates.length === 0) return null;
+  const i = indexAtOrBefore(dates, startStr);
+  const j = indexAtOrBefore(dates, endStr);
+  if (i < 0 || j < 0) return null;
+  const startClose = closes[i];
+  if (!(startClose > 0)) return null;
+  return ((closes[j] - startClose) / startClose) * 100;
 }
 
 // Annualized return ÷ annualized volatility, both derived from the same daily
 // returns: annualized mean is mean*252, annualized stdev is stdev*sqrt(252),
 // so the ratio simplifies to (mean / stdev) * sqrt(252) — a Sharpe ratio
-// without a risk-free-rate subtraction, over the selected date range.
-function volAdjustedScore(company) {
-  const cached = historyCache.get(company.symbol);
-  if (!cached || !cached.series || cached.series.length === 0) return null;
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const startStr = daysAgoToDateStr(startDaysAgo);
-  const endStr = daysAgoToDateStr(endDaysAgo);
-  if (cached.series[0].date > startStr) return null; // no coverage back to the start date
+// without a risk-free-rate subtraction, over the given window.
+function volAdjustedBetweenDates(prepared, startStr, endStr) {
+  const { dates, returns } = prepared;
+  if (dates.length === 0) return null;
+  if (dates[0] > startStr) return null; // no coverage back to the start date
+  const i = indexAtOrAfter(dates, startStr);
+  const j = indexAtOrBefore(dates, endStr);
+  if (i < 0 || j <= i) return null;
 
-  const returns = dailyReturnsInRange(cached.series, startStr, endStr);
-  if (returns.length < 2) return null;
-
-  const n = returns.length;
-  const mean = returns.reduce((a, b) => a + b, 0) / n;
-  const variance = returns.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
-  const stdev = Math.sqrt(variance);
+  let n = 0;
+  let sum = 0;
+  for (let k = i + 1; k <= j; k++) {
+    const r = returns[k];
+    if (Number.isNaN(r)) continue;
+    n += 1;
+    sum += r;
+  }
+  if (n < 2) return null;
+  const mean = sum / n;
+  let sumSq = 0;
+  for (let k = i + 1; k <= j; k++) {
+    const r = returns[k];
+    if (Number.isNaN(r)) continue;
+    sumSq += (r - mean) ** 2;
+  }
+  const stdev = Math.sqrt(sumSq / (n - 1));
   if (!(stdev > 0)) return null;
-
   return (mean / stdev) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+}
+
+// Prepared series are cached per symbol: the boards score every company on every
+// settings change, and the rank chart scores them ~120 times over.
+const preparedCache = new Map();
+function preparedFor(symbol) {
+  let prepared = preparedCache.get(symbol);
+  if (prepared) return prepared;
+  const cached = historyCache.get(symbol);
+  if (!cached || !cached.series || cached.series.length === 0) return null;
+  prepared = prepareSeries(cached.series);
+  preparedCache.set(symbol, prepared);
+  return prepared;
+}
+
+function customRangeReturn(company) {
+  const prepared = preparedFor(company.symbol);
+  if (!prepared) return null;
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  return returnBetweenDates(prepared, daysAgoToDateStr(startDaysAgo), daysAgoToDateStr(endDaysAgo));
+}
+
+function volAdjustedScore(company) {
+  const prepared = preparedFor(company.symbol);
+  if (!prepared) return null;
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  return volAdjustedBetweenDates(prepared, daysAgoToDateStr(startDaysAgo), daysAgoToDateStr(endDaysAgo));
 }
 
 // Live path reads server-computed scores (see refreshRankings below);
@@ -478,6 +546,112 @@ async function refreshRankings() {
   }
 }
 
+// ── rank over time ───────────────────────────────────────────────────
+// Mirrors src/rankHistory.js: at each sampled past date, score the whole
+// universe over the ranking window slid back to end at that date, then rank the
+// symbol among everyone who had a score. Runs client-side only as the fallback
+// for the static snapshot, which has no backend — but that channel has every
+// company's history embedded, so it can do the same work the server does.
+const RANK_HISTORY_MAX_POINTS = 120;
+const RANK_HISTORY_MIN_UNIVERSE = 5;
+
+function addDaysStr(dateStr, delta) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Sampled backwards from the newest so the latest trading day is always
+// included whatever the step works out to — that point has to agree with the
+// rank the boards are showing right now.
+function sampleRankDates(series, cutoffStr) {
+  const dates = [];
+  for (const p of series) if (p.date >= cutoffStr) dates.push(p.date);
+  if (dates.length === 0) return dates;
+  const step = Math.max(1, Math.ceil(dates.length / RANK_HISTORY_MAX_POINTS));
+  const out = [];
+  for (let i = dates.length - 1; i >= 0; i -= step) out.push(dates[i]);
+  out.reverse();
+  return out;
+}
+
+function computeRankHistoryClientSide(symbol, spanDays) {
+  const target = historyCache.get(symbol);
+  if (!target || !target.series || target.series.length === 0) return null;
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const score = state.settings.volAdjusted ? volAdjustedBetweenDates : returnBetweenDates;
+
+  const pack = [];
+  for (const c of state.leaderboard.companies) {
+    const prepared = preparedFor(c.symbol);
+    if (prepared) pack.push([c.symbol, prepared]);
+  }
+
+  const scores = new Float64Array(pack.length);
+  const points = [];
+  const dates = sampleRankDates(target.series, daysAgoToDateStr(spanDays));
+  // The boards score relative to *today*, not to the last trading day, so the
+  // newest point must too — otherwise the chart's last rank disagrees with the
+  // list the user just tapped. See the same step in src/rankHistory.js.
+  const todayStr = daysAgoToDateStr(0);
+  if (dates.length > 0 && dates[dates.length - 1] < todayStr) dates[dates.length - 1] = todayStr;
+  for (const date of dates) {
+    const startStr = addDaysStr(date, -startDaysAgo);
+    const endStr = addDaysStr(date, -endDaysAgo);
+    let mine = null;
+    let of = 0;
+    for (const [sym, prepared] of pack) {
+      const s = score(prepared, startStr, endStr);
+      if (s === null || !Number.isFinite(s)) continue;
+      scores[of] = s;
+      of += 1;
+      if (sym === symbol) mine = s;
+    }
+    if (mine === null || of < RANK_HISTORY_MIN_UNIVERSE) continue;
+    let better = 0;
+    for (let i = 0; i < of; i++) if (scores[i] > mine) better += 1;
+    const rank = better + 1;
+    points.push({ date, rank, of, pct: ((rank - 1) / (of - 1)) * 99 + 1 });
+  }
+
+  const { startDaysAgo: s, endDaysAgo: e } = state.settings.rankDateRange;
+  return { symbol, windowDays: s - e, points };
+}
+
+// Same dual-path shape as refreshRankings/refreshCorrelations. The sequence
+// guard matters more here than anywhere else: swiping through names fires one of
+// these per company, and they're the slowest call in the app.
+let rankHistorySeq = 0;
+async function loadRankHistory(symbol, spanDays) {
+  const seq = ++rankHistorySeq;
+  const fallback = async () => {
+    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
+    if (seq !== rankHistorySeq) return null;
+    return computeRankHistoryClientSide(symbol, spanDays);
+  };
+
+  if (typeof EMBEDDED_LEADERBOARD !== 'undefined') return fallback();
+
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const params = new URLSearchParams({
+    symbol,
+    startDaysAgo: String(startDaysAgo),
+    endDaysAgo: String(endDaysAgo),
+    volAdjusted: String(!!state.settings.volAdjusted),
+    spanDays: String(spanDays),
+  });
+  try {
+    const res = await fetch(`/api/rankhistory?${params}`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    const data = await res.json();
+    if (seq !== rankHistorySeq) return null;
+    return data;
+  } catch {
+    return fallback();
+  }
+}
+
 // ── tab routing ──────────────────────────────────────────────────────
 function goToTab(tab) {
   state.activeTab = tab;
@@ -634,6 +808,8 @@ function rowEl(c, rank, value) {
   const isGain = value >= 0;
   const sectorVar = SECTOR_VAR[c.sector] || '--sector-default';
   const row = baseRow(c, rank === 1 ? ' ranked-1' : '');
+  // Drives the logo's recentring — see .row[data-rank-digits] in styles.css.
+  row.dataset.rankDigits = String(String(rank).length);
   row.innerHTML = `
     <span class="rank">${rank}</span>
     ${logoAvatar(c, sectorVar)}
@@ -845,6 +1021,8 @@ function renderDetailContent(company) {
     if (detail.symbol !== opened) return;
     wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
   });
+
+  refreshRankChart();
 }
 
 // `sequence` is the ordered symbols of the board the row was tapped in, so a
@@ -968,7 +1146,7 @@ function initDetailSwipe() {
   };
 
   sheet.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('#chart-wrap, [data-segmented="detail"], .sheet-close')) return;
+    if (e.target.closest('#chart-wrap, #rank-wrap, [data-segmented="detail"], .sheet-close, .info-btn')) return;
     if (!detail.sequence || detail.sequence.length < 2) return;
     startX = e.clientX;
     startY = e.clientY;
@@ -1083,6 +1261,7 @@ function renderDetailSegmented() {
         const company = findCompany(detail.symbol);
         if (company) renderDetailReturn(company);
         renderChart();
+        refreshRankChart();
       });
       el.appendChild(btn);
     });
@@ -1384,6 +1563,227 @@ function attachChartScrub(wrap, coords, chartW) {
   hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !dragging) hide(); });
 }
 
+// ── rank over time chart ─────────────────────────────────────────────
+// Same SVG-in-CSS-pixels approach as the price chart. Inverted y: percentile 1
+// (best in the pack) is at the top, so "up" means the same thing on both charts.
+// Unlike the price chart this one does get gridlines — a rank of "38" means
+// nothing without the scale to read it against, where a price is legible from
+// the line's shape alone.
+const RANK_PAD_L = 26;
+const RANK_PAD_R = 30; // room for the current-value badge at the right edge
+// Deep enough top/bottom inset to seat the "better/worse" captions outside the
+// 1..100 band. Inside it they collided with the line for exactly the companies
+// worth looking at — anything pinned near rank 1 ran straight through "Better
+// rank".
+const RANK_PAD_Y = 20;
+const RANK_HEIGHT = 162;
+const RANK_LEVELS = [1, 25, 50, 75, 100];
+
+function rankSpanDays() {
+  const range = CHART_RANGES.find((r) => r.key === detail.range);
+  if (detail.range === 'ytd') {
+    const now = new Date();
+    return Math.max(31, Math.round((now - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000));
+  }
+  return range ? range.days : 366;
+}
+
+function renderRankChart() {
+  const wrap = document.getElementById('rank-wrap');
+  if (!wrap) return;
+  const data = detail.rankHistory;
+  const points = data && data.points ? data.points : [];
+
+  const sub = document.getElementById('rank-sub');
+  if (sub) {
+    const metric = state.settings.volAdjusted ? 'vol-adjusted return' : 'return';
+    const windowDays = data && data.windowDays ? data.windowDays : null;
+    sub.textContent = windowDays
+      ? `Percentile rank (1 = best) by ${metric} over a rolling ${windowDays}-day window`
+      : `Percentile rank (1 = best) by ${metric}`;
+  }
+  const note = document.getElementById('rank-note');
+  if (note) {
+    const of = points.length ? points[points.length - 1].of : state.leaderboard.companies.length;
+    note.textContent =
+      `Each point re-ranks all ${of} companies as of that date, using the same ranking window and `
+      + `metric as the boards (Settings). The last point is this company's rank right now.`;
+  }
+
+  if (points.length < 2) {
+    wrap.innerHTML = `<div class="chart-error">Not enough history to rank ${detail.symbol} over this range.</div>`;
+    const axis = document.getElementById('rank-axis-x');
+    if (axis) axis.innerHTML = '';
+    return;
+  }
+
+  const W = Math.max(Math.round(wrap.clientWidth || 0) || CHART_FALLBACK_W, 160);
+  const H = RANK_HEIGHT;
+  const innerW = W - RANK_PAD_L - RANK_PAD_R;
+  const innerH = H - RANK_PAD_Y * 2;
+  // Fixed 1..100 scale, not fitted to the data: the whole point is where this
+  // company sits against the field, which a self-scaling axis would hide.
+  const yFor = (pct) => RANK_PAD_Y + ((pct - 1) / 99) * innerH;
+  const xFor = (i) => RANK_PAD_L + (points.length === 1 ? 0 : (i / (points.length - 1)) * innerW);
+
+  const coords = points.map((p, i) => ({ x: xFor(i), y: yFor(p.pct), ...p }));
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+  const last = coords[coords.length - 1];
+  const first = coords[0];
+  // Filled downwards to the worst-rank edge: the area reads as "how much of the
+  // field is below this company", which is what a rank chart is about.
+  const areaPath = `${linePath} L${last.x.toFixed(2)},${H - RANK_PAD_Y} L${first.x.toFixed(2)},${H - RANK_PAD_Y} Z`;
+
+  const grid = RANK_LEVELS.map((level) => {
+    const y = yFor(level).toFixed(2);
+    return `<line class="rank-grid" x1="${RANK_PAD_L}" y1="${y}" x2="${W - RANK_PAD_R + 6}" y2="${y}" />`;
+  }).join('');
+  const yLabels = RANK_LEVELS.map((level) => {
+    const y = yFor(level).toFixed(2);
+    return `<text class="rank-y-label" x="${RANK_PAD_L - 6}" y="${y}" dy="0.32em" text-anchor="end">${level}</text>`;
+  }).join('');
+
+  const badgeY = Math.min(Math.max(last.y, RANK_PAD_Y + 8), H - RANK_PAD_Y - 8);
+  const badgeLabel = Math.round(last.pct);
+  const badgeW = badgeLabel >= 100 ? 26 : 20;
+
+  wrap.innerHTML = `
+    <svg class="rank-svg" viewBox="0 0 ${W} ${H}" role="img"
+         aria-label="${detail.symbol} percentile rank over time, ${detail.range}. Currently ${badgeLabel} out of 100, rank ${last.rank} of ${last.of}.">
+      <defs>
+        <linearGradient id="rank-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.26" />
+          <stop offset="50%" stop-color="currentColor" stop-opacity="0.06" />
+          <stop offset="92%" stop-color="currentColor" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      ${grid}
+      ${yLabels}
+      <text class="rank-edge-label better" x="${RANK_PAD_L + 2}" y="${RANK_PAD_Y}" dy="-0.55em">Better rank</text>
+      <text class="rank-edge-label worse" x="${RANK_PAD_L + 2}" y="${H - RANK_PAD_Y}" dy="1.35em">Worse rank</text>
+      <path class="rank-area" fill="url(#rank-grad)" d="${areaPath}" />
+      <path class="rank-line" id="rank-line-path" d="${linePath}" />
+      <line class="chart-crosshair-line" id="rank-crosshair-line" x1="0" y1="${RANK_PAD_Y}" x2="0" y2="${H - RANK_PAD_Y}" />
+      <circle class="chart-crosshair-dot" id="rank-crosshair-dot" r="4" />
+      <g class="rank-badge">
+        <rect x="${(last.x + 5).toFixed(2)}" y="${(badgeY - 9).toFixed(2)}" width="${badgeW}" height="18" rx="5" />
+        <text x="${(last.x + 5 + badgeW / 2).toFixed(2)}" y="${badgeY.toFixed(2)}" dy="0.34em" text-anchor="middle">${badgeLabel}</text>
+      </g>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="rank-hit" />
+    </svg>
+    <div class="chart-tooltip" id="rank-tooltip"></div>
+  `;
+
+  const axis = document.getElementById('rank-axis-x');
+  if (axis) {
+    const midIdx = Math.floor((points.length - 1) / 2);
+    axis.innerHTML =
+      `<span>${fmtChartDate(points[0].date)}</span>` +
+      `<span>${fmtChartDate(points[midIdx].date)}</span>` +
+      `<span>${fmtChartDate(points[points.length - 1].date)}</span>`;
+  }
+
+  const linePathEl = wrap.querySelector('#rank-line-path');
+  if (linePathEl) {
+    const length = linePathEl.getTotalLength();
+    linePathEl.style.strokeDasharray = String(length);
+    linePathEl.style.setProperty('--dash-length', String(length));
+  }
+
+  attachRankScrub(wrap, coords, W);
+}
+
+// Same own-drag-state pointer handling as the price chart's scrub — see the
+// comment on attachChartScrub for why e.pressure can't be the gate.
+function attachRankScrub(wrap, coords, chartW) {
+  const svg = wrap.querySelector('svg');
+  const hit = wrap.querySelector('#rank-hit');
+  const line = wrap.querySelector('#rank-crosshair-line');
+  const dot = wrap.querySelector('#rank-crosshair-dot');
+  const tooltip = wrap.querySelector('#rank-tooltip');
+  if (!svg || !hit) return;
+
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((clientX - rect.left) / rect.width) * chartW;
+    // Nearest by x rather than by index: the points are evenly spaced in x, but
+    // the plot area is inset on both sides, so index arithmetic would drift.
+    let best = 0;
+    for (let i = 1; i < coords.length; i++) {
+      if (Math.abs(coords[i].x - relX) < Math.abs(coords[best].x - relX)) best = i;
+    }
+    const c = coords[best];
+    line.setAttribute('x1', c.x);
+    line.setAttribute('x2', c.x);
+    line.style.opacity = '1';
+    dot.setAttribute('cx', c.x);
+    dot.setAttribute('cy', c.y);
+    dot.style.opacity = '1';
+
+    const pxRatio = rect.width / chartW;
+    tooltip.style.left = `${Math.min(Math.max(c.x * pxRatio, 66), rect.width - 66)}px`;
+    tooltip.style.opacity = '1';
+    tooltip.innerHTML = '';
+    const dateEl = document.createElement('span');
+    dateEl.textContent = `${fmtChartDate(c.date)} — `;
+    const rankEl = document.createElement('b');
+    rankEl.textContent = `#${c.rank} of ${c.of}`;
+    tooltip.appendChild(dateEl);
+    tooltip.appendChild(rankEl);
+  }
+
+  let dragging = false;
+  hit.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    try { hit.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+    showAt(e.clientX);
+    e.preventDefault();
+  });
+  hit.addEventListener('pointermove', (e) => {
+    if (dragging || e.pointerType === 'mouse') showAt(e.clientX);
+  });
+  hit.addEventListener('pointerup', () => { dragging = false; });
+  hit.addEventListener('pointercancel', () => { dragging = false; });
+  hit.addEventListener('pointerleave', (e) => {
+    if (e.pointerType !== 'mouse' || dragging) return;
+    line.style.opacity = '0';
+    dot.style.opacity = '0';
+    tooltip.style.opacity = '0';
+  });
+}
+
+// Kept separate from renderRankChart so the skeleton can go up immediately and
+// the (slow) computation can land later, or be superseded by a swipe.
+function refreshRankChart() {
+  const wrap = document.getElementById('rank-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = chartSkeletonHTML();
+  detail.rankHistory = null; // don't let a resize re-render the previous company's
+  const opened = detail.symbol;
+  const range = detail.range;
+  loadRankHistory(opened, rankSpanDays()).then((data) => {
+    if (detail.symbol !== opened || detail.range !== range) return;
+    detail.rankHistory = data;
+    renderRankChart();
+  }).catch(() => {
+    if (detail.symbol !== opened || detail.range !== range) return;
+    detail.rankHistory = null;
+    renderRankChart();
+  });
+}
+
+function initRankInfo() {
+  const btn = document.getElementById('rank-info-btn');
+  const note = document.getElementById('rank-note');
+  if (!btn || !note) return;
+  btn.addEventListener('click', () => {
+    const open = note.hidden;
+    note.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    btn.classList.toggle('open', open);
+  });
+}
+
 function fmtChartDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1394,6 +1794,7 @@ function initDetailSheet() {
   document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
   initDetailSwipe();
   initClearWatchlist();
+  initRankInfo();
   document.addEventListener('keydown', (e) => {
     const sheetOpen = !document.getElementById('detail-sheet').hidden;
     if (e.key === 'Escape' && sheetOpen) closeDetail();
@@ -1413,6 +1814,7 @@ function initDetailSheet() {
     resizeRaf = requestAnimationFrame(() => {
       resizeRaf = null;
       if (historyCache.has(detail.symbol)) renderChart();
+      if (detail.rankHistory) renderRankChart();
       positionSegmentedThumb(true);
     });
   });

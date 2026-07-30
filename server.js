@@ -5,6 +5,7 @@ const path = require('path');
 const config = require('./src/config');
 const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
+const { rankHistory } = require('./src/rankHistory');
 const { correlationsAgainst } = require('./src/correlation');
 
 const PORT = process.env.PORT || 3000;
@@ -114,6 +115,40 @@ function handleRank(req, res, { startDaysAgo, endDaysAgo, volAdjusted }) {
   });
 }
 
+// One company's rank among the universe over time, for the detail sheet's
+// "Rank Over Time" chart. Much heavier than /api/rank — it scores the whole
+// universe once per plotted point — so it's a per-symbol, on-demand call rather
+// than anything the boards depend on. See src/rankHistory.js.
+function handleRankHistory(req, res, { symbol, startDaysAgo, endDaysAgo, volAdjusted, spanDays }) {
+  const leaderboard = dataStore.getLeaderboard();
+  const historyBySymbol = dataStore.getHistoryBySymbol();
+  if (!leaderboard || !historyBySymbol) {
+    sendJSON(res, 503, { error: 'Data not ready yet, try again shortly.' });
+    return;
+  }
+  if (!Number.isFinite(startDaysAgo) || !Number.isFinite(endDaysAgo) || !Number.isFinite(spanDays)) {
+    sendJSON(res, 400, { error: 'startDaysAgo, endDaysAgo and spanDays must be numbers.' });
+    return;
+  }
+  if (!leaderboard.companies.some((c) => c.symbol === symbol)) {
+    sendJSON(res, 404, { error: `${symbol} is not in the current leaderboard universe.` });
+    return;
+  }
+  const result = rankHistory(historyBySymbol, {
+    symbol,
+    startDaysAgo,
+    endDaysAgo,
+    volAdjusted,
+    spanDays,
+    cacheKey: dataStore.getHistoryAsOf(),
+  });
+  if (!result) {
+    sendJSON(res, 502, { error: `No history available for ${symbol}.` });
+    return;
+  }
+  sendJSON(res, 200, { asOf: dataStore.getHistoryAsOf(), ...result });
+}
+
 // Return correlation of every universe name against the caller's watchlist, so
 // the frontend can fade names that would duplicate exposure it already has. The
 // watchlist lives in the browser's localStorage, so it has to come in on the
@@ -181,6 +216,18 @@ const server = http.createServer((req, res) => {
         .filter(Boolean),
       startDaysAgo: Number(params.get('startDaysAgo')),
       endDaysAgo: Number(params.get('endDaysAgo')),
+    });
+    return;
+  }
+  // Ahead of /api/rank: that prefix would otherwise swallow this path.
+  if (req.url.startsWith('/api/rankhistory')) {
+    const params = new URL(req.url, 'http://localhost').searchParams;
+    handleRankHistory(req, res, {
+      symbol: (params.get('symbol') || '').toUpperCase(),
+      startDaysAgo: Number(params.get('startDaysAgo')),
+      endDaysAgo: Number(params.get('endDaysAgo')),
+      volAdjusted: params.get('volAdjusted') === 'true',
+      spanDays: Number(params.get('spanDays')),
     });
     return;
   }
