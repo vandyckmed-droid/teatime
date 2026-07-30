@@ -1,0 +1,63 @@
+# Archives one file per day into data/snapshots/ (see scripts/snapshot.js).
+#
+# This is the only automation in the repo — deploying the GitHub Pages bundle is
+# still a plain commit, not a workflow. It exists because the archive has to
+# accrue daily whether or not anyone is working on the app, and there's no
+# always-on server to do it: the app is a static snapshot, so nothing else is
+# running at 09:00 to notice a new trading day happened.
+#
+# Requires an FMP_API_KEY repository secret
+# (Settings -> Secrets and variables -> Actions -> New repository secret).
+# Without it every run fails at the first fetch and commits nothing.
+
+name: Daily snapshot
+
+on:
+  schedule:
+    # 09:00 UTC daily — comfortably after the US close on the previous
+    # trading day, whichever side of daylight saving we're on. FMP's data is
+    # end-of-day, so there is nothing to gain from running nearer the bell.
+    - cron: '0 9 * * *'
+  # So a missed or failed day can be filled in by hand.
+  workflow_dispatch:
+
+# Weekend and holiday runs still fire; they just re-record the last trading
+# day's closes, which each file states via historyAsOf and lastClose.
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Capture today's board
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: node scripts/snapshot.js
+
+      - name: Commit it if there's something new
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/snapshots; then
+            echo "No new snapshot to commit."
+            exit 0
+          fi
+          git add data/snapshots
+          git commit -m "Daily snapshot: $(date -u +%Y-%m-%d)"
+          # Rebase before pushing: a normal working session commits to main all
+          # day, so this job is rarely pushing onto the commit it checked out.
+          git pull --rebase origin main
+          git push origin HEAD:main

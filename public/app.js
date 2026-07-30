@@ -1061,7 +1061,14 @@ function openDetail(symbol, sequence) {
     scroll.style.transition = '';
   }
 
-  renderDetailContent(company);
+  // Last gap where a render error could still surface as an open-but-blank
+  // sheet: showDetailAt catches its own, but this path had none.
+  try {
+    renderDetailContent(company);
+  } catch (err) {
+    console.error('Failed to render detail for', symbol, err);
+    return;
+  }
 
   document.getElementById('sheet-backdrop').hidden = false;
   document.getElementById('detail-sheet').hidden = false;

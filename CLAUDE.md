@@ -219,7 +219,17 @@ Concretely:
   both directions repeatedly (the owner's own framing: "bigger and better,"
   then "removal and cutting"). Bump or cut it — `screenerCandidatePool`
   should stay a healthy margin above it since screener results get deduped
-  and filtered down. Outbound FMP calls (per-company in `src/leaderboard.js`,
+  and filtered down. The trap when growing: `screenerMinMarketCap` is the
+  real ceiling and binds long before `screenerCandidatePool` does — at $50B
+  the screener only had 234 US names to give, so `universeSize: 250` silently
+  delivered 234. It bounds the candidate pool only (the top N by market cap
+  is still taken from whatever comes back), so lowering it doesn't make the
+  board less selective. Check the headroom before bumping.
+- Daily board snapshots accrue in `data/snapshots/` via `scripts/snapshot.js`
+  and the one workflow in the repo (`.github/workflows/daily-snapshot.yml`).
+  Append-only and deliberately stores inputs rather than one ranking — extend
+  what a file holds rather than adding a second archive, and don't rewrite
+  past files. Outbound FMP calls (per-company in `src/leaderboard.js`,
   and history in `src/history.js`) go through `mapWithConcurrency`
   (`src/concurrency.js`) capped at `config.fmpConcurrency`, not unbounded
   `Promise.all` — this is what keeps a bigger `universeSize` from turning

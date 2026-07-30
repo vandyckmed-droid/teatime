@@ -72,6 +72,22 @@ Then open http://localhost:3000.
   dual path. The per-company chart sheet has its own window toggle (1M-5Y),
   unrelated to the ranking date range; it drives both charts in the sheet.
 
+## The daily archive
+
+`scripts/snapshot.js` writes one file per day to `data/snapshots/`, run by
+`.github/workflows/daily-snapshot.yml` at 09:00 UTC. It's the only workflow in
+the repo — publishing the Pages bundle is still a plain commit.
+
+The app keeps no history of itself: `src/dataStore.js` holds the current day in
+memory and each refresh overwrites it, so yesterday's board is otherwise gone.
+Each file stores the day's ranked list plus the per-company facts and full
+returns map behind it, so a later question can be answered without assuming
+today what it will be. Schema and caveats: `data/snapshots/README.md`.
+
+Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
+`API_KEY=... node scripts/snapshot.js` (it no-ops if the day's file exists;
+`--force` overwrites).
+
 ## Extending it
 
 - New return window (for the per-company chart sheet): add a key to
