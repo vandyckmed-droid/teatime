@@ -994,8 +994,19 @@ function findCompany(symbol) {
 // sideways swipe can swap companies without re-running the open animation.
 function renderDetailContent(company) {
   const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
-  document.getElementById('detail-logo').outerHTML =
-    logoAvatar(company, sectorVar).replace('class="logo"', 'class="logo" id="detail-logo"');
+  // Build the node and set the id on it, rather than patching `class="logo"` in
+  // the markup string: the white-on-transparent marks render as
+  // `class="logo on-dark"`, so that substring didn't match and the id was
+  // silently dropped — after which the *next* render found no #detail-logo,
+  // threw, and left the sheet half-rendered and stuck mid-swipe.
+  const logoSlot = document.getElementById('detail-logo');
+  if (logoSlot) {
+    const holder = document.createElement('div');
+    holder.innerHTML = logoAvatar(company, sectorVar);
+    const next = holder.firstElementChild;
+    next.id = 'detail-logo';
+    logoSlot.replaceWith(next);
+  }
   pruneBrokenLogos(document.querySelector('.detail-header'));
   document.getElementById('detail-ticker').textContent = company.symbol;
   // Full legal name here, unlike the rows, which trim the corporate suffix.
@@ -1037,6 +1048,19 @@ function openDetail(symbol, sequence) {
   detail.sequence = sequence && sequence.length ? sequence : [symbol];
   detail.index = Math.max(0, detail.sequence.indexOf(symbol));
 
+  // Opening is the reset point for the swipe's inline transform. Without this a
+  // gesture that ended badly — a finger lifted outside the sheet, a render that
+  // threw mid-page — left the content translated off-screen and transparent,
+  // and every later open inherited it: the sheet was "open" but showed nothing.
+  const scroll = document.querySelector('.sheet-scroll');
+  if (scroll) {
+    scroll.style.transition = 'none';
+    scroll.style.transform = '';
+    scroll.style.opacity = '';
+    void scroll.offsetWidth; // flush, so restoring the transition doesn't animate the reset
+    scroll.style.transition = '';
+  }
+
   renderDetailContent(company);
 
   document.getElementById('sheet-backdrop').hidden = false;
@@ -1060,7 +1084,15 @@ function showDetailAt(index) {
   if (!company) return false;
   detail.symbol = company.symbol;
   detail.index = index;
-  renderDetailContent(company);
+  try {
+    renderDetailContent(company);
+  } catch (err) {
+    // A render that throws must not take the sheet with it. Reporting false
+    // sends the caller down its "couldn't page" path, which springs the swipe
+    // back to centre instead of leaving the content parked off-screen.
+    console.error('Failed to render detail for', company.symbol, err);
+    return false;
+  }
   positionSegmentedThumb(true);
   const scroll = document.querySelector('.sheet-scroll');
   if (scroll) scroll.scrollTop = 0;
