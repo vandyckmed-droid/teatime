@@ -148,6 +148,11 @@ no branch, no PR). Note what you improved at the top of the commit message.
 Trigger: the owner says `/overhaul` or asks for a full redesign/visual
 overhaul.
 
+**Run this with the highest-capability model available (Opus-tier or
+better) at maximum reasoning effort — this is a large, high-judgment task,
+not a fast/cheap-tier job. Think deeply before writing any code: plan the
+whole visual system first, then execute against that plan.**
+
 Rebuild the UI's visual language from scratch — new color system,
 typography scale, spacing model, shadows, radii, interactions. Don't
 preserve the old approach, improve it fundamentally. This is deliberately
