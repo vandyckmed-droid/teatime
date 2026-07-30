@@ -104,6 +104,45 @@ Remove obvious junk without asking.
 at the top of the commit message. List any skipped items (things you asked
 about) at the end.
 
+## /polish — design polish pass
+
+Trigger: the owner says `/polish` or asks for a design/UI polish pass.
+
+Audit the UI for visual consistency and polish. Improve layout, color,
+typography, spacing, and visual hierarchy. Keep the core aesthetic — just
+sharper.
+
+**Improve without asking:**
+- Inconsistent spacing, padding, margins (standardize to scale)
+- Font sizes or weights that don't match established hierarchy
+- Color mismatches or low-contrast text
+- Alignment issues, misaligned elements, or ragged spacing
+- Shadow depth or blur inconsistencies
+- Border radii or stroke weights that don't match the system
+- Orphaned or awkwardly sized elements
+- Typography that doesn't match the declared font stack (`--font-sans`
+  / `--font-mono`)
+
+**Enhance without asking:**
+- Subtle texture, gradient, or depth where it's visually flat
+- Shadow refinements (distance, blur, opacity) for better hierarchy
+- Letter spacing or line height tweaks for readability
+- Missing hover/press/focus states or transitions (iOS idioms — see
+  "This is an iPhone interface" below)
+- Icon sizing or alignment to baseline
+
+**Ask briefly (one-liner) only for:**
+- Significant color shifts (new palette or tone)
+- Layout restructuring (major reflow, reordering)
+- Font changes — this app is already hard-locked to the OS system stack
+  (see "This is an iPhone interface" below), so this only ever means
+  "swap away from that," never a weight/size tweak within it
+- Visual approaches you're unsure match the intended mood
+
+**After polish:** screenshot before/after if visually significant, per the
+testing bar below, then commit directly to `main` (see "Shipping" above —
+no branch, no PR). Note what you improved at the top of the commit message.
+
 ## Parking ideas
 
 Not every idea the owner floats should turn into a build-it-now task. When
