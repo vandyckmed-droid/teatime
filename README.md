@@ -85,15 +85,16 @@ Then open http://localhost:3000.
   branching to maintain (this is a single-user app; see `CLAUDE.md`).
 - All design tokens (colors, type scale, spacing, radii, shadows, motion
   easings) live as CSS custom properties in one `:root` block at the top of
-  `public/styles.css` — a cool near-neutral ground with amber reserved for
-  interaction/ownership (active tab, selected segment, rank 1, watchlist
-  star) and green/red reserved for gain/loss.
+  `public/styles.css` — a true-black canvas with charcoal card surfaces, one
+  green shared deliberately by gains and key actions (active tab, selected
+  segment, rank 1, watchlist star — "green = good / yours / act here"), and
+  red reserved for loss.
 - Sector chip colors (`SECTOR_VAR` in `public/app.js`, `--sector-*` custom
   properties in `public/styles.css`, currently 11 sectors + a default) vary
   hue, lightness, *and* chroma deliberately — not a fixed saturation/lightness
-  ring — so neighboring sectors differ in punch, not just hue. The three
-  closest to a reserved gain/loss/accent hue are deliberately de-chromatized
-  so they can't be misread as a semantic color. Not validated against a
+  ring — so neighboring sectors differ in punch, not just hue. The two
+  closest to a reserved gain/loss hue are deliberately de-chromatized so
+  they can't be misread as a semantic color. Not validated against a
   colorblind-safety floor. Every chip still shows the sector name as text
   too, so color is never the sole signal. Add a new sector's color in the
   same style (see the comment block above the palette in `styles.css`) if

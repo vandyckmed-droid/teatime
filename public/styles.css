@@ -4,49 +4,56 @@
    Dark is the only theme (see CLAUDE.md): one unconditional :root block, no
    prefers-color-scheme branching, no light variant.
 
-   The ground is a cool near-neutral ink (hue ~265 at chroma <= 0.014) so the
-   data colors carry all the chroma on screen. Amber is the only warm hue in
-   the system and it is reserved for interaction + ownership (active tab,
-   selected segment, rank 1, watchlisted star, switch on) — never for data.
-   Green and red are reserved for gain/loss. Those three protected bands are
-   what the sector palette below is designed around.
+   The locked look: a true-black canvas with restrained charcoal surfaces,
+   so one green is the loudest thing on screen — and that green is shared,
+   deliberately, by gains AND key actions (active tab, selected segment,
+   rank 1, watchlisted star, switch on). "Green = good / yours / act here"
+   is one learnable rule, the same unification finance apps like Robinhood
+   make on purpose. Red stays reserved for loss. Those two protected bands
+   (green ~157°, red ~24°) are what the sector palette is designed around.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* ── ground / surface ladder (real lightness steps, ~5% L apart, so cards
-        read as elevated without leaning on a drop shadow) ── */
-  --bg: #08090C;
-  --surface: #15171C;
-  --surface-2: #202329;
-  --surface-3: #2D3038;
+  /* ── ground / surface ladder. True black canvas; charcoal steps are
+        compressed low (L ≈ 7 / 11 / 16%) so cards read as elevated without
+        ever going grey — the canvas stays black, the cards stay charcoal. ── */
+  --bg: #000000;
+  --surface: #0F1113;
+  --surface-2: #1A1D20;
+  --surface-3: #26292E;
 
   /* Alpha hairlines rather than opaque lines: one value layers correctly on
-     top of any of the four surfaces above. */
-  --hairline: rgba(255, 255, 255, 0.07);
-  --hairline-strong: rgba(255, 255, 255, 0.13);
-  --highlight: rgba(255, 255, 255, 0.05);
+     top of any of the four surfaces above. A hair stronger than before —
+     pure black swallows low-alpha edges. */
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.14);
+  --highlight: rgba(255, 255, 255, 0.06);
 
-  --text: #EEF0F4;
-  --text-2: #A5ABB7;
-  --text-3: #777D8A;
+  --text: #F3F4F6;
+  --text-2: #A2A7AD;
+  --text-3: #737880;
 
-  /* ── semantics: three protected hue bands ── */
-  --accent: #F8BC49;        /* oklch(0.83 0.145 80)  — interaction + identity */
-  --accent-ink: #14100A;    /* glyph/text on an amber fill */
-  --gain: #2FDE9D;          /* oklch(0.80 0.165 162) */
+  /* ── semantics: two protected hue bands ──
+     One green for both gain and action (oklch ≈ 0.78 0.19 157): saturated
+     enough to carry the whole interface, short of acid-neon so it stays
+     calm on an OLED black. Dark-green ink for text on a green fill. */
+  --accent: #00D97E;
+  --accent-ink: #01271A;
+  --gain: #00D97E;
   --loss: #F95E5D;          /* oklch(0.685 0.19 24) */
 
   /* ── sector palette ─────────────────────────────────────────────────
      Referenced by SECTOR_VAR in app.js, surfaced as the ticker chip's tint
      and a dot on the detail sheet's Sector fact. Hues are spread around the
      wheel, but lightness AND chroma vary deliberately too, so neighbouring
-     hues also differ in punch — the previous set was 12 hues at one fixed
-     saturation/lightness, which made them all read as "some pastel".
+     hues also differ in punch. Everything here sits a step quieter than the
+     action green — the sector coding is legible on inspection but never
+     competes with it.
 
-     The three that have to live near a reserved band are de-chromatized so
-     they can't be misread as a semantic color: Basic Materials is the
-     --loss hue at half its chroma (dusty clay, not "down"), Consumer
-     Defensive is yellower and lighter than the --gain mint, Financial
-     Services is far lighter and greener than the --accent gold.
+     The two that live near a protected band are de-chromatized so they
+     can't be misread as a semantic color: Basic Materials is the --loss
+     hue at half its chroma (dusty clay, not "down"), and Consumer
+     Defensive is a soft low-chroma sage — nothing vivid may sit near the
+     gain/action green's hue.
 
      Not validated against a colorblind-safety floor (single sighted owner),
      and identity never depends on hue anyway: the chip carries the ticker
@@ -58,23 +65,27 @@
   --sector-basic-materials: #DC8E8B;     /* oklch(0.725 0.095 22)  dusty rose */
   --sector-energy: #FF9853;              /* oklch(0.775 0.150 52)  orange */
   --sector-financial: #DBD96E;           /* oklch(0.865 0.130 108) citron */
-  --sector-consumer-defensive: #8ADB78;  /* oklch(0.815 0.155 140) leaf */
+  --sector-consumer-defensive: #A6C9A3;  /* oklch(0.790 0.055 148) sage — de-chromatized: green is semantic */
   --sector-health: #69DDDE;              /* oklch(0.830 0.105 196) aqua */
   --sector-utilities: #7CB2CE;           /* oklch(0.735 0.070 232) steel */
   --sector-industrials: #C1AE97;         /* oklch(0.760 0.038 72)  concrete */
   --sector-default: #A99EC0;             /* oklch(0.720 0.050 300) lilac-grey */
 
   /* ── depth: cards get a 1px top light edge (the iOS material tell), not a
-        drop shadow. Shadows are only for layers that genuinely float. ── */
+        drop shadow — a drop shadow is invisible on a true-black canvas
+        anyway. Shadows are only for layers that genuinely float. ── */
   --shadow-card: inset 0 1px 0 var(--highlight);
   --shadow-float:
     0 12px 32px -8px rgba(0, 0, 0, 0.75),
     0 2px 8px rgba(0, 0, 0, 0.40);
 
-  --tabbar-bg: rgba(8, 9, 12, 0.72);
-  --sheet-scrim: rgba(4, 5, 7, 0.55);
+  --tabbar-bg: rgba(0, 0, 0, 0.72);
+  --sheet-scrim: rgba(0, 0, 0, 0.60);
 
-  /* ── type ── */
+  /* ── type: bold modern sans everywhere data speaks; mono survives only in
+        the ticker chips (a deliberate instrument accent) and literal
+        code/error text. All numeric sans runs tabular-nums so columns of
+        figures still align. ── */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --fs-title: 32px;
@@ -85,7 +96,8 @@
   --fs-micro: 11px;
   --fs-nano: 10px;
 
-  /* ── space (4px baseline) ── */
+  /* ── space (4px baseline; gutter is the page's side margin — .wrap and
+        every full-bleed element must share it) ── */
   --s1: 4px;
   --s2: 8px;
   --s3: 12px;
@@ -93,12 +105,13 @@
   --s5: 20px;
   --s6: 24px;
   --s7: 32px;
+  --gutter: 20px;
 
   /* ── radius ── */
   --r-sm: 8px;
   --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 24px;
+  --r-lg: 18px;
+  --r-xl: 28px;
   --r-full: 999px;
 
   /* ── motion ── */
@@ -134,35 +147,34 @@ button { font: inherit; color: inherit; }
 }
 
 .wrap {
-  padding: calc(var(--s5) + env(safe-area-inset-top)) var(--s4) calc(96px + env(safe-area-inset-bottom));
+  padding: calc(var(--s6) + env(safe-area-inset-top)) var(--gutter) calc(96px + env(safe-area-inset-bottom));
 }
 
 /* ── large-title nav header ───────────────────────────────────────────── */
 .nav-title {
   font-size: var(--fs-title);
-  font-weight: 700;
-  letter-spacing: -0.022em;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   line-height: 1.06;
-  margin: 0 0 var(--s1);
+  margin: 0 0 var(--s2);
 }
 .sub {
   font-size: var(--fs-sub);
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--text-2);
-  margin: 0 0 var(--s2);
+  margin: 0 0 var(--s3);
   max-width: 42ch;
 }
 
 .meta-row {
   display: flex; align-items: center; gap: 7px;
-  font-family: var(--font-mono);
   font-size: var(--fs-micro);
   line-height: 1.5;
   color: var(--text-3);
-  padding-bottom: var(--s3);
+  padding-bottom: var(--s4);
+  font-variant-numeric: tabular-nums;
 }
-/* A quiet "this data is live" tell, in amber because amber is this app's
-   one signal color. */
+/* A quiet "this data is live" tell, in the app's one signal green. */
 .meta-row::before {
   content: '';
   width: 5px; height: 5px; border-radius: 50%;
@@ -182,22 +194,21 @@ button { font: inherit; color: inherit; }
   top: env(safe-area-inset-top);
   z-index: 20;
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
-  margin: 0 calc(-1 * var(--s4)) var(--s2);
-  padding: var(--s2) var(--s4) 7px;
+  margin: 0 calc(-1 * var(--gutter)) var(--s2);
+  padding: var(--s2) var(--gutter) 7px;
   background: color-mix(in oklab, var(--bg) 90%, transparent);
   backdrop-filter: blur(16px) saturate(1.3);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
   border-bottom: 1px solid var(--hairline);
   font-size: var(--fs-micro);
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
 }
 .section-label-value {
-  font-family: var(--font-mono);
   font-weight: 500;
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0;
   text-transform: none;
   color: var(--text-2);
@@ -222,8 +233,8 @@ button { font: inherit; color: inherit; }
 .row {
   position: relative;
   display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s3) 14px;
-  min-height: 62px;
+  padding: 14px var(--s4);
+  min-height: 66px;
   cursor: pointer;
   transition: background 180ms ease;
 }
@@ -237,14 +248,14 @@ button { font: inherit; color: inherit; }
 }
 .row:last-child::after { display: none; }
 .row.unavailable { opacity: 0.45; }
-.row.is-selected { background: color-mix(in oklab, var(--accent) 6%, transparent); }
+.row.is-selected { background: color-mix(in oklab, var(--accent) 3%, transparent); }
 .row:active { background: var(--surface-2); transition: none; }
-.row.is-selected:active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.row.is-selected:active { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .rank {
   width: 26px; flex-shrink: 0; text-align: right; /* fits a 3-digit rank */
-  font-family: var(--font-mono); font-weight: 600; font-size: var(--fs-sub);
+  font-weight: 600; font-size: var(--fs-sub);
   color: var(--text-3); font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
@@ -283,7 +294,7 @@ button { font: inherit; color: inherit; }
   display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
 }
 .return-val {
-  font-family: var(--font-mono); font-weight: 600; font-size: 15.5px;
+  font-weight: 700; font-size: 16px;
   font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.15;
   white-space: nowrap;
 }
@@ -291,7 +302,7 @@ button { font: inherit; color: inherit; }
 .return-val.loss { color: var(--loss); }
 .return-val.na { color: var(--text-3); font-size: var(--fs-cap); font-weight: 500; }
 .price-mini {
-  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3);
+  font-size: 11px; color: var(--text-3);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
@@ -338,7 +349,7 @@ button { font: inherit; color: inherit; }
 /* ── loading skeletons (shaped like a real row, shimmer sweep) ─────────── */
 .skeleton-row {
   display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s3) var(--s4); min-height: 62px;
+  padding: 14px var(--s4); min-height: 66px;
   border-bottom: 1px solid var(--hairline);
 }
 .skeleton-row:last-child { border-bottom: none; }
@@ -375,7 +386,7 @@ button { font: inherit; color: inherit; }
 
 .footnote {
   margin: var(--s5) var(--s1) 0;
-  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); line-height: 1.7;
+  font-size: var(--fs-micro); color: var(--text-3); line-height: 1.7;
 }
 
 /* ── watchlist empty state ────────────────────────────────────────────── */
@@ -426,8 +437,8 @@ button { font: inherit; color: inherit; }
 .ios-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .stepper-date {
-  font-family: var(--font-mono); font-size: 14px; font-weight: 500; color: var(--text);
-  margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
 }
 .stepper-days { font-size: var(--fs-micro); color: var(--text-3); margin-top: 2px; }
 
@@ -472,8 +483,8 @@ button { font: inherit; color: inherit; }
 .segmented button {
   position: relative; z-index: 1;
   flex: 1 1 0; min-width: 0;
-  font-family: var(--font-mono); font-size: var(--fs-cap); font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-cap); font-weight: 700;
+  letter-spacing: 0.02em;
   padding: 7px 2px; min-height: 30px; border-radius: var(--r-sm);
   border: none; background: transparent; color: var(--text-3);
   cursor: pointer; white-space: nowrap;
@@ -528,7 +539,7 @@ button { font: inherit; color: inherit; }
   position: absolute; top: 4px; right: calc(50% - 26px);
   min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-full);
   background: var(--accent); color: var(--accent-ink);
-  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   font-variant-numeric: tabular-nums;
 }
@@ -589,11 +600,11 @@ button { font: inherit; color: inherit; }
 /* Sans, not mono: SF Mono at 34px reads clunky, SF Pro with tabular figures
    is what iOS itself uses for a headline number. */
 .detail-price {
-  font-size: 34px; font-weight: 700; letter-spacing: -0.03em; color: var(--text);
+  font-size: 36px; font-weight: 800; letter-spacing: -0.03em; color: var(--text);
   font-variant-numeric: tabular-nums; line-height: 1.05;
 }
 .detail-return {
-  font-family: var(--font-mono); font-weight: 600; font-size: var(--fs-cap);
+  font-weight: 700; font-size: var(--fs-cap);
   font-variant-numeric: tabular-nums;
   padding: 5px var(--s2); border-radius: var(--r-sm);
   background: color-mix(in oklab, currentColor 15%, transparent);
@@ -643,7 +654,7 @@ button { font: inherit; color: inherit; }
 @keyframes chart-area-in { from { opacity: 0; } to { opacity: 1; } }
 
 .chart-line {
-  fill: none; stroke: currentColor; stroke-width: 1.9;
+  fill: none; stroke: currentColor; stroke-width: 2.2;
   stroke-linejoin: round; stroke-linecap: round;
   animation: chart-line-in 700ms var(--ease-out) both;
 }
@@ -673,7 +684,7 @@ button { font: inherit; color: inherit; }
 .chart-crosshair-dot { fill: var(--text); stroke: var(--surface-2); stroke-width: 2.5; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 .chart-tooltip {
   position: absolute; top: -2px; left: 0;
-  font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-2);
+  font-size: var(--fs-micro); font-weight: 500; color: var(--text-2);
   background: var(--surface-3); border: 1px solid var(--hairline-strong);
   border-radius: var(--r-sm); box-shadow: var(--shadow-float);
   padding: 4px var(--s2); pointer-events: none; opacity: 0; white-space: nowrap;
@@ -690,7 +701,7 @@ button { font: inherit; color: inherit; }
    stack into one indistinguishable block of mono text in the bottom corner. */
 .chart-axis-y {
   position: absolute; left: 2px;
-  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; color: var(--text-2);
+  font-size: 11px; font-weight: 600; color: var(--text-2);
   font-variant-numeric: tabular-nums; pointer-events: none;
   animation: chart-fade-in 400ms ease-out 200ms both;
 }
@@ -698,7 +709,7 @@ button { font: inherit; color: inherit; }
 .chart-axis-y.min { bottom: 2px; }
 .chart-axis-x {
   display: flex; justify-content: space-between;
-  font-family: var(--font-mono); font-size: 9.5px; color: var(--text-3);
+  font-size: 10px; font-weight: 500; color: var(--text-3);
   font-variant-numeric: tabular-nums;
   margin: 10px var(--s1) 0;
 }
