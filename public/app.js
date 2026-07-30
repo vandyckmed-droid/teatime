@@ -766,12 +766,15 @@ function renderRanksCallout(unavailable) {
 function renderWatchlistBoard() {
   const label = document.getElementById('watchlist-score-label');
   const head = document.getElementById('watchlist-board-head');
+  const actions = document.getElementById('watchlist-actions');
   const rowsEl = document.getElementById('watchlist-rows');
   const companies = state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol));
 
   if (companies.length === 0) {
     label.hidden = true;
     head.hidden = true;
+    actions.hidden = true;
+    resetClearWatchlist();
     rowsEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-glyph" aria-hidden="true">
@@ -784,6 +787,7 @@ function renderWatchlistBoard() {
 
   label.hidden = false;
   head.hidden = false;
+  actions.hidden = false;
   fillBoard(rowsEl, companies.map((c) => ({ c, value: scoreFor(c) })));
 }
 
@@ -883,6 +887,48 @@ function showDetailAt(index) {
   const scroll = document.querySelector('.sheet-scroll');
   if (scroll) scroll.scrollTop = 0;
   return true;
+}
+
+// ── clear watchlist ──────────────────────────────────────────────────
+// Two taps, because one tap would throw away saved state with no undo. The
+// armed state reverts on its own so a stray first tap can't leave a live
+// destructive button sitting there.
+const CLEAR_ARM_MS = 4000;
+let clearArmedTimer = null;
+
+function resetClearWatchlist() {
+  const btn = document.getElementById('clear-watchlist');
+  if (!btn) return;
+  if (clearArmedTimer) { clearTimeout(clearArmedTimer); clearArmedTimer = null; }
+  btn.classList.remove('armed');
+  btn.textContent = 'Clear watchlist';
+}
+
+function initClearWatchlist() {
+  const btn = document.getElementById('clear-watchlist');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const count = state.watchlist.size;
+    if (count === 0) return;
+
+    if (!btn.classList.contains('armed')) {
+      btn.classList.add('armed');
+      btn.textContent = `Tap again to remove ${count}`;
+      clearArmedTimer = setTimeout(resetClearWatchlist, CLEAR_ARM_MS);
+      return;
+    }
+
+    resetClearWatchlist();
+    state.watchlist.clear();
+    saveWatchlist();
+    updateWatchlistBadge();
+    // Nothing is held any more, so nothing should still be faded as a
+    // correlate of it.
+    await refreshCorrelations();
+    renderAll();
+    // Stays on this tab rather than bouncing to Ranks — the empty state already
+    // says where to go, and navigating for the user is a surprise.
+  });
 }
 
 // ── swipe between companies ──────────────────────────────────────────
@@ -1347,6 +1393,7 @@ function initDetailSheet() {
   document.getElementById('sheet-close').addEventListener('click', closeDetail);
   document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
   initDetailSwipe();
+  initClearWatchlist();
   document.addEventListener('keydown', (e) => {
     const sheetOpen = !document.getElementById('detail-sheet').hidden;
     if (e.key === 'Escape' && sheetOpen) closeDetail();
