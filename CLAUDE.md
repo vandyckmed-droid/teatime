@@ -143,6 +143,57 @@ sharper.
 testing bar below, then commit directly to `main` (see "Shipping" above —
 no branch, no PR). Note what you improved at the top of the commit message.
 
+## /overhaul — full visual redesign
+
+Trigger: the owner says `/overhaul` or asks for a full redesign/visual
+overhaul.
+
+Rebuild the UI's visual language from scratch — new color system,
+typography scale, spacing model, shadows, radii, interactions. Don't
+preserve the old approach, improve it fundamentally. This is deliberately
+the opposite of `/polish`: `/polish` keeps the aesthetic and sharpens it,
+`/overhaul` is free to replace it.
+
+Two things stay fixed regardless, since they're explicit product decisions
+this app has made repeatedly, not "the old approach" being overhauled: the
+OS system font stack (no downloaded webfonts) and the fixed-width,
+dark-only, iOS-idiom shell (bottom tab bar, large-title headers, bottom
+sheet, grouped-list settings) — both covered in "This is an iPhone
+interface" below. Redesign everything inside those two boundaries as
+aggressively as you want.
+
+**Redesign without asking:**
+- Complete layout restructure within the fixed-width iOS shell (grid,
+  flow, component organization)
+- Color palette swap (new primary, secondary, accent, neutrals) — still
+  dark-only, no light variant
+- Typography overhaul within the system font stack (new weight system,
+  size scale, hierarchy)
+- Spacing system (new baseline, scale, density)
+- Shadow and depth model (new visual language)
+- Border radii, stroke weights, visual texture (start fresh)
+- Interaction states (hover, focus, active, disabled) — design from
+  scratch
+- Visual hierarchy (contrast, sizing, positioning)
+- Alignment model, component sizing, proportions
+
+**Ship without asking:**
+- New icon set if current one doesn't fit the aesthetic
+- Refined animations or transitions that match new mood
+- Revised component library with new baseline
+- Updated color tokens, shadow definitions, spacing scale
+
+**Ask briefly (one-liner) only for:**
+- Major structural decisions if multiple strong approaches exist
+- Mood/tone if you're uncertain what the target aesthetic is
+- Specific UI patterns (modal styling, navigation approach, etc.) if
+  undefined
+
+**After overhaul:** before/after screenshots essential, per the testing
+bar below. Commit all at once or in logical visual systems, directly to
+`main` (see "Shipping" above — no branch, no PR). Describe the new
+aesthetic, rationale, and what changed at the top of the commit message.
+
 ## Parking ideas
 
 Not every idea the owner floats should turn into a build-it-now task. When
