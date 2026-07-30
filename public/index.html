@@ -10,8 +10,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Ranks" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#100E09" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23A2751C'/%3E%3Cpath d='M27 62 L42 44 L56 55 L74 30' stroke='%23FCEFD2' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <meta name="theme-color" content="#08090C" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23F8BC49'/%3E%3Cpath d='M22 68 L42 46 L57 58 L79 27' stroke='%2314100A' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='79' cy='27' r='7.5' fill='%2314100A'/%3E%3C/svg%3E" />
 
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -27,7 +27,9 @@
           <span id="as-of">Loading&hellip;</span>
         </div>
 
-        <div class="section-label" id="ranks-score-label">Largest by market cap</div>
+        <div class="section-label" id="ranks-score-label">
+          <span class="section-label-key">Largest by market cap</span>
+        </div>
 
         <div class="board">
           <div id="ranks-rows">
@@ -51,17 +53,19 @@
     <section class="panel" id="panel-watchlist" data-panel="watchlist" hidden>
       <div class="wrap">
         <div class="nav-title">Watchlist</div>
-        <p class="sub">Tap a filled circle to remove one.</p>
+        <p class="sub">Tap a filled star to remove one.</p>
 
-        <div class="section-label" id="watchlist-score-label" hidden>Saved</div>
+        <div class="section-label" id="watchlist-score-label" hidden>
+          <span class="section-label-key">Saved</span>
+        </div>
 
         <div class="board">
           <div id="watchlist-rows">
             <div class="empty-state">
               <div class="empty-state-glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="28" height="28"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
+                <svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z"/></svg>
               </div>
-              <p>Your watchlist is empty. Head to Ranks and tap the circle on any company to save it here.</p>
+              <p>Your watchlist is empty. Head to Ranks and tap the star on any company to save it here.</p>
             </div>
           </div>
         </div>
@@ -74,35 +78,38 @@
         <div class="nav-title">Settings</div>
         <p class="sub">Tune how the board scores and ranks companies.</p>
 
-        <div class="section-label">Scoring</div>
+        <div class="section-label"><span class="section-label-key">Scoring</span></div>
         <div class="settings-list" id="settings-list"></div>
 
-        <div class="section-label" id="daterange-label" style="margin-top: 20px;">Ranking window</div>
+        <div class="section-label" id="daterange-label"><span class="section-label-key">Ranking window</span></div>
         <div class="settings-list" id="daterange-settings"></div>
       </div>
     </section>
 
     <!-- ────────────────────── Tab bar chrome ─────────────────── -->
     <nav class="tabbar" role="tablist" aria-label="Primary">
+      <!-- Descending bars: a leaderboard, not a generic bar chart. -->
       <button class="tab-btn" data-tab="ranks" role="tab" aria-selected="true">
         <span class="tab-icon">
-          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4.2" height="8.5" rx="1"/><rect x="9.9" y="7" width="4.2" height="13.5" rx="1"/><rect x="16.8" y="3" width="4.2" height="17.5" rx="1"/></svg>
-          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="12" width="4.2" height="8.5" rx="1"/><rect x="9.9" y="7" width="4.2" height="13.5" rx="1"/><rect x="16.8" y="3" width="4.2" height="17.5" rx="1"/></svg>
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.25" y="3.5" width="5.5" height="17" rx="2"/><rect x="9.25" y="8.5" width="5.5" height="12" rx="2"/><rect x="15.25" y="13.5" width="5.5" height="7" rx="2"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><rect x="3.25" y="3.5" width="5.5" height="17" rx="2"/><rect x="9.25" y="8.5" width="5.5" height="12" rx="2"/><rect x="15.25" y="13.5" width="5.5" height="7" rx="2"/></svg>
         </span>
         <span class="tab-label">Ranks</span>
       </button>
       <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
         <span class="tab-icon">
-          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
-          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z"/></svg>
         </span>
         <span class="tab-label">Watchlist</span>
         <span class="tab-badge" id="watchlist-badge" hidden>0</span>
       </button>
+      <!-- Sliders, not a gear: this page is entirely parameter tuning, and a
+           20-node gear turns to mush at 23px. -->
       <button class="tab-btn" data-tab="settings" role="tab" aria-selected="false">
         <span class="tab-icon">
-          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-          <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3.4"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 8.8h9.4M18 8.8h3M3 15.2h3.6M12.2 15.2H21"/><circle cx="15.2" cy="8.8" r="2.8"/><circle cx="9.4" cy="15.2" r="2.8"/></svg>
+          <svg class="icon-filled" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M3 8.8h9.4M18.4 8.8h2.6M3 15.2h3M12.6 15.2H21"/><circle cx="15.2" cy="8.8" r="2.9" fill="currentColor"/><circle cx="9.4" cy="15.2" r="2.9" fill="currentColor"/></svg>
         </span>
         <span class="tab-label">Settings</span>
       </button>
@@ -113,7 +120,7 @@
     <div class="sheet" id="detail-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="detail-name">
       <div class="sheet-handle" aria-hidden="true"></div>
       <button type="button" class="sheet-close" id="sheet-close" aria-label="Close">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
 
       <div class="sheet-scroll">

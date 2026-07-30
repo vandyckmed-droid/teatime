@@ -34,6 +34,8 @@ const TRADING_DAYS_PER_YEAR = 252;
 // universeSize=100 (checked live against the screener). Add more here if a
 // future resize surfaces a sector not covered — falls back to
 // --sector-default rather than breaking.
+// Keys are FMP's sector strings; values are the custom properties defined in
+// styles.css (see the sector palette block there for how those hues are chosen).
 const SECTOR_VAR = {
   Technology: '--sector-tech',
   'Communication Services': '--sector-comm',
@@ -143,6 +145,29 @@ function daysAgoToDateStr(daysAgo) {
 }
 function fmtStepperDate(daysAgo) {
   return daysAgoToDate(daysAgo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+// Two-digit year, for the sticky section header where the whole range has to
+// share one line with its label.
+function fmtCompactDate(daysAgo) {
+  return daysAgoToDate(daysAgo)
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+    .replace(/,\s*(\d\d)$/, " '$1"); // "Nov 22, 25" → "Nov 22 '25"
+}
+
+// Company names are the single most-truncated thing in a 62px row, and the
+// legal suffix is the least informative part of them ("Sandisk Corporation" →
+// "Sandisk" buys back five characters of actual name). Row lists only — the
+// detail sheet still shows the full name as returned by the API.
+const NAME_SUFFIX = /[\s,]+(?:and\s+|&\s*)?(?:Incorporated|Inc|Corporation|Corp|Company|Co|Holdings|Holding|Group|plc|Ltd|Limited|N\.?V|S\.?A|SE|AG)\.?$/i;
+function shortName(name) {
+  let s = String(name).replace(/^The\s+/i, '');
+  for (let i = 0; i < 3; i++) {
+    const next = s.replace(NAME_SUFFIX, '');
+    if (next === s) break;
+    s = next;
+  }
+  s = s.trim().replace(/[,&]$/, '').trim();
+  return s || String(name);
 }
 
 // ── scoring: point-to-point return over the custom date range, or an
@@ -284,48 +309,67 @@ function rankDateRangeLabel() {
   const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
   return `${fmtStepperDate(startDaysAgo)} → ${fmtStepperDate(endDaysAgo)}`;
 }
+function rankDateRangeShort() {
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  return `${fmtCompactDate(startDaysAgo)} → ${fmtCompactDate(endDaysAgo)}`;
+}
 
+// The section label is a sticky two-part header (see .section-label in
+// styles.css): a fixed caps key on the left, the live ranking window in mono on
+// the right. Split like that it fits one line, which the old single run of
+// uppercased text did not.
 function updateScoreLabels() {
-  const text = state.settings.volAdjusted
-    ? `Ranked by return, ${rankDateRangeLabel()} · vol-adjusted`
-    : `Ranked by return, ${rankDateRangeLabel()}`;
+  const value = state.settings.volAdjusted
+    ? `${rankDateRangeShort()} · vol-adj`
+    : rankDateRangeShort();
+  const html =
+    '<span class="section-label-key">Ranked by return</span>' +
+    `<span class="section-label-value">${value}</span>`;
   const ranksLabel = document.getElementById('ranks-score-label');
-  if (ranksLabel) ranksLabel.textContent = text;
+  if (ranksLabel) ranksLabel.innerHTML = html;
   const watchlistLabel = document.getElementById('watchlist-score-label');
-  if (watchlistLabel) watchlistLabel.textContent = text;
+  if (watchlistLabel) watchlistLabel.innerHTML = html;
 }
 
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
+// The chip carries two things at once: the ticker (identity) and the sector
+// (category, as its tint). --chip-color is the only styling JS sets — the
+// tint/text/inset-border math all lives in .ticker-chip in styles.css.
 function sectorChip(c) {
   const sectorVar = SECTOR_VAR[c.sector] || '--sector-default';
   const secondary = [fmtCap(c.marketCap), c.sector || 'Uncategorized'].join(' · ');
   return `
     <span class="name-cell">
-      <span class="ticker-chip" style="background: color-mix(in srgb, var(${sectorVar}) 16%, transparent); color: var(${sectorVar});">${c.symbol}</span>
+      <span class="ticker-chip" style="--chip-color: var(${sectorVar})">${c.symbol}</span>
       <span class="name-text">
-        <div class="company-name">${c.name}</div>
+        <div class="company-name">${shortName(c.name)}</div>
         <div class="sector-line">${secondary}</div>
       </span>
     </span>`;
 }
 
-function selectCircle(c) {
+// The one star that was just tapped, so only it plays the spring — a re-render
+// happens for plenty of reasons (a settings change, another row's toggle) and
+// every saved star bouncing each time would be noise.
+let lastToggledSymbol = null;
+
+const STAR_PATH = 'M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z';
+
+function starButton(c) {
   const checked = state.watchlist.has(c.symbol);
+  const justChecked = checked && c.symbol === lastToggledSymbol;
   return `
     <span class="select-cell">
-      <button type="button" class="select-circle${checked ? ' checked' : ''}" data-symbol="${c.symbol}"
-        aria-pressed="${checked}" aria-label="${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+      <button type="button" class="star-btn${checked ? ' checked' : ''}${justChecked ? ' just-checked' : ''}"
+        data-symbol="${c.symbol}" aria-pressed="${checked}"
+        aria-label="${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>
       </button>
     </span>`;
 }
 
-function buildRow(c, rank, value) {
+function rowEl(c, rank, value) {
   const isGain = value >= 0;
-  return { el: rowEl(c, rank, value, isGain), value };
-}
-
-function rowEl(c, rank, value, isGain) {
   const row = document.createElement('div');
   row.className = `row${rank === 1 ? ' ranked-1' : ''}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
@@ -336,11 +380,11 @@ function rowEl(c, rank, value, isGain) {
     <span class="rank">${rank}</span>
     ${sectorChip(c)}
     <span class="trailing-cell">
-      <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="return-val ${isGain ? 'gain' : 'loss'}"></span>
+      <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="mini-bar"><span class="mini-bar-mid"></span><span class="mini-bar-fill"></span></span>
     </span>
-    ${selectCircle(c)}
+    ${starButton(c)}
   `;
   row.querySelector('.return-val').textContent = state.settings.volAdjusted ? fmtScore(value) : fmtPct(value);
   return row;
@@ -357,25 +401,27 @@ function buildUnavailableRow(c) {
     <span class="rank">&mdash;</span>
     ${sectorChip(c)}
     <span class="trailing-cell">
-      <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="return-val na">N/A</span>
+      <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="mini-bar"><span class="mini-bar-mid"></span></span>
     </span>
-    ${selectCircle(c)}
+    ${starButton(c)}
   `;
   return row;
 }
 
 function attachSelectHandlers(container) {
-  container.querySelectorAll('.select-circle').forEach((btn) => {
+  container.querySelectorAll('.star-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const symbol = btn.dataset.symbol;
       if (state.watchlist.has(symbol)) state.watchlist.delete(symbol);
       else state.watchlist.add(symbol);
+      lastToggledSymbol = symbol;
       saveWatchlist();
       updateWatchlistBadge(true);
       renderAll();
+      lastToggledSymbol = null;
     });
   });
 }
@@ -392,20 +438,30 @@ function attachRowHandlers(container) {
   });
 }
 
-function renderRanksBoard() {
-  const companies = state.leaderboard.companies;
+// The diverging mini-bar used to be linear against max|value|, which meant one
+// outlier set the scale for everyone: with a +856% run at the top, every row
+// from about 10th down collapsed to a 2px dot. Compressing with a square root
+// keeps the ordering strictly monotonic (no clamping, unlike a percentile cap,
+// which instead flattens the whole top of the list) while still leaving small
+// values visibly non-zero. Returns half-width percent, since the bar diverges
+// from the centre.
+function barPct(value, maxAbs) {
+  if (!(maxAbs > 0)) return 0;
+  return Math.min(Math.sqrt(Math.abs(value) / maxAbs) * 50, 50);
+}
 
-  const scored = companies.map((c) => ({ c, value: scoreFor(c) }));
+// Renders one board (Ranks or Watchlist) from scored companies: ranked rows
+// first, then the ones with too little history to score. Returns the
+// unavailable list so callers can explain it.
+function fillBoard(rowsEl, scored) {
   const available = scored.filter((x) => x.value !== null).sort((a, b) => b.value - a.value);
   const unavailable = scored.filter((x) => x.value === null).map((x) => x.c);
-  const maxAbs = Math.max(...available.map((x) => Math.abs(x.value)), 1);
+  const maxAbs = Math.max(...available.map((x) => Math.abs(x.value)), 0);
 
-  const rowsEl = document.getElementById('ranks-rows');
   rowsEl.innerHTML = '';
-
   available.forEach(({ c, value }, i) => {
-    const { el } = buildRow(c, i + 1, value);
-    const pct = Math.min((Math.abs(value) / maxAbs) * 50, 50);
+    const el = rowEl(c, i + 1, value);
+    const pct = barPct(value, maxAbs);
     const fill = el.querySelector('.mini-bar-fill');
     const isGain = value >= 0;
     fill.classList.add(isGain ? 'gain' : 'loss');
@@ -417,6 +473,12 @@ function renderRanksBoard() {
 
   attachSelectHandlers(rowsEl);
   attachRowHandlers(rowsEl);
+  return unavailable;
+}
+
+function renderRanksBoard() {
+  const scored = state.leaderboard.companies.map((c) => ({ c, value: scoreFor(c) }));
+  const unavailable = fillBoard(document.getElementById('ranks-rows'), scored);
   renderRanksCallout(unavailable);
 }
 
@@ -444,34 +506,15 @@ function renderWatchlistBoard() {
     rowsEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-glyph" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="30" height="30"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 2.5l2.9 6.05 6.6.86-4.8 4.63 1.18 6.58L12 17.9l-5.88 3.72L7.3 15l-4.8-4.63 6.6-.86L12 2.5z"/></svg>
+          <svg viewBox="0 0 24 24" width="30" height="30"><path d="${STAR_PATH}"/></svg>
         </div>
-        <p>Your watchlist is empty. Head to Ranks and tap the circle on any company to save it here.</p>
+        <p>Your watchlist is empty. Head to Ranks and tap the star on any company to save it here.</p>
       </div>`;
     return;
   }
 
   label.hidden = false;
-  const scored = companies.map((c) => ({ c, value: scoreFor(c) }));
-  const available = scored.filter((x) => x.value !== null).sort((a, b) => b.value - a.value);
-  const unavailable = scored.filter((x) => x.value === null).map((x) => x.c);
-  const maxAbs = Math.max(...available.map((x) => Math.abs(x.value)), 1);
-
-  rowsEl.innerHTML = '';
-  available.forEach(({ c, value }, i) => {
-    const { el } = buildRow(c, i + 1, value);
-    const pct = Math.min((Math.abs(value) / maxAbs) * 50, 50);
-    const fill = el.querySelector('.mini-bar-fill');
-    const isGain = value >= 0;
-    fill.classList.add(isGain ? 'gain' : 'loss');
-    fill.style.left = isGain ? '50%' : `${50 - pct}%`;
-    fill.style.width = `${pct}%`;
-    rowsEl.appendChild(el);
-  });
-  unavailable.forEach((c) => rowsEl.appendChild(buildUnavailableRow(c)));
-
-  attachSelectHandlers(rowsEl);
-  attachRowHandlers(rowsEl);
+  fillBoard(rowsEl, companies.map((c) => ({ c, value: scoreFor(c) })));
 }
 
 function updateWatchlistBadge(animate = false) {
@@ -507,8 +550,8 @@ function openDetail(symbol) {
   const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
   const chip = document.getElementById('detail-chip');
   chip.textContent = company.symbol;
-  chip.style.background = `color-mix(in srgb, var(${sectorVar}) 16%, transparent)`;
-  chip.style.color = `var(${sectorVar})`;
+  chip.style.setProperty('--chip-color', `var(${sectorVar})`);
+  // Full legal name here, unlike the rows, which trim the corporate suffix.
   document.getElementById('detail-name').textContent = company.name;
   document.getElementById('detail-sector').textContent = company.sector || 'Uncategorized';
   document.getElementById('detail-price').textContent = fmtPrice(company.price);
@@ -521,6 +564,10 @@ function openDetail(symbol) {
   requestAnimationFrame(() => {
     document.getElementById('sheet-backdrop').classList.add('open');
     document.getElementById('detail-sheet').classList.add('open');
+    // The segmented thumb needs real layout numbers, which don't exist until
+    // the sheet stops being display:none — and it should be in place before
+    // the sheet slides in, not slide sideways afterwards.
+    positionSegmentedThumb(true);
   });
 
   // Usually replaced near-instantly (history is prefetched at boot), but shows
@@ -574,23 +621,58 @@ function renderDetailFacts(company) {
     .join('');
 }
 
+// Built once, then only aria-pressed and the thumb's position change. The old
+// version re-rendered its innerHTML on every tap, which is why no transition
+// ever played: a freshly-inserted element has no previous value to animate
+// from (same reason the chart marks below use `animation`, not `transition`).
 function renderDetailSegmented() {
   const el = document.querySelector('[data-segmented="detail"]');
-  el.innerHTML = '';
-  CHART_RANGES.forEach((r) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = r.label;
-    btn.setAttribute('aria-pressed', String(r.key === detail.range));
-    btn.addEventListener('click', () => {
-      detail.range = r.key;
-      renderDetailSegmented();
-      const company = findCompany(detail.symbol);
-      if (company) renderDetailReturn(company);
-      renderChart();
+  if (!el) return;
+  if (!el.querySelector('button')) {
+    el.innerHTML = '<span class="segmented-thumb" aria-hidden="true"></span>';
+    CHART_RANGES.forEach((r) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = r.label;
+      btn.dataset.range = r.key;
+      btn.addEventListener('click', () => {
+        detail.range = r.key;
+        syncSegmented();
+        const company = findCompany(detail.symbol);
+        if (company) renderDetailReturn(company);
+        renderChart();
+      });
+      el.appendChild(btn);
     });
-    el.appendChild(btn);
+  }
+  syncSegmented();
+}
+
+function syncSegmented() {
+  const el = document.querySelector('[data-segmented="detail"]');
+  if (!el) return;
+  el.querySelectorAll('button').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.range === detail.range));
   });
+  positionSegmentedThumb();
+}
+
+// `instant` skips the slide — used when the sheet is (re)opening, where the
+// thumb should simply already be under the right label.
+function positionSegmentedThumb(instant = false) {
+  const el = document.querySelector('[data-segmented="detail"]');
+  if (!el) return;
+  const thumb = el.querySelector('.segmented-thumb');
+  const active = el.querySelector('button[aria-pressed="true"]');
+  if (!thumb || !active || !active.offsetWidth) return; // not laid out yet
+  const skipAnim = instant || !thumb.style.width;
+  if (skipAnim) thumb.style.transition = 'none';
+  thumb.style.width = `${active.offsetWidth}px`;
+  thumb.style.transform = `translateX(${active.offsetLeft}px)`;
+  if (skipAnim) {
+    void thumb.offsetWidth; // flush, so the restored transition doesn't animate this move
+    thumb.style.transition = '';
+  }
 }
 
 async function loadHistoryFor(symbol) {
@@ -635,18 +717,40 @@ function sliceForRange(series, rangeKey) {
   return series.filter((p) => p.date >= cutoffStr);
 }
 
-// ── chart: SVG line + area, colored by direction, with a touch-scrub crosshair
-const CHART_W = 400;
-const CHART_H = 160;
-const CHART_PAD = 10;
+// ── chart: SVG line + gradient area, colored by direction, with a touch-scrub
+// crosshair.
+//
+// The viewBox is measured from the wrapper in CSS pixels at render time (1 unit
+// = 1 px) rather than being a fixed 400x160 box stretched to fit with
+// preserveAspectRatio="none". That stretch scaled x and y by different factors,
+// which turned every circle into an ellipse and made diagonal stroke weight
+// inconsistent — visible on the endpoint dots. Trade-off: the geometry is tied
+// to the rendered size, so a viewport change has to re-render (see the resize
+// handler at the bottom of this section).
+const CHART_PAD_X = 6;
+// Generous top/bottom inset: it keeps the min/max labels in a band no data
+// point can reach, which is what used to make the low label collide with the
+// start-point dot whenever a range bottomed out on its first day.
+const CHART_PAD_Y = 26;
+const CHART_FALLBACK_W = 344;
+const CHART_FALLBACK_H = 184;
+
+function chartSize() {
+  const wrap = document.getElementById('chart-wrap');
+  return {
+    w: Math.max(Math.round(wrap?.clientWidth || 0) || CHART_FALLBACK_W, 160),
+    h: Math.max(Math.round(wrap?.clientHeight || 0) || CHART_FALLBACK_H, 100),
+  };
+}
 
 // A decorative (non-data) wave shape shown in place of "Loading chart…" while
-// a symbol's history is being fetched — same skeleton-pulse language as the
-// Ranks loading rows, shaped like a chart instead of a generic block.
+// a symbol's history is being fetched — same shimmer language as the Ranks
+// loading rows, shaped like a chart instead of a generic block. Purely
+// decorative, so this one keeps the cheap stretched viewBox.
 function chartSkeletonHTML() {
   return `
     <div class="chart-skeleton" aria-hidden="true">
-      <svg viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none">
+      <svg viewBox="0 0 400 160" preserveAspectRatio="none">
         <path class="chart-skeleton-area" d="M0,112 C40,96 60,124 100,104 C140,84 160,110 200,92 C240,74 260,100 300,86 C340,72 360,94 400,82 L400,160 L0,160 Z" />
         <path class="chart-skeleton-line" d="M0,112 C40,96 60,124 100,104 C140,84 160,110 200,92 C240,74 260,100 300,86 C340,72 360,94 400,82" />
       </svg>
@@ -668,15 +772,17 @@ function renderChart() {
   }
   detail.slice = slice;
 
+  const { w: W, h: H } = chartSize();
   const closes = slice.map((p) => p.close);
   const min = Math.min(...closes);
   const max = Math.max(...closes);
   const span = max - min || 1;
-  const innerH = CHART_H - CHART_PAD * 2;
+  const innerH = H - CHART_PAD_Y * 2;
+  const innerW = W - CHART_PAD_X * 2;
 
   const coords = slice.map((p, i) => ({
-    x: slice.length === 1 ? CHART_PAD : CHART_PAD + (i / (slice.length - 1)) * (CHART_W - CHART_PAD * 2),
-    y: CHART_PAD + innerH - ((p.close - min) / span) * innerH,
+    x: slice.length === 1 ? CHART_PAD_X : CHART_PAD_X + (i / (slice.length - 1)) * innerW,
+    y: CHART_PAD_Y + innerH - ((p.close - min) / span) * innerH,
     date: p.date,
     close: p.close,
   }));
@@ -685,23 +791,32 @@ function renderChart() {
   const dir = isGain ? 'gain' : 'loss';
 
   const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
-  const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(2)},${CHART_H} L0,${CHART_H} Z`;
-  const baselineY = coords[0].y.toFixed(2);
   const first = coords[0];
   const last = coords[coords.length - 1];
+  // Closed against the line's own first/last x, not 0/W — anchoring it to the
+  // container's edges put a stray diagonal wedge under the first point.
+  const areaPath = `${linePath} L${last.x.toFixed(2)},${H} L${first.x.toFixed(2)},${H} Z`;
+  const baselineY = first.y.toFixed(2);
 
   wrap.innerHTML = `
-    <div class="chart-axis-y max" id="chart-axis-max">${fmtPrice(max)}</div>
-    <div class="chart-axis-y min" id="chart-axis-min">${fmtPrice(min)}</div>
-    <svg viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
-      <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${CHART_W}" y2="${baselineY}" />
-      <path class="chart-area ${dir}" id="chart-area-path" d="${areaPath}" />
-      <path class="chart-line ${dir}" id="chart-line-path" d="${linePath}" />
+    <div class="chart-axis-y max">${fmtPrice(max)}</div>
+    <div class="chart-axis-y min">${fmtPrice(min)}</div>
+    <svg class="chart-svg ${dir}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
+      <defs>
+        <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.34" />
+          <stop offset="72%" stop-color="currentColor" stop-opacity="0.07" />
+          <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${W}" y2="${baselineY}" />
+      <path class="chart-area" id="chart-area-path" fill="url(#chart-grad)" d="${areaPath}" />
+      <path class="chart-line" id="chart-line-path" d="${linePath}" />
       <circle class="chart-startpoint" id="chart-startpoint-dot" cx="${first.x.toFixed(2)}" cy="${first.y.toFixed(2)}" r="3.5" />
-      <circle class="chart-endpoint ${dir}" id="chart-endpoint-dot" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
-      <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${CHART_H}" />
+      <circle class="chart-endpoint" id="chart-endpoint-dot" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
+      <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${H}" />
       <circle class="chart-crosshair-dot" id="crosshair-dot" r="4.5" />
-      <rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="transparent" id="chart-hit" />
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="chart-hit" />
     </svg>
     <div class="chart-tooltip" id="chart-tooltip"></div>
   `;
@@ -712,7 +827,7 @@ function renderChart() {
   }
 
   animateChartIn(wrap);
-  attachChartScrub(wrap, coords);
+  attachChartScrub(wrap, coords, W);
 }
 
 // Line "draws in" left-to-right via the classic stroke-dasharray/dashoffset
@@ -731,7 +846,7 @@ function animateChartIn(wrap) {
   linePath.style.setProperty('--dash-length', String(length));
 }
 
-function attachChartScrub(wrap, coords) {
+function attachChartScrub(wrap, coords, chartW) {
   const svg = wrap.querySelector('svg');
   const hit = wrap.querySelector('#chart-hit');
   const crosshairLine = wrap.querySelector('#crosshair-line');
@@ -740,8 +855,8 @@ function attachChartScrub(wrap, coords) {
 
   function nearestIndex(clientX) {
     const rect = svg.getBoundingClientRect();
-    const relX = ((clientX - rect.left) / rect.width) * CHART_W;
-    const idx = Math.round((relX / CHART_W) * (coords.length - 1));
+    const relX = ((clientX - rect.left) / rect.width) * chartW;
+    const idx = Math.round((relX / chartW) * (coords.length - 1));
     return Math.min(coords.length - 1, Math.max(0, idx));
   }
 
@@ -756,8 +871,8 @@ function attachChartScrub(wrap, coords) {
     crosshairDot.style.opacity = '1';
 
     const rect = svg.getBoundingClientRect();
-    const pxRatio = rect.width / CHART_W;
-    const leftPx = Math.min(Math.max(c.x * pxRatio, 28), rect.width - 28);
+    const pxRatio = rect.width / chartW;
+    const leftPx = Math.min(Math.max(c.x * pxRatio, 62), rect.width - 62);
     tooltip.style.left = `${leftPx}px`;
     tooltip.style.opacity = '1';
     tooltip.innerHTML = '';
@@ -792,6 +907,21 @@ function initDetailSheet() {
   document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !document.getElementById('detail-sheet').hidden) closeDetail();
+  });
+
+  // The chart's viewBox is in real pixels, so a size change (rotation, or the
+  // keyboard/URL bar appearing) needs a re-render rather than a rescale. Only
+  // matters while the sheet is actually open.
+  let resizeRaf = null;
+  window.addEventListener('resize', () => {
+    const sheet = document.getElementById('detail-sheet');
+    if (!sheet || sheet.hidden || !detail.symbol) return;
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = null;
+      if (historyCache.has(detail.symbol)) renderChart();
+      positionSegmentedThumb(true);
+    });
   });
 }
 
