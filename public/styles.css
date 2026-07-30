@@ -220,7 +220,6 @@ button { font: inherit; color: inherit; }
 .settings-list + .section-label { margin-top: var(--s6); }
 
 /* ── card surfaces ────────────────────────────────────────────────────── */
-.board,
 .settings-list {
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
@@ -228,29 +227,33 @@ button { font: inherit; color: inherit; }
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
+/* The board is not a card itself: each row is its own charcoal card, and
+   the true-black canvas showing through the gaps is what separates them —
+   no hairline separators to manage at all. The inner selector matters:
+   rows actually live one container down (#ranks-rows / #watchlist-rows),
+   so the stack gap has to apply there too. */
+.board,
+.board > * {
+  display: flex; flex-direction: column; gap: var(--s2);
+}
 
-/* ── rows ─────────────────────────────────────────────────────────────── */
+/* ── rows (one card each) ─────────────────────────────────────────────── */
 .row {
   position: relative;
   display: flex; align-items: center; gap: var(--s2);
   padding: 14px var(--s4);
   min-height: 66px;
   cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
   transition: background 180ms ease;
 }
-/* Separators are inset to the ticker chip's leading edge, the way iOS insets
-   table separators to the text column — 150 full-bleed rules was most of the
-   list's visual noise. */
-.row::after {
-  content: '';
-  position: absolute; left: 48px; right: 0; bottom: 0; height: 1px;
-  background: var(--hairline);
-}
-.row:last-child::after { display: none; }
 .row.unavailable { opacity: 0.45; }
-.row.is-selected { background: color-mix(in oklab, var(--accent) 3%, transparent); }
+.row.is-selected { background: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
 .row:active { background: var(--surface-2); transition: none; }
-.row.is-selected:active { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.row.is-selected:active { background: color-mix(in oklab, var(--accent) 9%, var(--surface-2)); }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .rank {
@@ -344,15 +347,20 @@ button { font: inherit; color: inherit; }
   100% { transform: scale(1) rotate(0deg); }
 }
 
-.error-box { padding: var(--s5); color: var(--loss); font-family: var(--font-mono); font-size: var(--fs-sub); line-height: 1.5; }
+.error-box {
+  padding: var(--s5); color: var(--loss); font-family: var(--font-mono); font-size: var(--fs-sub); line-height: 1.5;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
+}
 
 /* ── loading skeletons (shaped like a real row, shimmer sweep) ─────────── */
 .skeleton-row {
   display: flex; align-items: center; gap: var(--s2);
   padding: 14px var(--s4); min-height: 66px;
-  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
 }
-.skeleton-row:last-child { border-bottom: none; }
 .skeleton-block {
   border-radius: var(--r-sm);
   background:
@@ -390,7 +398,12 @@ button { font: inherit; color: inherit; }
 }
 
 /* ── watchlist empty state ────────────────────────────────────────────── */
-.empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--s3); padding: 56px var(--s6); text-align: center; }
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s3);
+  padding: 56px var(--s6); text-align: center;
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-md); box-shadow: var(--shadow-card);
+}
 .empty-state-glyph {
   width: 54px; height: 54px; border-radius: 18px;
   background: color-mix(in oklab, var(--accent) 10%, var(--surface-2));
@@ -715,7 +728,7 @@ button { font: inherit; color: inherit; }
 }
 
 /* ── detail facts ─────────────────────────────────────────────────────── */
-.detail-facts { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.detail-facts { display: flex; flex-wrap: wrap; gap: var(--s3); }
 .detail-fact {
   flex: 1 1 0; min-width: 92px;
   border: 1px solid var(--hairline); border-radius: var(--r-md);
