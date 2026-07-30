@@ -20,6 +20,11 @@ on:
     - cron: '0 9 * * *'
   # So a missed or failed day can be filled in by hand.
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Recapture even if today already has a file (use to test the run end to end)'
+        type: boolean
+        default: false
 
 # Weekend and holiday runs still fire; they just re-record the last trading
 # day's closes, which each file states via historyAsOf and lastClose.
@@ -44,7 +49,10 @@ jobs:
       - name: Capture today's board
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-        run: node scripts/snapshot.js
+        # Without --force the script exits before it fetches anything when the
+        # day already has a file, which is right for a retried cron but would
+        # make a manual test run prove nothing.
+        run: node scripts/snapshot.js ${{ inputs.force && '--force' || '' }}
 
       - name: Commit it if there's something new
         run: |
