@@ -16,10 +16,25 @@ function getApiKey() {
 // the ~3 per company would otherwise discard the whole universe's fetch and
 // leave the store serving yesterday's data for another day.
 const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-const MAX_ATTEMPTS = 5;
+// Enough attempts to ride out a rate-limit *window*, not just a blip. The
+// once-daily refresh has no deadline worth protecting, and the alternative —
+// giving up — throws away the whole all-or-nothing cycle and serves stale data
+// for another day. Worst case per request is ~2.5 minutes of waiting.
+const MAX_ATTEMPTS = 7;
 const BASE_BACKOFF_MS = 1500;
+const MAX_BACKOFF_MS = 45000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// FMP sometimes says exactly how long to wait; believe it over our own guess,
+// but don't let a bad header park the process for an hour.
+function retryAfterMs(res) {
+  const header = res.headers && res.headers.get ? res.headers.get('retry-after') : null;
+  if (!header) return null;
+  const seconds = Number(header);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return Math.min(seconds * 1000, MAX_BACKOFF_MS);
+}
 
 async function fmpGet(endpoint, params = {}) {
   const url = new URL(`${BASE_URL}/${endpoint}`);
@@ -42,8 +57,8 @@ async function fmpGet(endpoint, params = {}) {
     if (!RETRY_STATUSES.has(res.status) || attempt === MAX_ATTEMPTS) break;
     // Exponential, with jitter so a burst of concurrent callers that all got
     // rate-limited together don't march back in lockstep and trip it again.
-    const wait = BASE_BACKOFF_MS * 2 ** (attempt - 1) * (1 + Math.random() * 0.4);
-    await sleep(wait);
+    const backoff = Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+    await sleep(retryAfterMs(res) ?? backoff * (1 + Math.random() * 0.4));
   }
   throw new Error(`FMP ${endpoint} request failed: ${lastStatus}`);
 }
