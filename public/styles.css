@@ -251,18 +251,51 @@ button { font: inherit; color: inherit; }
   transition: background 180ms ease;
 }
 .row.unavailable { opacity: 0.45; }
-.row.is-selected { background: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
 .row:active { background: var(--surface-2); transition: none; }
-.row.is-selected:active { background: color-mix(in oklab, var(--accent) 9%, var(--surface-2)); }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* ── saved rows: a partial outline glow ───────────────────────────────
+   Not a full green border — a 1.5px gradient ring that's bright at the
+   top-left and fades to nothing before it wraps the card, plus a soft
+   green bloom underneath. Enough to pick saved cards out while scrolling
+   without turning the list into a wall of outlined boxes. The ring is
+   drawn just outside the border by masking a gradient-filled box down to
+   its own padding edge (the standard gradient-border technique). */
+.row.is-selected {
+  background: color-mix(in oklab, var(--accent) 4%, var(--surface));
+  box-shadow:
+    var(--shadow-card),
+    0 2px 18px -8px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+.row.is-selected:active { background: color-mix(in oklab, var(--accent) 9%, var(--surface-2)); }
+.row.is-selected::before {
+  content: '';
+  position: absolute; inset: -1px;
+  border-radius: calc(var(--r-md) + 1px);
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 70%, transparent) 0%,
+    color-mix(in oklab, var(--accent) 26%, transparent) 24%,
+    transparent 46%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Left-aligned so the number sits at the card's leading edge rather than
+   floating mid-gutter, and big enough to be the row's index at a glance.
+   Fixed width still holds the chip column steady from rank 1 to 150. */
 .rank {
-  width: 26px; flex-shrink: 0; text-align: right; /* fits a 3-digit rank */
-  font-weight: 600; font-size: var(--fs-sub);
+  width: 32px; flex-shrink: 0; text-align: left;
+  font-weight: 700; font-size: 20px;
   color: var(--text-3); font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
 }
 .row.ranked-1 .rank { color: var(--accent); }
+.row.unavailable .rank { font-size: var(--fs-body); }
 
 .name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 
@@ -324,27 +357,38 @@ button { font: inherit; color: inherit; }
 .mini-bar-fill.gain { background: var(--gain); left: 50%; }
 .mini-bar-fill.loss { background: var(--loss); }
 
-/* ── watchlist star (add / remove) ────────────────────────────────────── */
+/* ── watchlist add / added control ───────────────────────────────────
+   Plus = "add this", check = "added". Unsaved is a hollow outlined key so
+   it reads as an affordance; saved is a solid green disc — the same green
+   as the card's outline glow, so the row and its control agree. */
 .select-cell { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.star-btn {
-  width: 26px; height: 26px; padding: 0; flex-shrink: 0; position: relative;
+.add-btn {
+  width: 28px; height: 28px; padding: 0; flex-shrink: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
-  background: none; border: none; cursor: pointer;
-  color: color-mix(in oklab, var(--text-3) 72%, transparent);
+  background: none; border: none; border-radius: 50%; cursor: pointer;
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--text-3) 50%, transparent);
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.star-btn::after { content: ''; position: absolute; inset: -9px; } /* 44pt tap target */
-.star-btn svg { width: 21px; height: 21px; transition: transform 120ms var(--ease-out); }
-.star-btn svg path { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
-.star-btn:active svg { transform: scale(0.84); }
-.star-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-radius: var(--r-sm); }
-.star-btn.checked { color: var(--accent); }
-.star-btn.checked svg path { fill: currentColor; stroke: currentColor; }
-/* Only the star that was just tapped springs — app.js tags it, so a
-   re-render for any other reason doesn't set every saved star bouncing. */
-.star-btn.just-checked svg { animation: star-pop 380ms var(--ease-spring); }
-@keyframes star-pop {
-  0% { transform: scale(0.6) rotate(-14deg); }
-  100% { transform: scale(1) rotate(0deg); }
+.add-btn::after { content: ''; position: absolute; inset: -8px; } /* 44pt tap target */
+.add-btn svg { width: 16px; height: 16px; transition: transform 120ms var(--ease-out); }
+.add-btn svg path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.add-btn .icon-check { display: none; }
+.add-btn:active svg { transform: scale(0.78); }
+.add-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.add-btn.checked {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.add-btn.checked .icon-plus { display: none; }
+.add-btn.checked .icon-check { display: block; }
+/* Only the control that was just tapped springs — app.js tags it, so a
+   re-render for any other reason doesn't set every saved row bouncing. */
+.add-btn.just-checked { animation: add-pop 380ms var(--ease-spring); }
+@keyframes add-pop {
+  0% { transform: scale(0.62); }
+  100% { transform: scale(1); }
 }
 
 .error-box {
@@ -410,7 +454,7 @@ button { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: center;
   color: color-mix(in oklab, var(--accent) 70%, var(--text-3));
 }
-.empty-state-glyph svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.empty-state-glyph svg path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .empty-state p { margin: 0; max-width: 28ch; color: var(--text-3); font-size: var(--fs-sub); line-height: 1.55; }
 
 /* ── settings ─────────────────────────────────────────────────────────── */
@@ -757,7 +801,7 @@ button { font: inherit; color: inherit; }
   .chart-axis-y,
   .tab-badge.pop,
   .tab-btn[aria-selected="true"] .icon-filled,
-  .star-btn.just-checked svg { animation: none; }
+  .add-btn.just-checked { animation: none; }
   .skeleton-block { background: var(--surface-2); }
   .chart-skeleton { opacity: 0.4; }
   .mini-bar-fill,
@@ -771,6 +815,7 @@ button { font: inherit; color: inherit; }
   .row,
   .tab-btn,
   .tab-icon,
-  .star-btn svg,
+  .add-btn,
+  .add-btn svg,
   .stepper-btn { transition: none; }
 }

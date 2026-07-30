@@ -353,17 +353,21 @@ function sectorChip(c) {
 // every saved star bouncing each time would be noise.
 let lastToggledSymbol = null;
 
-const STAR_PATH = 'M12 2.8 L14.32 8.81 L20.75 9.16 L15.76 13.22 L17.41 19.44 L12 15.95 L6.59 19.44 L8.24 13.22 L3.25 9.16 L9.68 8.81 Z';
+// Plus = "add this", check = "added". Both icons ship in the markup and CSS
+// picks one by .checked, so toggling never re-parses SVG.
+const PLUS_PATH = 'M12 5.5v13M5.5 12h13';
+const CHECK_PATH = 'M5 12.6l4.7 4.6L19 7.8';
 
-function starButton(c) {
+function addButton(c) {
   const checked = state.watchlist.has(c.symbol);
   const justChecked = checked && c.symbol === lastToggledSymbol;
   return `
     <span class="select-cell">
-      <button type="button" class="star-btn${checked ? ' checked' : ''}${justChecked ? ' just-checked' : ''}"
+      <button type="button" class="add-btn${checked ? ' checked' : ''}${justChecked ? ' just-checked' : ''}"
         data-symbol="${c.symbol}" aria-pressed="${checked}"
         aria-label="${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>
+        <svg class="icon-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="${PLUS_PATH}"/></svg>
+        <svg class="icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="${CHECK_PATH}"/></svg>
       </button>
     </span>`;
 }
@@ -384,7 +388,7 @@ function rowEl(c, rank, value) {
       <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="mini-bar"><span class="mini-bar-mid"></span><span class="mini-bar-fill"></span></span>
     </span>
-    ${starButton(c)}
+    ${addButton(c)}
   `;
   row.querySelector('.return-val').textContent = state.settings.volAdjusted ? fmtScore(value) : fmtPct(value);
   return row;
@@ -405,13 +409,13 @@ function buildUnavailableRow(c) {
       <span class="price-mini">${fmtPrice(c.price)}</span>
       <span class="mini-bar"><span class="mini-bar-mid"></span></span>
     </span>
-    ${starButton(c)}
+    ${addButton(c)}
   `;
   return row;
 }
 
 function attachSelectHandlers(container) {
-  container.querySelectorAll('.star-btn').forEach((btn) => {
+  container.querySelectorAll('.add-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const symbol = btn.dataset.symbol;
@@ -506,9 +510,9 @@ function renderWatchlistBoard() {
     rowsEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-glyph" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="30" height="30"><path d="${STAR_PATH}"/></svg>
+          <svg viewBox="0 0 24 24" width="30" height="30"><path d="${PLUS_PATH}"/></svg>
         </div>
-        <p>Your watchlist is empty. Head to Ranks and tap the star on any company to save it here.</p>
+        <p>Your watchlist is empty. Head to Ranks and tap the plus on any company to save it here.</p>
       </div>`;
     return;
   }
