@@ -622,6 +622,7 @@ function openDetail(symbol) {
   const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
   document.getElementById('detail-logo').outerHTML =
     logoAvatar(company, sectorVar).replace('class="logo"', 'class="logo" id="detail-logo"');
+  pruneBrokenLogos(document.querySelector('.detail-header'));
   document.getElementById('detail-ticker').textContent = company.symbol;
   // Full legal name here, unlike the rows, which trim the corporate suffix.
   document.getElementById('detail-name').textContent = company.name;
@@ -870,8 +871,26 @@ function renderChart() {
   const areaPath = `${linePath} L${last.x.toFixed(2)},${H} L${first.x.toFixed(2)},${H} Z`;
   const baselineY = first.y.toFixed(2);
 
+  // Axis landmarks: three price levels and three dates, marked with 5px ticks
+  // rather than gridlines. Discrete and generously spaced on purpose — a full
+  // grid over a 344px sparkline reads as noise, but with the tooltip now showing
+  // cumulative return instead of price, the price levels have to come from
+  // somewhere.
+  const midPrice = (min + max) / 2;
+  // Only the mid level: the min/max labels sit outside the data band on purpose
+  // (see CHART_PAD_Y), so ticks level with them float free of their own labels.
+  // The mid label is centred on the band, so its tick lands exactly on it.
+  const yTicks = [CHART_PAD_Y + innerH / 2];
+  const midIdx = Math.floor((slice.length - 1) / 2);
+  const xTicks = [first.x, coords[midIdx].x, last.x];
+  const ticks = [
+    ...yTicks.map((y) => `<line class="chart-tick" x1="1" y1="${y.toFixed(2)}" x2="6" y2="${y.toFixed(2)}" />`),
+    ...xTicks.map((x) => `<line class="chart-tick" x1="${x.toFixed(2)}" y1="${H - 7}" x2="${x.toFixed(2)}" y2="${H - 2}" />`),
+  ].join('');
+
   wrap.innerHTML = `
     <div class="chart-axis-y max">${fmtPrice(max)}</div>
+    <div class="chart-axis-y mid">${fmtPrice(midPrice)}</div>
     <div class="chart-axis-y min">${fmtPrice(min)}</div>
     <svg class="chart-svg ${dir}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
       <defs>
@@ -881,6 +900,7 @@ function renderChart() {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
         </linearGradient>
       </defs>
+      ${ticks}
       <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${W}" y2="${baselineY}" />
       <path class="chart-area" id="chart-area-path" fill="url(#chart-grad)" d="${areaPath}" />
       <path class="chart-line" id="chart-line-path" d="${linePath}" />
@@ -895,7 +915,10 @@ function renderChart() {
 
   const axisXEl = document.getElementById('chart-axis-x');
   if (axisXEl) {
-    axisXEl.innerHTML = `<span>${fmtChartDate(slice[0].date)}</span><span>${fmtChartDate(slice[slice.length - 1].date)}</span>`;
+    axisXEl.innerHTML =
+      `<span>${fmtChartDate(slice[0].date)}</span>` +
+      `<span>${fmtChartDate(slice[midIdx].date)}</span>` +
+      `<span>${fmtChartDate(slice[slice.length - 1].date)}</span>`;
   }
 
   animateChartIn(wrap);
@@ -947,13 +970,19 @@ function attachChartScrub(wrap, coords, chartW) {
     const leftPx = Math.min(Math.max(c.x * pxRatio, 62), rect.width - 62);
     tooltip.style.left = `${leftPx}px`;
     tooltip.style.opacity = '1';
+    // Cumulative return from the range's opening close, not the raw price: the
+    // price is already readable off the y-axis landmarks, and "how far up from
+    // where this range started" is the thing the chart is actually about.
+    const base = coords[0].close;
+    const cum = base > 0 ? ((c.close - base) / base) * 100 : null;
     tooltip.innerHTML = '';
     const dateEl = document.createElement('span');
     dateEl.textContent = fmtChartDate(c.date) + ' — ';
-    const priceEl = document.createElement('b');
-    priceEl.textContent = fmtPrice(c.close);
+    const cumEl = document.createElement('b');
+    cumEl.textContent = cum === null ? 'N/A' : fmtPct(cum);
+    if (cum !== null) cumEl.className = cum >= 0 ? 'gain' : 'loss';
     tooltip.appendChild(dateEl);
-    tooltip.appendChild(priceEl);
+    tooltip.appendChild(cumEl);
   }
 
   function hide() {
@@ -962,11 +991,28 @@ function attachChartScrub(wrap, coords, chartW) {
     tooltip.style.opacity = '0';
   }
 
-  hit.addEventListener('pointerdown', (e) => { showAt(e.clientX); hit.setPointerCapture(e.pointerId); });
-  hit.addEventListener('pointermove', (e) => { if (e.pressure > 0 || e.pointerType === 'mouse') showAt(e.clientX); });
-  hit.addEventListener('pointerup', hide);
-  hit.addEventListener('pointercancel', hide);
-  hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hide(); });
+  // Track the drag ourselves rather than testing e.pressure: a plain iOS touch
+  // reports pressure 0, so the old `pressure > 0` gate meant no pointermove ever
+  // counted and the crosshair stuck wherever the finger first landed instead of
+  // following it. Pointer capture keeps the moves coming to this element even
+  // once the finger leaves it.
+  let dragging = false;
+  hit.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    try { hit.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+    showAt(e.clientX);
+    e.preventDefault(); // don't let the drag turn into a sheet scroll
+  });
+  hit.addEventListener('pointermove', (e) => {
+    if (dragging || e.pointerType === 'mouse') showAt(e.clientX);
+  });
+  // Releasing leaves the reading on screen rather than clearing it: a quick tap
+  // is a legitimate "what was it here?" and hiding on pointerup would make that
+  // gesture flash and vanish. It clears on the next render — a range switch or
+  // reopening the sheet.
+  hit.addEventListener('pointerup', () => { dragging = false; });
+  hit.addEventListener('pointercancel', () => { dragging = false; hide(); });
+  hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !dragging) hide(); });
 }
 
 function fmtChartDate(dateStr) {

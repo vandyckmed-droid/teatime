@@ -836,7 +836,9 @@ button { font: inherit; color: inherit; }
   transform: translateX(-50%); transition: opacity 120ms ease;
   font-variant-numeric: tabular-nums;
 }
-.chart-tooltip b { color: var(--text); font-weight: 600; }
+.chart-tooltip b { color: var(--text); font-weight: 700; }
+.chart-tooltip b.gain { color: var(--gain); }
+.chart-tooltip b.loss { color: var(--loss); }
 
 /* renderChart insets the data band 24px from the top and bottom of the plot,
    so these two labels sit in a band no data point can reach — no pill
@@ -851,7 +853,16 @@ button { font: inherit; color: inherit; }
   animation: chart-fade-in 400ms ease-out 200ms both;
 }
 .chart-axis-y.max { top: 0; }
+/* Centred on the data band, which is inset equally top and bottom. */
+.chart-axis-y.mid { top: 50%; transform: translateY(-50%); color: var(--text-3); font-weight: 500; }
 .chart-axis-y.min { bottom: 2px; }
+
+/* Discrete axis landmarks — 5px ticks, not gridlines. Faint enough to read as
+   registration marks behind the data rather than as chart furniture. */
+.chart-tick {
+  stroke: var(--text-3); stroke-width: 1; stroke-opacity: 0.45;
+  animation: chart-fade-in 400ms ease-out 200ms both;
+}
 .chart-axis-x {
   display: flex; justify-content: space-between;
   font-size: 10px; font-weight: 500; color: var(--text-3);
@@ -887,6 +898,7 @@ button { font: inherit; color: inherit; }
   .chart-endpoint,
   .chart-startpoint,
   .chart-axis-y,
+  .chart-tick,
   .tab-badge.pop,
   .tab-btn[aria-selected="true"] .icon-filled,
   .add-btn.just-checked { animation: none; }
