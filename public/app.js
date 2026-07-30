@@ -120,6 +120,10 @@ const detail = {
   symbol: null,
   range: DEFAULT_CHART_RANGE,
   slice: null, // the currently-rendered range's [{date, close}], oldest first
+  // The board order the sheet was opened from, and where we are in it — what
+  // swiping left/right walks through.
+  sequence: null,
+  index: 0,
 };
 
 // ── persistence ──────────────────────────────────────────────────────
@@ -693,12 +697,16 @@ function attachSelectHandlers(container) {
 }
 
 function attachRowHandlers(container) {
+  // Read the order at click time, not now: the board re-sorts on every settings
+  // change, and the sheet's swipe order has to match what's actually on screen.
+  const boardOrder = () =>
+    [...container.querySelectorAll('.row[data-symbol]')].map((r) => r.dataset.symbol);
   container.querySelectorAll('.row[data-symbol]').forEach((row) => {
-    row.addEventListener('click', () => openDetail(row.dataset.symbol));
+    row.addEventListener('click', () => openDetail(row.dataset.symbol, boardOrder()));
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        openDetail(row.dataset.symbol);
+        openDetail(row.dataset.symbol, boardOrder());
       }
     });
   });
@@ -802,13 +810,9 @@ function findCompany(symbol) {
   return state.leaderboard.companies.find((c) => c.symbol === symbol) || null;
 }
 
-function openDetail(symbol) {
-  const company = findCompany(symbol);
-  if (!company) return;
-
-  detail.symbol = symbol;
-  detail.range = DEFAULT_CHART_RANGE;
-
+// Everything inside the sheet for one company. Split out from openDetail so a
+// sideways swipe can swap companies without re-running the open animation.
+function renderDetailContent(company) {
   const sectorVar = SECTOR_VAR[company.sector] || '--sector-default';
   document.getElementById('detail-logo').outerHTML =
     logoAvatar(company, sectorVar).replace('class="logo"', 'class="logo" id="detail-logo"');
@@ -822,6 +826,37 @@ function openDetail(symbol) {
   renderDetailFacts(company);
   renderDetailSegmented();
 
+  // Usually replaced near-instantly (history is prefetched at boot), but shows
+  // for real when a symbol missed the batch prefetch and needs its own fetch —
+  // also clears out the previously-open company's chart immediately instead of
+  // leaving it on screen for a frame.
+  const wrap = document.getElementById('chart-wrap');
+  wrap.innerHTML = chartSkeletonHTML();
+  const opened = company.symbol;
+  loadHistoryFor(opened).then(() => {
+    // A fast swipe can land a stale fetch after the next company is showing.
+    if (detail.symbol !== opened) return;
+    renderChart();
+  }).catch((err) => {
+    if (detail.symbol !== opened) return;
+    wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
+  });
+}
+
+// `sequence` is the ordered symbols of the board the row was tapped in, so a
+// swipe walks the list exactly as it appears on screen — ranked order from
+// Ranks, saved order from Watchlist.
+function openDetail(symbol, sequence) {
+  const company = findCompany(symbol);
+  if (!company) return;
+
+  detail.symbol = symbol;
+  detail.range = DEFAULT_CHART_RANGE;
+  detail.sequence = sequence && sequence.length ? sequence : [symbol];
+  detail.index = Math.max(0, detail.sequence.indexOf(symbol));
+
+  renderDetailContent(company);
+
   document.getElementById('sheet-backdrop').hidden = false;
   document.getElementById('detail-sheet').hidden = false;
   requestAnimationFrame(() => {
@@ -832,17 +867,115 @@ function openDetail(symbol) {
     // the sheet slides in, not slide sideways afterwards.
     positionSegmentedThumb(true);
   });
+}
 
-  // Usually replaced near-instantly (history is prefetched at boot), but shows
-  // for real when a symbol missed the batch prefetch and needs its own fetch —
-  // also clears out the previously-open company's chart immediately instead of
-  // leaving it on screen for a frame.
-  document.getElementById('chart-wrap').innerHTML = chartSkeletonHTML();
+// Swap to another company in the open sheet, keeping the selected chart range so
+// the same window carries across names — the point of swiping is comparison.
+function showDetailAt(index) {
+  if (!detail.sequence) return false;
+  if (index < 0 || index >= detail.sequence.length) return false;
+  const company = findCompany(detail.sequence[index]);
+  if (!company) return false;
+  detail.symbol = company.symbol;
+  detail.index = index;
+  renderDetailContent(company);
+  positionSegmentedThumb(true);
+  const scroll = document.querySelector('.sheet-scroll');
+  if (scroll) scroll.scrollTop = 0;
+  return true;
+}
 
-  loadHistoryFor(symbol).then(() => renderChart()).catch((err) => {
-    const wrap = document.getElementById('chart-wrap');
-    wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
+// ── swipe between companies ──────────────────────────────────────────
+// Horizontal drag on the sheet pages to the next/previous name in the board's
+// order. Gestures starting on the chart or the range control are left alone —
+// both are horizontal by nature (scrub, and a row of pills) and would otherwise
+// fight this. Vertical scrolling stays native via touch-action: pan-y.
+const SWIPE_COMMIT_PX = 56;
+const SWIPE_AXIS_LOCK_PX = 10;
+// Past the ends there's nothing to page to, so the drag gets heavily damped
+// instead of blocked outright — it still moves, which reads as "that's the end".
+const SWIPE_EDGE_DAMPING = 0.22;
+
+function initDetailSwipe() {
+  const sheet = document.getElementById('detail-sheet');
+  const content = document.querySelector('.sheet-scroll');
+  if (!sheet || !content) return;
+
+  let startX = 0;
+  let startY = 0;
+  let axis = null; // null = undecided, 'x' = ours, 'y' = the scroller's
+  let active = false;
+
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const neighbour = (dx) => (dx < 0 ? detail.index + 1 : detail.index - 1);
+  const hasNeighbour = (dx) => {
+    const i = neighbour(dx);
+    return !!detail.sequence && i >= 0 && i < detail.sequence.length;
+  };
+
+  const setX = (px, animate) => {
+    content.style.transition = animate
+      ? 'transform 220ms var(--ease-out), opacity 180ms ease-out'
+      : 'none';
+    content.style.transform = px ? `translateX(${px}px)` : '';
+    content.style.opacity = '';
+  };
+
+  sheet.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('#chart-wrap, [data-segmented="detail"], .sheet-close')) return;
+    if (!detail.sequence || detail.sequence.length < 2) return;
+    startX = e.clientX;
+    startY = e.clientY;
+    axis = null;
+    active = true;
   });
+
+  sheet.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (axis === null) {
+      if (Math.abs(dx) < SWIPE_AXIS_LOCK_PX && Math.abs(dy) < SWIPE_AXIS_LOCK_PX) return;
+      axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (axis === 'y') { active = false; return; }
+    }
+    if (axis !== 'x') return;
+    setX(dx * (hasNeighbour(dx) ? 1 : SWIPE_EDGE_DAMPING), false);
+  });
+
+  const finish = (e) => {
+    if (!active) return;
+    const dx = e.clientX - startX;
+    active = false;
+    if (axis !== 'x') return;
+
+    if (Math.abs(dx) < SWIPE_COMMIT_PX || !hasNeighbour(dx)) {
+      setX(0, true); // spring back
+      return;
+    }
+    const next = neighbour(dx);
+    if (reduceMotion()) {
+      setX(0, false);
+      showDetailAt(next);
+      return;
+    }
+    // Out the way the finger was going, then in from the opposite edge.
+    const w = content.getBoundingClientRect().width || 360;
+    const exit = Math.sign(dx) * w;
+    content.style.transition = 'transform 150ms ease-out, opacity 150ms ease-out';
+    content.style.transform = `translateX(${exit}px)`;
+    content.style.opacity = '0';
+    setTimeout(() => {
+      if (!showDetailAt(next)) { setX(0, true); return; }
+      content.style.transition = 'none';
+      content.style.transform = `translateX(${-exit}px)`;
+      content.style.opacity = '0';
+      requestAnimationFrame(() => setX(0, true));
+    }, 150);
+  };
+
+  sheet.addEventListener('pointerup', finish);
+  sheet.addEventListener('pointercancel', () => { if (active) { active = false; setX(0, true); } });
 }
 
 function closeDetail() {
@@ -1213,8 +1346,13 @@ function fmtChartDate(dateStr) {
 function initDetailSheet() {
   document.getElementById('sheet-close').addEventListener('click', closeDetail);
   document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
+  initDetailSwipe();
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !document.getElementById('detail-sheet').hidden) closeDetail();
+    const sheetOpen = !document.getElementById('detail-sheet').hidden;
+    if (e.key === 'Escape' && sheetOpen) closeDetail();
+    // Keyboard equivalent of the swipe.
+    if (sheetOpen && e.key === 'ArrowRight') { e.preventDefault(); showDetailAt(detail.index + 1); }
+    if (sheetOpen && e.key === 'ArrowLeft') { e.preventDefault(); showDetailAt(detail.index - 1); }
   });
 
   // The chart's viewBox is in real pixels, so a size change (rotation, or the

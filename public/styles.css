@@ -82,7 +82,7 @@
     0 2px 8px rgba(0, 0, 0, 0.40);
 
   --tabbar-bg: rgba(0, 0, 0, 0.72);
-  --sheet-scrim: rgba(0, 0, 0, 0.60);
+  --sheet-scrim: rgba(0, 0, 0, 0.38);
 
   /* ── type: bold modern sans everywhere, including every number; mono is
         down to literal code/error text only. All numeric sans runs
@@ -711,8 +711,10 @@ button { font: inherit; color: inherit; }
 .sheet-backdrop {
   position: fixed; inset: 0; z-index: 60;
   background: var(--sheet-scrim);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  /* Deliberately light: enough to push the board back without erasing it, so
+     the list stays legible behind the sheet. */
+  backdrop-filter: blur(6px) saturate(1.05);
+  -webkit-backdrop-filter: blur(6px) saturate(1.05);
   opacity: 0; transition: opacity 280ms ease;
 }
 .sheet-backdrop.open { opacity: 1; }
@@ -744,6 +746,10 @@ button { font: inherit; color: inherit; }
 
 .sheet-scroll {
   overflow-y: auto;
+  /* Vertical scrolling stays native; horizontal is claimed by the
+     swipe-between-companies gesture (initDetailSwipe in app.js). */
+  touch-action: pan-y;
+  will-change: transform;
   padding: var(--s5) var(--s4) calc(var(--s7) + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
 }
