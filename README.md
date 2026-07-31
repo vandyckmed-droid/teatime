@@ -80,7 +80,8 @@ Then open http://localhost:3000.
   Watchlist rank by a custom date range (set in Settings, adjustable via
   +/− steppers, or in one tap from the 12M/6M pills that sit with the Ranks
   board's sticky header — `RANK_WINDOW_PRESETS` in `public/app.js`); scoring
-  is computed server-side via `/api/rank` and cached in `state.rankScores`. The frontend falls back to the old client-side
+  is computed server-side via `/api/rank` and cached in `state.rankScores`.
+  The frontend falls back to the old client-side
   computation (over batch-fetched history) if `/api/rank` isn't reachable —
   this is what makes the static-snapshot preview channels (which have no
   backend at all) still work unmodified. The sheet shows exactly one chart —
