@@ -61,10 +61,9 @@ Then open http://localhost:3000.
   in `state.rankScores`. The frontend falls back to the old client-side
   computation (over batch-fetched history) if `/api/rank` isn't reachable —
   this is what makes the static-snapshot preview channels (which have no
-  backend at all) still work unmodified. The per-company chart sheet has its
-  own window toggle (1M-3Y), unrelated to the ranking date range. That sheet
-  shows one chart — a price line, or the rolling volatility-adjusted score as
-  bars — chosen in Settings.
+  backend at all) still work unmodified. The sheet shows exactly one chart —
+  the price line — over a window picked by its own range pills (1M-5Y, 1M-3Y
+  in the snapshot bundle), unrelated to the ranking date range.
 
 ## The daily archive
 
@@ -97,9 +96,10 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   further — repeated FMP fetches per visitor, and shipping the full universe's
   history JSON to the browser just to rank it.
 - New setting: add an entry to `SETTINGS` in `public/app.js`.
-  `renderSettings()` dispatches on `type` (`'toggle'`, `'choice'`,
-  `'daterange'`, ...) and routes the row by its optional `section`; a new
-  `type` needs one more branch there.
+  `renderSettings()` dispatches on `type` (`'toggle'`, `'threshold'`,
+  `'daterange'`); a new `type` needs one more branch there. `SETTINGS` is
+  also what `loadSettings()` validates stored values against — a key that
+  isn't listed there is dropped rather than kept around forever.
 - Different universe (e.g. a specific sector, or largest by revenue instead of
   market cap): adjust the screener call in `src/leaderboard.js`.
 

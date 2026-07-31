@@ -18,18 +18,6 @@ const SETTINGS = [
     default: 0.7,
   },
   {
-    key: 'detailChart',
-    type: 'choice',
-    section: 'display',
-    label: 'Chart',
-    description: 'Price as a line, or the volatility-adjusted return over a rolling ranking window as bars around zero.',
-    options: [
-      { value: 'line', label: 'Line' },
-      { value: 'bars', label: 'Bars' },
-    ],
-    default: 'line',
-  },
-  {
     key: 'rankDateRange',
     type: 'daterange',
     label: 'Ranking date range',
@@ -153,29 +141,43 @@ function loadWatchlist() {
 function saveWatchlist() {
   localStorage.setItem(STORAGE_KEYS.watchlist, JSON.stringify([...state.watchlist]));
 }
+// SETTINGS is the schema, not just the render list: stored values are read back
+// key by key, so anything that no longer names a real setting is dropped rather
+// than carried around forever. Several chart settings have come and gone here,
+// and each one used to leave a dead key behind in localStorage.
 function loadSettings() {
-  const defaults = Object.fromEntries(SETTINGS.map((s) => [s.key, s.default]));
+  // Object defaults are cloned, not handed out by reference: the date-range
+  // steppers edit `state.settings.rankDateRange` in place, which would
+  // otherwise rewrite the SETTINGS entry's own default object.
+  const defaults = Object.fromEntries(SETTINGS.map((s) => [
+    s.key,
+    s.default && typeof s.default === 'object' ? { ...s.default } : s.default,
+  ]));
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{}');
-    const settings = { ...defaults, ...stored };
-
-    // Two rounds of history behind this one setting: it was once a subject
-    // ('price'/'rank') paired with a separate style, then a three-way choice
-    // including 'rank', and now just the two chart styles. Anything that no
-    // longer names a real option resolves to the style that was in play.
-    const CHART_OPTIONS = ['line', 'bars'];
-    if (!CHART_OPTIONS.includes(settings.detailChart)) {
-      settings.detailChart = stored.chartStyle === 'bars' ? 'bars' : 'line';
+    const settings = { ...defaults };
+    for (const key of Object.keys(defaults)) {
+      if (key in stored) settings[key] = stored[key];
     }
-    delete settings.chartStyle;
 
     // A saved window can outlive the bounds it was saved under — the static
     // snapshot carries less history than the live server, so a range stored
-    // before that reaches back past any data and scores nothing at all.
+    // before that reaches back past any data and scores nothing at all. A
+    // stored value of the wrong shape entirely falls back to the default,
+    // rather than turning into NaN dates further down.
     const range = settings.rankDateRange;
-    if (range && typeof range.startDaysAgo === 'number') {
+    if (!range || typeof range.startDaysAgo !== 'number' || typeof range.endDaysAgo !== 'number') {
+      settings.rankDateRange = defaults.rankDateRange;
+    } else {
       range.startDaysAgo = Math.min(range.startDaysAgo, DATE_RANGE_MAX_DAYS_AGO);
       range.endDaysAgo = Math.min(range.endDaysAgo, range.startDaysAgo - DATE_RANGE_MIN_GAP);
+    }
+
+    // Write the cleaned-up version back right away rather than waiting for the
+    // next setting change, so a retired key doesn't sit in storage indefinitely
+    // on a device where nobody touches Settings again.
+    if (Object.keys(stored).some((key) => !(key in defaults))) {
+      localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
     }
     return settings;
   } catch {
@@ -581,72 +583,6 @@ async function refreshRankings() {
     if (seq !== rankRequestSeq) return;
     state.rankScores = computeRankScoresClientSide();
   }
-}
-
-// ── the rolling volatility-adjusted score ────────────────────────────
-// Scoring a window that slides date by date, which both the detail sheet's
-// bars and the row sparklines are built from.
-const ROLLING_MAX_POINTS = 120;
-
-// How many days back a range key reaches. Takes the key rather than reading
-// detail.range, because the row sparklines need it for a fixed range while no
-// sheet is open.
-function chartSpanDays(rangeKey) {
-  if (rangeKey === 'ytd') {
-    const now = new Date();
-    return Math.max(31, Math.round((now - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000));
-  }
-  const range = CHART_RANGES.find((r) => r.key === rangeKey);
-  return range ? range.days : 366;
-}
-
-function addDaysStr(dateStr, delta) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
-}
-
-// Sampled backwards from the newest so the latest trading day is always
-// included whatever the step works out to — that point has to agree with the
-// score the boards are showing right now.
-function sampleRollingDates(series, cutoffStr, maxPoints = ROLLING_MAX_POINTS) {
-  const dates = [];
-  for (const p of series) if (p.date >= cutoffStr) dates.push(p.date);
-  if (dates.length === 0) return dates;
-  const step = Math.max(1, Math.ceil(dates.length / maxPoints));
-  const out = [];
-  for (let i = dates.length - 1; i >= 0; i -= step) out.push(dates[i]);
-  out.reverse();
-  // The boards score relative to *today*, so the newest sample must too, or the
-  // last value won't match what the list is showing. Same step as
-  // rollingVolAdjusted.
-  const todayStr = daysAgoToDateStr(0);
-  if (dates.length > 0 && out[out.length - 1] < todayStr) out[out.length - 1] = todayStr;
-  return out;
-}
-
-// The vol-adjusted score as of each of a set of dates: at every one, the
-// Settings ranking window is slid back to end there and scored, exactly as
-// src/ranking.js does for the board. So the newest value here *is* the score
-// the board shows for this company — not an approximation of it.
-function rollingVolAdjusted(symbol, spanDays, maxPoints) {
-  const prepared = preparedFor(symbol);
-  const cached = historyCache.get(symbol);
-  if (!prepared || !cached || !cached.series) return [];
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const out = [];
-  for (const date of sampleRollingDates(cached.series, daysAgoToDateStr(spanDays), maxPoints)) {
-    const value = volAdjustedBetweenDates(
-      prepared, addDaysStr(date, -startDaysAgo), addDaysStr(date, -endDaysAgo),
-    );
-    // Dates without enough history behind them to fill the window are dropped
-    // rather than plotted as zero — no score and a score of zero are different
-    // facts, and zero is a meaningful value on this axis.
-    if (value === null || !Number.isFinite(value)) continue;
-    out.push({ date, value });
-  }
-  return out;
 }
 
 // ── tab routing ──────────────────────────────────────────────────────
@@ -1559,12 +1495,17 @@ async function loadAllHistories(symbols) {
   }
 }
 
+// Falls back to the default range for a key that isn't in CHART_RANGES: the
+// static snapshot bundle publishes a shorter list than the live app (it carries
+// less history), so "this key no longer exists" is a real state, not a typo.
 function sliceForRange(series, rangeKey) {
-  const range = CHART_RANGES.find((r) => r.key === rangeKey);
+  const range = CHART_RANGES.find((r) => r.key === rangeKey)
+    || CHART_RANGES.find((r) => r.key === DEFAULT_CHART_RANGE)
+    || CHART_RANGES[0];
   const now = new Date();
   let cutoff;
-  if (rangeKey === 'ytd') {
-    cutoff = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  if (range.days === null) {
+    cutoff = new Date(Date.UTC(now.getUTCFullYear(), 0, 1)); // YTD
   } else {
     cutoff = new Date(now.getTime() - range.days * 86400000);
   }
@@ -1612,170 +1553,11 @@ function chartSkeletonHTML() {
     </div>`;
 }
 
-// ── bars: the rolling vol-adjusted score around a zero line ──────────
-// Each bar is the company's volatility-adjusted return — annualized mean daily
-// return ÷ annualized volatility — measured over the Settings ranking window
-// ending on that bar's date. So the bars answer "how has this company's
-// risk-adjusted standing moved", where the line only shows raw price.
-//
-// Two windows are in play and they do different jobs, which is the thing to
-// keep straight: the ranking window (Settings) sets how far back each bar
-// looks, and the range pills set how far back the *chart* goes. Same split as
-// the rank chart.
-//
-// The rightmost bar is the score the board itself shows for this company: it
-// uses the identical window against the identical prepared series, so it's the
-// same number, not a near miss.
-const BAR_TARGET_COUNT = 26;
-const BAR_MIN_WIDTH = 3;
-// Left gutter for the zero label. The line chart's price labels sit above and
-// below the data band so they need none, but zero lands *inside* the band —
-// without a gutter it prints over the first couple of bars.
-const BAR_PAD_L = 34;
-
-function renderBarsChart(wrap, slice) {
-  const bars = rollingVolAdjusted(detail.symbol, chartSpanDays(detail.range), BAR_TARGET_COUNT);
-  const caption = document.getElementById('chart-caption');
-  if (bars.length === 0) {
-    wrap.innerHTML = `<div class="chart-error">Not enough history to score ${detail.symbol} over the ranking window yet.</div>`;
-    if (caption) caption.hidden = true;
-    const axis = document.getElementById('chart-axis-x');
-    if (axis) axis.innerHTML = '';
-    return;
-  }
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  if (caption) {
-    caption.hidden = false;
-    caption.textContent =
-      `Volatility-adjusted return over a rolling ${startDaysAgo - endDaysAgo}-day window`;
-  }
-
-  const { w: W, h: H } = chartSize();
-  const innerH = H - CHART_PAD_Y * 2;
-  const innerW = W - BAR_PAD_L - CHART_PAD_X;
-
-  // Zero is always on the scale, but the scale isn't forced symmetric: a stretch
-  // spent entirely above zero would waste half the chart on empty space.
-  const hi = Math.max(0, ...bars.map((b) => b.value));
-  const lo = Math.min(0, ...bars.map((b) => b.value));
-  const spread = hi - lo || 1;
-  const yFor = (v) => CHART_PAD_Y + innerH - ((v - lo) / spread) * innerH;
-  const zeroY = yFor(0);
-
-  const slot = innerW / bars.length;
-  const barW = Math.max(BAR_MIN_WIDTH, slot * 0.66);
-  const coords = bars.map((b, i) => {
-    const cx = BAR_PAD_L + slot * (i + 0.5);
-    const y = yFor(b.value);
-    return {
-      ...b,
-      cx,
-      x: cx - barW / 2,
-      // Never shorter than a hairline: a score sitting at zero should still
-      // read as a bar on the axis rather than vanishing.
-      y: Math.min(y, zeroY),
-      height: Math.max(1.5, Math.abs(zeroY - y)),
-    };
-  });
-
-  const rects = coords.map((c) => `<rect class="chart-bar ${c.value >= 0 ? 'gain' : 'loss'}"
-    x="${c.x.toFixed(2)}" y="${c.y.toFixed(2)}" width="${barW.toFixed(2)}" height="${c.height.toFixed(2)}"
-    rx="${Math.min(2, barW / 3).toFixed(2)}" />`).join('');
-
-  const latest = bars[bars.length - 1].value;
-  // Against the wrapper's full height, which is what `top` resolves against —
-  // not against the inner band, which would drop the label below its own line.
-  const zeroPct = (zeroY / H) * 100;
-  // Dropped when zero is effectively an edge of the scale, where it would print
-  // on top of the min or max label.
-  const zeroCrowded = zeroY - CHART_PAD_Y < 16 || H - CHART_PAD_Y - zeroY < 16;
-
-  wrap.innerHTML = `
-    <div class="chart-axis-y max">${fmtScore(hi)}</div>
-    ${zeroCrowded ? '' : `<div class="chart-axis-y zero" style="top: ${zeroPct.toFixed(2)}%">0.00</div>`}
-    <div class="chart-axis-y min">${fmtScore(lo)}</div>
-    <svg class="chart-svg bars" viewBox="0 0 ${W} ${H}" role="img"
-         aria-label="${detail.symbol} rolling volatility-adjusted return, ${detail.range}. ${bars.length} bars, currently ${fmtScore(latest)}.">
-      <line class="chart-zero" x1="${BAR_PAD_L - 4}" y1="${zeroY.toFixed(2)}" x2="${W}" y2="${zeroY.toFixed(2)}" />
-      ${rects}
-      <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${H}" />
-      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="chart-hit" />
-    </svg>
-    <div class="chart-tooltip" id="chart-tooltip"></div>
-  `;
-
-  const axisXEl = document.getElementById('chart-axis-x');
-  if (axisXEl) {
-    const mid = coords[Math.floor((coords.length - 1) / 2)];
-    axisXEl.innerHTML =
-      `<span>${fmtChartDate(coords[0].date)}</span>` +
-      `<span>${fmtChartDate(mid.date)}</span>` +
-      `<span>${fmtChartDate(coords[coords.length - 1].date)}</span>`;
-  }
-
-  attachBarScrub(wrap, coords, W);
-}
-
-// Same own-drag-state handling as the other two scrubs (see attachChartScrub on
-// why e.pressure can't be the gate). Highlights whole bars rather than tracking
-// a point, since a bar is a period, not an instant.
-function attachBarScrub(wrap, coords, chartW) {
-  const svg = wrap.querySelector('svg');
-  const hit = wrap.querySelector('#chart-hit');
-  const line = wrap.querySelector('#crosshair-line');
-  const tooltip = wrap.querySelector('#chart-tooltip');
-  if (!svg || !hit) return;
-
-  function showAt(clientX) {
-    const rect = svg.getBoundingClientRect();
-    const relX = ((clientX - rect.left) / rect.width) * chartW;
-    let best = 0;
-    for (let i = 1; i < coords.length; i++) {
-      if (Math.abs(coords[i].cx - relX) < Math.abs(coords[best].cx - relX)) best = i;
-    }
-    const c = coords[best];
-    svg.querySelectorAll('.chart-bar').forEach((el, i) => el.classList.toggle('is-active', i === best));
-    line.setAttribute('x1', c.cx);
-    line.setAttribute('x2', c.cx);
-    line.style.opacity = '1';
-
-    const pxRatio = rect.width / chartW;
-    tooltip.style.left = `${Math.min(Math.max(c.cx * pxRatio, 70), rect.width - 70)}px`;
-    tooltip.style.opacity = '1';
-    tooltip.innerHTML = '';
-    const dateEl = document.createElement('span');
-    dateEl.textContent = `${fmtChartDate(c.date)} — `;
-    const valEl = document.createElement('b');
-    valEl.textContent = fmtScore(c.value);
-    valEl.className = c.value >= 0 ? 'gain' : 'loss';
-    tooltip.appendChild(dateEl);
-    tooltip.appendChild(valEl);
-  }
-
-  let dragging = false;
-  hit.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    try { hit.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
-    showAt(e.clientX);
-    e.preventDefault();
-  });
-  hit.addEventListener('pointermove', (e) => {
-    if (dragging || e.pointerType === 'mouse') showAt(e.clientX);
-  });
-  hit.addEventListener('pointerup', () => { dragging = false; });
-  hit.addEventListener('pointercancel', () => { dragging = false; });
-  hit.addEventListener('pointerleave', (e) => {
-    if (e.pointerType !== 'mouse' || dragging) return;
-    line.style.opacity = '0';
-    tooltip.style.opacity = '0';
-    svg.querySelectorAll('.chart-bar.is-active').forEach((el) => el.classList.remove('is-active'));
-  });
-}
-
 function renderChart() {
   const wrap = document.getElementById('chart-wrap');
+  if (!wrap) return;
   const cached = historyCache.get(detail.symbol);
-  if (!cached || cached.series.length < 2) {
+  if (!cached || !Array.isArray(cached.series) || cached.series.length < 2) {
     wrap.innerHTML = `<div class="chart-error">No chart data available for ${detail.symbol}.</div>`;
     return;
   }
@@ -1786,14 +1568,6 @@ function renderChart() {
     return;
   }
   detail.slice = slice;
-
-  if (state.settings.detailChart === 'bars') {
-    renderBarsChart(wrap, slice);
-    return;
-  }
-
-  const caption = document.getElementById('chart-caption');
-  if (caption) caption.hidden = true;
 
   const { w: W, h: H } = chartSize();
   const closes = slice.map((p) => p.close);
@@ -2002,15 +1776,10 @@ function initDetailSheet() {
 
 // ── settings tab ─────────────────────────────────────────────────────
 function renderSettings() {
-  // A setting's `section` picks which list it lands in, so grouping is part of
-  // the config rather than the render code — same spirit as `type`.
-  const lists = {
-    scoring: document.getElementById('settings-list'),
-    display: document.getElementById('display-settings'),
-  };
-  Object.values(lists).forEach((el) => { if (el) el.innerHTML = ''; });
+  const list = document.getElementById('settings-list');
+  if (!list) return;
+  list.innerHTML = '';
   SETTINGS.forEach((setting) => {
-    const list = lists[setting.section] || lists.scoring;
     const row = document.createElement('div');
     row.className = 'settings-row';
     if (setting.type === 'toggle') {
@@ -2034,31 +1803,6 @@ function renderSettings() {
           await refreshRankings();
           renderAll();
         }
-      });
-    }
-    // A pick-one row. Reuses the detail sheet's segmented pills rather than
-    // inventing a second look for the same job; no sliding thumb here, since
-    // this one doesn't sit under a chart it needs to feel connected to.
-    if (setting.type === 'choice') {
-      const current = state.settings[setting.key];
-      row.innerHTML = `
-        <div class="settings-row-text">
-          <div class="settings-row-label">${setting.label}</div>
-          <div class="settings-row-desc">${setting.description}</div>
-        </div>
-        <div class="segmented segmented-inline" role="group" aria-label="${setting.label}">
-          ${setting.options.map((o) => `
-            <button type="button" data-key="${setting.key}" data-value="${o.value}"
-              aria-pressed="${o.value === current}">${o.label}</button>`).join('')}
-        </div>`;
-      list.appendChild(row);
-      row.querySelectorAll('.segmented-inline button').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          if (state.settings[setting.key] === btn.dataset.value) return;
-          state.settings[setting.key] = btn.dataset.value;
-          saveSettings();
-          renderSettings();
-        });
       });
     }
     // Threshold stepper: 0.30–1.00 in 0.05 steps, 1.00 shown as "Off". Changing
@@ -2101,7 +1845,7 @@ function renderSettings() {
     note.id = 'settings-note';
     note.className = 'settings-note';
     note.innerHTML = 'More settings land here as the board grows — each one is a config entry in <code>public/app.js</code> (<code>SETTINGS</code>) with no other wiring required.';
-    lists.scoring.parentElement.appendChild(note);
+    list.parentElement.appendChild(note);
   }
 
   renderDateRangeSetting();

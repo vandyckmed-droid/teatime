@@ -104,13 +104,6 @@
 
         <div class="section-label"><span class="section-label-key">Scoring</span></div>
         <div class="settings-list" id="settings-list"></div>
-
-        <!-- Display preferences, which change nothing about how the board is
-             scored — hence their own section rather than a row under Scoring.
-             Last because it's a set-once choice, where the scoring controls
-             above it get tweaked repeatedly and shouldn't be pushed down. -->
-        <div class="section-label"><span class="section-label-key">Detail sheet</span></div>
-        <div class="settings-list" id="display-settings"></div>
       </div>
     </section>
 
@@ -177,9 +170,6 @@
         </div>
 
         <div class="chart-card">
-          <!-- Only the bars view needs saying out loud: a price line explains
-               itself, a rolling risk-adjusted score does not. -->
-          <p class="chart-caption" id="chart-caption" hidden></p>
           <div class="chart-wrap" id="chart-wrap">
             <div class="chart-skeleton" aria-hidden="true">
               <svg viewBox="0 0 400 160" preserveAspectRatio="none">

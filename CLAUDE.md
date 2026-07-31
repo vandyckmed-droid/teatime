@@ -212,9 +212,13 @@ Concretely:
 ## Extensibility patterns already in place — use them, don't route around them
 
 - `SETTINGS` in `public/app.js` is a config array; each entry renders a
-  Settings row generically by `type` (`'toggle'`, `'daterange'`, ...). A new
-  setting is a new array entry plus, if it's a new `type`, one more branch in
-  `renderSettings()` — not a bespoke one-off section.
+  Settings row generically by `type` (`'toggle'`, `'threshold'`,
+  `'daterange'`). A new setting is a new array entry plus, if it's a new
+  `type`, one more branch in `renderSettings()` — not a bespoke one-off
+  section. It doubles as the schema for what's persisted: `loadSettings()`
+  reads stored values back key by key and drops anything no longer listed, so
+  a removed setting takes its saved value with it instead of leaving a dead
+  key in `localStorage`.
 - `METRICS` / `CHART_RANGES` in `src/config.js` / `public/app.js` are the
   same pattern for return windows. Ranks/Watchlist ranking is a custom
   date range (Settings-driven); the per-ticker chart sheet has its own
@@ -264,11 +268,12 @@ Concretely:
   channel above, since it has no backend to answer `/api/rank` at all;
   `EMBEDDED_LEADERBOARD` being defined is the signal that bundle uses to
   skip the live-endpoint attempt outright rather than let it fail into the
-  console every load. The detail sheet's bars view comes from
-  `rollingVolAdjusted` in the browser — the same window the boards score by,
-  slid date by date — so it needs no endpoint of its own, and only ever runs
-  for the one open company. This holds well past a few hundred companies now;
-  the remaining cost to watch as `universeSize` keeps growing is the
-  once-daily refresh cycle's own wall-clock time (bounded by
-  `config.fmpConcurrency`) and the size of the in-memory store, not
-  per-visitor load.
+  console every load. The detail sheet draws one chart and one only — the
+  price line over the range the pills pick — from the single symbol's own
+  history, so it needs no endpoint of its own. Several richer chart views
+  have been tried here and all of them have since been reverted; the plain
+  price line is the deliberate resting state, not a stub waiting to be
+  filled in. This holds well past a few hundred companies now; the remaining
+  cost to watch as `universeSize` keeps growing is the once-daily refresh
+  cycle's own wall-clock time (bounded by `config.fmpConcurrency`) and the
+  size of the in-memory store, not per-visitor load.
