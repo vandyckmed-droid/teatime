@@ -38,7 +38,7 @@ module.exports = {
   // changes with no other code to touch up to a few hundred companies; past
   // that, the fetch-everything-on-load architecture itself needs to change
   // (see CLAUDE.md's Extensibility patterns section).
-  universeSize: 250,
+  universeSize: 300,
   screenerCandidatePool: 750,
   // NOTE when resizing: screenerMinMarketCap below is the real ceiling on how
   // big the universe can get, and it binds long before screenerCandidatePool
@@ -47,6 +47,9 @@ module.exports = {
   // make the board more selective, it just starves it. At $50B the screener
   // only had 234 US NYSE/NASDAQ names to give, which silently capped
   // universeSize: 250 at 234. Check the headroom before bumping.
+  //
+  // Measured on the move to 300 (2026-07-31): $30B returns 339 candidates,
+  // $22B returns 441, $15B returns 559.
   // Caps how many FMP requests this server has in flight at once (leaderboard
   // per-company calls, and batch history fetches). Keeps growth in
   // universeSize from turning into a burst of N simultaneous outbound
@@ -63,9 +66,11 @@ module.exports = {
   // safety net — this just stops provoking it.
   fmpConcurrency: 6,
 
-  // $30B leaves ~335 candidates after dedupe, i.e. real headroom above
-  // universeSize: 250 rather than the 234 a $50B floor could supply.
-  screenerMinMarketCap: 30e9,
+  // $22B leaves ~440 candidates before dedupe — real headroom above
+  // universeSize: 300, with room for market caps to drift down without the
+  // board silently coming up short. ($30B would have supplied only 339, a
+  // margin thin enough that a broad selloff could eat it.)
+  screenerMinMarketCap: 22e9,
   country: 'US',
   exchanges: 'NYSE,NASDAQ',
   metrics: METRICS,

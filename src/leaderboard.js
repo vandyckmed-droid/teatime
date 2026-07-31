@@ -2,13 +2,48 @@ const fmp = require('./fmpClient');
 const config = require('./config');
 const { mapWithConcurrency } = require('./concurrency');
 
-// Multiple share classes (GOOGL/GOOG, BRK-A/BRK-B) and duplicate listings
-// map to the same company; keep only the higher-market-cap line per name.
+// How much of a listing actually changes hands in a day, in dollars. Used
+// both to spot listings that aren't really the company (below) and to pick
+// which of a company's lines represents it.
+function dollarVolume(row) {
+  return (row.volume || 0) * (row.price || 0);
+}
+
+// The screener returns more than operating companies. Bond and preferred
+// lines — AT&T's "5.35% GLB NTS 66", Prudential's junior subordinated notes,
+// Fifth Third's preferred series — come back carrying their *parent's* market
+// cap, so they sort straight into the top of the board as a second copy of a
+// company already on it. Two signals catch them, both already on the screener
+// row, so neither costs a request:
+//
+//  - What it trades. A real company of this size turns over millions of
+//    dollars a day; these lines do tens of thousands. The gap in the live
+//    pool is an order of magnitude wide (nothing between $0.5M and $2.6M),
+//    so the floor isn't finely tuned and doesn't need re-tuning as the
+//    universe grows. It also drops a couple of genuine-but-untradeable
+//    listings (Formula One's class A, whose class K line trades normally),
+//    which is the right answer for a board about what you could actually buy.
+//  - What it's called. Some preferred lines do trade actively, so for those
+//    the name is the only tell.
+const MIN_DOLLAR_VOLUME = 1e6;
+const NON_COMMON_NAME = /\b(notes?|debentures?|preferred|subordinated|depositary|perpetual|pfd|jrsub)\b|\d\s*%/i;
+
+function isOperatingCompany(row) {
+  if (NON_COMMON_NAME.test(row.companyName || '')) return false;
+  return dollarVolume(row) >= MIN_DOLLAR_VOLUME;
+}
+
+// Multiple share classes (GOOGL/GOOG, BRK-A/BRK-B) and duplicate listings map
+// to the same company; keep one line per name. Picked by what trades, not by
+// market cap: the lines share a company's market cap (or the secondary one
+// even reports slightly more of it), so market cap picked essentially at
+// random — which is how a $10k-a-day listing ended up representing PPL and
+// Fifth Third on the board.
 function dedupeByCompany(rows) {
   const bestByName = new Map();
   for (const row of rows) {
     const existing = bestByName.get(row.companyName);
-    if (!existing || row.marketCap > existing.marketCap) {
+    if (!existing || dollarVolume(row) > dollarVolume(existing)) {
       bestByName.set(row.companyName, row);
     }
   }
@@ -67,7 +102,7 @@ async function getLeaderboard() {
     exchanges: config.exchanges,
   });
 
-  const universe = dedupeByCompany(candidates)
+  const universe = dedupeByCompany(candidates.filter(isOperatingCompany))
     .sort((a, b) => b.marketCap - a.marketCap)
     .slice(0, config.universeSize);
 

@@ -20,8 +20,17 @@ Then open http://localhost:3000.
   screener, price-change, profile, historical daily prices). Retries 429/5xx
   with backoff and honours `Retry-After`; everything else fails fast.
 - `src/leaderboard.js` — builds the universe: largest companies by market cap
-  (NYSE/NASDAQ, ETFs/funds excluded, duplicate share classes deduped to the
-  larger-cap line), with trailing returns for every configured window. A
+  (NYSE/NASDAQ, ETFs/funds excluded), with trailing returns for every
+  configured window. Two filters run before the top-N cut, because the
+  screener also returns bond and preferred lines carrying their *parent's*
+  market cap — AT&T's "5.35% GLB NTS 66" sorts in beside AT&T itself. Names
+  that read as debt or preferred stock are dropped, as is anything trading
+  under $1M a day (a real company this size trades millions; these trade
+  tens of thousands). Remaining duplicate lines of one company — share
+  classes like GOOGL/GOOG, BRK-A/BRK-B — collapse to whichever line actually
+  trades, not the higher market cap: the lines report near-identical caps,
+  so that tiebreak decided nothing and let a $10k-a-day listing stand in for
+  its company. A
   company is marked unavailable for a given window if it hasn't been trading
   long enough for that return to be meaningful (e.g. a company that IPO'd two
   months ago has no real "1Y return") rather than silently showing a clamped,

@@ -59,7 +59,12 @@ Notes for whoever reads these later:
 - `capturedCompanies` below `universeSize` means the screener ran out of
   qualifying names before the target was filled (`screenerMinMarketCap`), not
   that companies dropped out. The 2026-07-30 file is the first such case: 250
-  asked for, 234 supplied under a $50B floor since lowered to $30B.
+  asked for, 234 supplied under a $50B floor, since lowered to $22B as the
+  universe grew to 300.
+- Files written before 2026-07-31 include a handful of bond and preferred
+  listings (TBB, PFH, PPLC, FITB-PM and similar) that carry their parent
+  company's market cap, so those days double-count a few companies. From
+  2026-07-31 on they're filtered out — see `src/leaderboard.js`.
 - Anything not stored here — a different ranking window, sector aggregates,
   correlations — is recomputable from `returns` and the per-company facts. Raw
   daily-close series are *not* stored: they're ~10MB/day, and FMP still serves

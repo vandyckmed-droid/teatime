@@ -236,7 +236,20 @@ Concretely:
   the screener only had 234 US names to give, so `universeSize: 250` silently
   delivered 234. It bounds the candidate pool only (the top N by market cap
   is still taken from whatever comes back), so lowering it doesn't make the
-  board less selective. Check the headroom before bumping.
+  board less selective. Check the headroom before bumping — at $22B (the
+  floor set for `universeSize: 300`) the screener returns ~440 names, ~425
+  after the junk-listing filter below.
+- That filter is the other thing to know when growing the universe. FMP's
+  screener returns bond and preferred lines alongside operating companies,
+  and they carry their *parent's* market cap, so they sort in as a second
+  copy of a company already on the board (AT&T's "5.35% GLB NTS 66" was
+  sitting at rank 76). `src/leaderboard.js` drops them on two signals from
+  the screener row itself — debt/preferred wording in the name, and under
+  $1M a day of trading — and picks between a company's remaining lines by
+  what trades rather than by market cap, since duplicate lines report
+  near-identical caps. Growing the universe surfaces more of these, not
+  fewer: re-check the drop list rather than assuming the two rules still
+  cover it.
 - Daily board snapshots accrue in `data/snapshots/` via `scripts/snapshot.js`
   and the one workflow in the repo (`.github/workflows/daily-snapshot.yml`).
   Append-only and deliberately stores inputs rather than one ranking — extend
