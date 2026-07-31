@@ -408,24 +408,6 @@ button { font: inherit; color: inherit; }
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 2.5px color-mix(in oklab, var(--accent) 20%, transparent);
 }
-/* ── the row's chart alternative ──────────────────────────────────────
-   Same 88px cell, no labels: at this size it's a shape, and every number it
-   could carry is already in the columns either side. */
-.spark-cell { padding-top: 0; display: flex; align-items: center; }
-.spark-cell svg { display: block; width: 100%; height: 34px; overflow: visible; }
-.spark-line {
-  fill: none; stroke-width: 1.6;
-  stroke-linejoin: round; stroke-linecap: round;
-  /* Non-scaling so preserveAspectRatio="none" can't stretch the stroke into
-     different weights horizontally and vertically. */
-  vector-effect: non-scaling-stroke;
-}
-.spark-line.gain { stroke: var(--gain); }
-.spark-line.loss { stroke: var(--loss); }
-.spark-bar.gain { fill: var(--gain); }
-.spark-bar.loss { fill: var(--loss); }
-.spark-zero { stroke: var(--hairline-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
-
 .range-ends {
   display: flex; justify-content: space-between;
   margin-top: 2px;

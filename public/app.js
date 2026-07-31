@@ -30,18 +30,6 @@ const SETTINGS = [
     default: 'line',
   },
   {
-    key: 'rowVisual',
-    type: 'choice',
-    section: 'display',
-    label: 'In each row',
-    description: 'Show where the price sits in its 52-week range, or the same chart the company opens to, shrunk to fit the row.',
-    options: [
-      { value: 'range', label: '52wk' },
-      { value: 'chart', label: 'Chart' },
-    ],
-    default: 'range',
-  },
-  {
     key: 'rankDateRange',
     type: 'daterange',
     label: 'Ranking date range',
@@ -711,30 +699,6 @@ function updateScoreLabels() {
   document.querySelectorAll('.board-head-score').forEach((el) => {
     el.textContent = state.settings.volAdjusted ? 'Vol-adj return' : 'Return';
   });
-  // …and the middle column names whatever it's currently showing.
-  const chartHeads = { line: '1Y price', bars: 'Vol-adj, 1Y' };
-  document.querySelectorAll('.board-head-range').forEach((el) => {
-    el.textContent = state.settings.rowVisual === 'chart'
-      ? (chartHeads[state.settings.detailChart] || '1Y')
-      : '52-week range';
-  });
-}
-
-// The row sparklines need every company's daily closes, which the live server
-// otherwise never sends: /api/rank returns scores alone precisely so the
-// browser doesn't have to download the universe's history. Only fetch it when
-// something is actually going to draw it.
-let rowHistoryPending = false;
-function ensureRowHistories() {
-  if (state.settings.rowVisual !== 'chart' || !state.leaderboard || rowHistoryPending) return;
-  const symbols = state.leaderboard.companies.map((c) => c.symbol);
-  if (symbols.every((s) => historyCache.has(s))) return;
-  rowHistoryPending = true;
-  loadAllHistories(symbols).finally(() => {
-    rowHistoryPending = false;
-    renderRanksBoard();
-    renderWatchlistBoard();
-  });
 }
 
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
@@ -761,81 +725,7 @@ function rangePct(c) {
   return Math.max(0, Math.min(100, pct));
 }
 
-// ── the row's middle cell ────────────────────────────────────────────
-// Either the 52-week range, or a shrunk copy of the chart this company opens
-// to (Settings → In each row). The sparkline is drawn in the same viewBox
-// units as its cell so the geometry needs no scaling, and deliberately carries
-// no labels: at 88px it's a shape, and the numbers it would need are already
-// in the columns either side of it.
-const SPARK_W = 88;
-const SPARK_H = 34;
-const SPARK_PAD_Y = 3;
-// Enough points to keep the shape honest, few enough to stay legible at 88px.
-const SPARK_LINE_POINTS = 44;
-const SPARK_BAR_COUNT = 11;
-
-function sparkPath(series) {
-  const step = Math.max(1, Math.ceil(series.length / SPARK_LINE_POINTS));
-  const pts = [];
-  for (let i = 0; i < series.length; i += step) pts.push(series[i].close);
-  const last = series[series.length - 1].close;
-  if (pts[pts.length - 1] !== last) pts.push(last);
-  if (pts.length < 2) return null;
-
-  const min = Math.min(...pts);
-  const max = Math.max(...pts);
-  const span = max - min || 1;
-  const innerH = SPARK_H - SPARK_PAD_Y * 2;
-  const d = pts.map((v, i) => {
-    const x = (i / (pts.length - 1)) * SPARK_W;
-    const y = SPARK_PAD_Y + innerH - ((v - min) / span) * innerH;
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return { d, gain: pts[pts.length - 1] >= pts[0] };
-}
-
-function sparkCell(c) {
-  const cached = historyCache.get(c.symbol);
-  const bars = state.settings.detailChart === 'bars';
-
-  if (bars) {
-    const values = rollingVolAdjusted(c.symbol, chartSpanDays(DEFAULT_CHART_RANGE), SPARK_BAR_COUNT);
-    if (values.length < 2) return '<span class="range-cell range-cell-empty">&mdash;</span>';
-    const hi = Math.max(0, ...values.map((v) => v.value));
-    const lo = Math.min(0, ...values.map((v) => v.value));
-    const spread = hi - lo || 1;
-    const innerH = SPARK_H - SPARK_PAD_Y * 2;
-    const yFor = (v) => SPARK_PAD_Y + innerH - ((v - lo) / spread) * innerH;
-    const zeroY = yFor(0);
-    const slot = SPARK_W / values.length;
-    const w = Math.max(2, slot * 0.62);
-    const rects = values.map((v, i) => {
-      const y = yFor(v.value);
-      return `<rect class="spark-bar ${v.value >= 0 ? 'gain' : 'loss'}" x="${(slot * (i + 0.5) - w / 2).toFixed(1)}"
-        y="${Math.min(y, zeroY).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(1, Math.abs(zeroY - y)).toFixed(1)}" />`;
-    }).join('');
-    return `
-      <span class="range-cell spark-cell">
-        <svg viewBox="0 0 ${SPARK_W} ${SPARK_H}" aria-hidden="true" preserveAspectRatio="none">
-          <line class="spark-zero" x1="0" y1="${zeroY.toFixed(1)}" x2="${SPARK_W}" y2="${zeroY.toFixed(1)}" />
-          ${rects}
-        </svg>
-      </span>`;
-  }
-
-  const slice = cached && cached.series ? sliceForRange(cached.series, DEFAULT_CHART_RANGE) : [];
-  const path = slice.length >= 2 ? sparkPath(slice) : null;
-  if (!path) return '<span class="range-cell range-cell-empty">&mdash;</span>';
-  return `
-    <span class="range-cell spark-cell">
-      <svg viewBox="0 0 ${SPARK_W} ${SPARK_H}" aria-hidden="true" preserveAspectRatio="none">
-        <path class="spark-line ${path.gain ? 'gain' : 'loss'}" d="${path.d}" />
-      </svg>
-    </span>`;
-}
-
 function rangeCell(c) {
-  if (state.settings.rowVisual === 'chart') return sparkCell(c);
   const pct = rangePct(c);
   if (pct === null) return '<span class="range-cell range-cell-empty">&mdash;</span>';
   return `
@@ -1088,7 +978,6 @@ function updateWatchlistBadge(animate = false) {
 
 function renderAll() {
   updateScoreLabels();
-  ensureRowHistories();
   renderRanksBoard();
   renderWatchlistBoard();
 }
@@ -2169,8 +2058,6 @@ function renderSettings() {
           state.settings[setting.key] = btn.dataset.value;
           saveSettings();
           renderSettings();
-          // The rows can depend on this choice (see rowVisual), so redraw them.
-          if (state.leaderboard && state.rankingsLoaded) renderAll();
         });
       });
     }

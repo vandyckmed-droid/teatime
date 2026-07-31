@@ -64,8 +64,7 @@ Then open http://localhost:3000.
   backend at all) still work unmodified. The per-company chart sheet has its
   own window toggle (1M-3Y), unrelated to the ranking date range. That sheet
   shows one chart — a price line, or the rolling volatility-adjusted score as
-  bars — chosen in Settings, and the same choice can replace each board row's
-  52-week range with a sparkline of it.
+  bars — chosen in Settings.
 
 ## The daily archive
 
