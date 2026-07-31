@@ -996,6 +996,71 @@ function renderPortfolioCard() {
   card.hidden = false;
 }
 
+// ── add the next ranked name ─────────────────────────────────────────
+// "Next" means the highest-scoring company on the Ranks board that isn't
+// already held and isn't blocked by the diversification filter — so the
+// ranking window and the correlation threshold in Settings both decide what
+// gets added, exactly as they decide what the board shows.
+//
+// They decide it once, at the moment of the tap. Changing either setting
+// afterwards re-sorts and re-fades the board but never touches the watchlist:
+// a saved name leaves only by its own check or by Clear watchlist.
+function nextRankedCandidate() {
+  if (!state.leaderboard || !state.rankingsLoaded) return null;
+  const scored = state.leaderboard.companies
+    .map((c) => ({ c, value: scoreFor(c) }))
+    // Unscored names aren't on the ranked list at all under this window, so
+    // "the next one down" can't reach them.
+    .filter((x) => x.value !== null)
+    .sort((a, b) => b.value - a.value);
+  for (const { c } of scored) {
+    if (state.watchlist.has(c.symbol)) continue;
+    if (correlationBlock(c)) continue;
+    return c;
+  }
+  return null;
+}
+
+let addNextFlashTimer = null;
+function flashAddNext(text) {
+  const btn = document.getElementById('add-next');
+  if (!btn) return;
+  if (addNextFlashTimer) clearTimeout(addNextFlashTimer);
+  btn.classList.add('is-spent');
+  btn.textContent = text;
+  addNextFlashTimer = setTimeout(() => {
+    addNextFlashTimer = null;
+    btn.classList.remove('is-spent');
+    btn.textContent = 'Add next ranked';
+  }, 2200);
+}
+
+async function addNextRanked() {
+  const company = nextRankedCandidate();
+  if (!company) {
+    // Everything above the correlation threshold is either held already or
+    // too close to something held — worth saying, since the alternative is a
+    // tap that appears to do nothing.
+    flashAddNext('Nothing left to add');
+    return;
+  }
+  state.watchlist.add(company.symbol);
+  lastToggledSymbol = company.symbol;
+  saveWatchlist();
+  updateWatchlistBadge(true);
+  renderAll();
+  lastToggledSymbol = null;
+  // The held set changed, so every other name's correlation against it did
+  // too — including what the *next* tap would be allowed to add.
+  await refreshCorrelations();
+  renderAll();
+}
+
+function initWatchlistActions() {
+  const btn = document.getElementById('add-next');
+  if (btn) btn.addEventListener('click', addNextRanked);
+}
+
 function renderWatchlistBoard() {
   const label = document.getElementById('watchlist-score-label');
   const head = document.getElementById('watchlist-board-head');
@@ -1010,11 +1075,19 @@ function renderWatchlistBoard() {
     resetClearWatchlist();
     rowsEl.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-glyph" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="30" height="30"><path d="${PLUS_PATH}"/></svg>
-        </div>
-        <p>Your watchlist is empty. Head to Ranks and tap the plus on any company to save it here.</p>
+        <button type="button" class="empty-state-glyph" id="add-next-empty" aria-label="Add the top-ranked company">
+          <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${PLUS_PATH}"/></svg>
+        </button>
+        <p>Your watchlist is empty. Tap the plus to add the top-ranked company, or pick your own from Ranks.</p>
       </div>`;
+    // Rebuilt with the empty state, so it's wired here rather than once at
+    // boot. Disabled until there are scores to rank by — a plus that silently
+    // does nothing is worse than one that's visibly not ready.
+    const addBtn = document.getElementById('add-next-empty');
+    if (addBtn) {
+      addBtn.disabled = !state.rankingsLoaded;
+      addBtn.addEventListener('click', addNextRanked);
+    }
     return;
   }
 
@@ -2073,6 +2146,7 @@ function initDetailSheet() {
   initDetailSwipe();
   initDetailDismiss();
   initClearWatchlist();
+  initWatchlistActions();
   document.addEventListener('keydown', (e) => {
     const sheetOpen = !document.getElementById('detail-sheet').hidden;
     // Escape steps back one level rather than always closing: from full screen

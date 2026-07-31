@@ -76,7 +76,13 @@ Then open http://localhost:3000.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
   bottom sheet that opens a price chart when you tap a company. The Watchlist
   tab leads with a card showing the owner's own portfolio (see
-  `src/portfolio.js`), which stays hidden if no balances are recorded. Ranks and
+  `src/portfolio.js`), which stays hidden if no balances are recorded, and
+  carries an "add next ranked" control — the plus in the empty state, a button
+  beside Clear watchlist once there are names — that saves the highest-ranked
+  company not already held and not blocked by the diversification filter. The
+  watchlist itself is a plain stored set of symbols: the ranking window and
+  the correlation threshold decide what a tap adds, but changing them
+  afterwards never adds or removes anything. Ranks and
   Watchlist rank by a custom date range (set in Settings, adjustable via
   +/− steppers, or in one tap from the 12M/6M pills that sit with the Ranks
   board's sticky header — `RANK_WINDOW_PRESETS` in `public/app.js`); scoring

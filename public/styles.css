@@ -603,19 +603,53 @@ button { font: inherit; color: inherit; }
   background: var(--surface); border: 1px solid var(--hairline);
   border-radius: var(--r-md); box-shadow: var(--shadow-card);
 }
+/* A real button, not decoration: it adds the top-ranked name (see
+   addNextRanked in app.js), which is the whole reason the empty state exists. */
 .empty-state-glyph {
-  width: 54px; height: 54px; border-radius: 18px;
+  width: 54px; height: 54px; border-radius: 18px; border: none;
   background: color-mix(in oklab, var(--accent) 10%, var(--surface-2));
   display: flex; align-items: center; justify-content: center;
   color: color-mix(in oklab, var(--accent) 70%, var(--text-3));
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), background 160ms ease, color 160ms ease;
 }
+.empty-state-glyph:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface-2));
+  color: var(--accent);
+}
+.empty-state-glyph:active:not(:disabled) { transform: scale(0.92); }
+.empty-state-glyph:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.empty-state-glyph:disabled { opacity: 0.5; cursor: default; }
 .empty-state-glyph svg path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .empty-state p { margin: 0; max-width: 28ch; color: var(--text-3); font-size: var(--fs-sub); line-height: 1.55; }
 
 /* ── destructive action below a list ──────────────────────────────────
    Quiet until armed: a full-strength red button sitting under the list all the
    time reads as a warning about something that hasn't happened. */
-.board-actions { display: flex; justify-content: center; margin-top: var(--s5); }
+.board-actions {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  gap: var(--s3); margin-top: var(--s5);
+}
+/* The constructive counterpart to .danger-btn below: same pill, carrying the
+   app's one green because adding is the "yours / act here" action. */
+.action-btn {
+  padding: 11px var(--s5); min-height: 44px;
+  border: 1px solid color-mix(in oklab, var(--accent) 38%, transparent);
+  border-radius: var(--r-full);
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  font-size: var(--fs-sub); font-weight: 700; letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), background 160ms ease,
+              color 160ms ease, border-color 160ms ease;
+}
+.action-btn:active:not(:disabled) { transform: scale(0.96); }
+.action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Nothing left to add: says so in place rather than going silent on a tap. */
+.action-btn.is-spent {
+  background: var(--surface); color: var(--text-3);
+  border-color: var(--hairline);
+}
 .danger-btn {
   padding: 11px var(--s5); min-height: 44px;
   border: 1px solid var(--hairline);

@@ -233,6 +233,12 @@ Concretely:
   date range (Settings-driven); the per-ticker chart sheet has its own
   window toggle. No standing rule on how connected these two should be —
   judge it fresh each time a feature touches both.
+- The watchlist is a stored set of symbols and nothing else, deliberately.
+  Settings decide what "add next ranked" (`addNextRanked` / the empty-state
+  plus) picks at the moment of the tap; they never retroactively change what's
+  held. A saved name leaves only by its own check or Clear watchlist — keep
+  it that way, and don't add anything that prunes the set when the window or
+  the correlation threshold moves.
 - `RANK_WINDOW_PRESETS` in `public/app.js` backs the pills above the Ranks
   board; a new preset is a new entry. They and the Settings steppers are two
   views of one stored value, so each re-renders the other, and a pill lights

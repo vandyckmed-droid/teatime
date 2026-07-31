@@ -86,17 +86,19 @@
         <div class="board">
           <div id="watchlist-rows">
             <div class="empty-state">
-              <div class="empty-state-glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 5.5v13M5.5 12h13"/></svg>
-              </div>
-              <p>Your watchlist is empty. Head to Ranks and tap the plus on any company to save it here.</p>
+              <button type="button" class="empty-state-glyph" id="add-next-empty" aria-label="Add the top-ranked company">
+                <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg>
+              </button>
+              <p>Your watchlist is empty. Tap the plus to add the top-ranked company, or pick your own from Ranks.</p>
             </div>
           </div>
         </div>
 
-        <!-- Destructive action, so it sits after the list (iOS puts these last)
-             and takes two taps — see the confirm step in app.js. -->
+        <!-- Add-next first, then the destructive action, which sits last (iOS
+             puts these last) and takes two taps — see the confirm step in
+             app.js. -->
         <div class="board-actions" id="watchlist-actions" hidden>
+          <button type="button" class="action-btn" id="add-next">Add next ranked</button>
           <button type="button" class="danger-btn" id="clear-watchlist">Clear watchlist</button>
         </div>
       </div>
