@@ -684,6 +684,23 @@ button { font: inherit; color: inherit; }
 .segmented button[aria-pressed="true"]:active { color: var(--accent-ink); }
 .segmented button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* Settings variant: sits beside a label rather than under a chart, so it sizes
+   to its options instead of stretching, and paints the selection directly on
+   the button — there's no chart below it for a sliding thumb to feel tied to. */
+.segmented-inline {
+  flex: 0 0 auto; align-self: center;
+  margin-left: var(--s3);
+}
+.segmented-inline button {
+  flex: 0 0 auto;
+  padding: 7px var(--s3);
+  transition: color 200ms ease, background 200ms ease;
+}
+.segmented-inline button[aria-pressed="true"] {
+  background: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 /* ── tab bar ──────────────────────────────────────────────────────────── */
 .tabbar {
   position: fixed; left: 50%; bottom: 0; transform: translateX(-50%);

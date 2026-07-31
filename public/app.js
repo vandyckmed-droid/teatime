@@ -18,6 +18,18 @@ const SETTINGS = [
     default: 0.7,
   },
   {
+    key: 'detailChart',
+    type: 'choice',
+    section: 'display',
+    label: 'Chart',
+    description: 'Which chart a company opens to. One at a time, so the sheet stays short enough to see the board behind it.',
+    options: [
+      { value: 'price', label: 'Price' },
+      { value: 'rank', label: 'Rank' },
+    ],
+    default: 'price',
+  },
+  {
     key: 'rankDateRange',
     type: 'daterange',
     label: 'Ranking date range',
@@ -1033,6 +1045,21 @@ function renderDetailContent(company) {
   renderDetailFacts(company);
   renderDetailSegmented();
 
+  // One chart at a time (Settings → "Chart in the detail sheet"). Two of them
+  // filled the sheet to its 90vh cap, which left nothing of the blurred board
+  // visible behind it and made the sheet feel like a page rather than a panel.
+  const showRank = state.settings.detailChart === 'rank';
+  document.querySelector('.chart-card:not(.rank-card)').hidden = showRank;
+  document.querySelector('.rank-card').hidden = !showRank;
+  // Empty the one that isn't showing rather than just hiding it: an SVG left in
+  // the DOM keeps its geometry and listeners alive for a card nobody can see.
+  document.getElementById(showRank ? 'chart-wrap' : 'rank-wrap').innerHTML = '';
+
+  if (showRank) {
+    refreshRankChart();
+    return;
+  }
+
   // Usually replaced near-instantly (history is prefetched at boot), but shows
   // for real when a symbol missed the batch prefetch and needs its own fetch —
   // also clears out the previously-open company's chart immediately instead of
@@ -1048,8 +1075,6 @@ function renderDetailContent(company) {
     if (detail.symbol !== opened) return;
     wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
   });
-
-  refreshRankChart();
 }
 
 // `sequence` is the ordered symbols of the board the row was tapped in, so a
@@ -1514,8 +1539,10 @@ function renderDetailSegmented() {
         syncSegmented();
         const company = findCompany(detail.symbol);
         if (company) renderDetailReturn(company);
-        renderChart();
-        refreshRankChart();
+        // Only redraw the chart that's actually on screen — the rank one is the
+        // expensive call in the app, and recomputing a hidden card is pure cost.
+        if (state.settings.detailChart === 'rank') refreshRankChart();
+        else renderChart();
       });
       el.appendChild(btn);
     });
@@ -2068,8 +2095,11 @@ function initDetailSheet() {
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(() => {
       resizeRaf = null;
-      if (historyCache.has(detail.symbol)) renderChart();
-      if (detail.rankHistory) renderRankChart();
+      if (state.settings.detailChart === 'rank') {
+        if (detail.rankHistory) renderRankChart();
+      } else if (historyCache.has(detail.symbol)) {
+        renderChart();
+      }
       positionSegmentedThumb(true);
     });
   });
@@ -2077,9 +2107,15 @@ function initDetailSheet() {
 
 // ── settings tab ─────────────────────────────────────────────────────
 function renderSettings() {
-  const list = document.getElementById('settings-list');
-  list.innerHTML = '';
+  // A setting's `section` picks which list it lands in, so grouping is part of
+  // the config rather than the render code — same spirit as `type`.
+  const lists = {
+    scoring: document.getElementById('settings-list'),
+    display: document.getElementById('display-settings'),
+  };
+  Object.values(lists).forEach((el) => { if (el) el.innerHTML = ''; });
   SETTINGS.forEach((setting) => {
+    const list = lists[setting.section] || lists.scoring;
     const row = document.createElement('div');
     row.className = 'settings-row';
     if (setting.type === 'toggle') {
@@ -2103,6 +2139,31 @@ function renderSettings() {
           await refreshRankings();
           renderAll();
         }
+      });
+    }
+    // A pick-one row. Reuses the detail sheet's segmented pills rather than
+    // inventing a second look for the same job; no sliding thumb here, since
+    // this one doesn't sit under a chart it needs to feel connected to.
+    if (setting.type === 'choice') {
+      const current = state.settings[setting.key];
+      row.innerHTML = `
+        <div class="settings-row-text">
+          <div class="settings-row-label">${setting.label}</div>
+          <div class="settings-row-desc">${setting.description}</div>
+        </div>
+        <div class="segmented segmented-inline" role="group" aria-label="${setting.label}">
+          ${setting.options.map((o) => `
+            <button type="button" data-key="${setting.key}" data-value="${o.value}"
+              aria-pressed="${o.value === current}">${o.label}</button>`).join('')}
+        </div>`;
+      list.appendChild(row);
+      row.querySelectorAll('.segmented-inline button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (state.settings[setting.key] === btn.dataset.value) return;
+          state.settings[setting.key] = btn.dataset.value;
+          saveSettings();
+          renderSettings();
+        });
       });
     }
     // Threshold stepper: 0.30–1.00 in 0.05 steps, 1.00 shown as "Off". Changing
@@ -2145,7 +2206,7 @@ function renderSettings() {
     note.id = 'settings-note';
     note.className = 'settings-note';
     note.innerHTML = 'More settings land here as the board grows — each one is a config entry in <code>public/app.js</code> (<code>SETTINGS</code>) with no other wiring required.';
-    list.parentElement.appendChild(note);
+    lists.scoring.parentElement.appendChild(note);
   }
 
   renderDateRangeSetting();
