@@ -74,7 +74,10 @@ Then open http://localhost:3000.
   endpoints only serve symbols in the current leaderboard universe — this is
   a leaderboard companion, not an open proxy for arbitrary FMP queries.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
-  bottom sheet that opens a price chart when you tap a company. The Watchlist
+  bottom sheet that opens a price chart when you tap a company. Board rows
+  carry rank, logo, name, sector and return only — the 52-week range bar that
+  used to be an 88px column moved into the full-screen ticker view, where it
+  has the width to be read. The Watchlist
   tab leads with a card showing the owner's own portfolio (see
   `src/portfolio.js`), which stays hidden if no balances are recorded, and
   carries an "add next ranked" control — the plus in the empty state, a button

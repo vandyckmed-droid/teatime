@@ -718,24 +718,6 @@ function rangePct(c) {
   return Math.max(0, Math.min(100, pct));
 }
 
-function rangeCell(c) {
-  const pct = rangePct(c);
-  if (pct === null) return '<span class="range-cell range-cell-empty">&mdash;</span>';
-  return `
-    <span class="range-cell">
-      <span class="range-now" style="left: ${pct}%">${fmtRangePrice(c.price)}</span>
-      <span class="range-track">
-        <span class="range-cap lo"></span>
-        <span class="range-cap hi"></span>
-        <span class="range-thumb" style="left: ${pct}%"></span>
-      </span>
-      <span class="range-ends">
-        <span>${fmtRangePrice(c.low52)}</span>
-        <span>${fmtRangePrice(c.high52)}</span>
-      </span>
-    </span>`;
-}
-
 // Ticker is the identity now (big, first); the legal name is the subtitle and
 // the sector is a colored dot plus a short label, so the whole block stays one
 // narrow column beside the logo.
@@ -780,9 +762,11 @@ function addButton(c) {
     </span>`;
 }
 
-// Both row builders share one column order — rank, logo, name block, 52-week
-// range, score/price, add control — which is also what the .board-head labels
-// sit over, so the two stay aligned by construction.
+// Both row builders share one column order — rank, logo, name block,
+// score/price, add control — which is also what the .board-head label sits
+// over, so the two stay aligned by construction. The 52-week range used to be
+// a column here; it lives in the full-screen ticker view now, where it has
+// the width to be readable.
 function baseRow(c, extraClass) {
   const row = document.createElement('div');
   const blocked = correlationBlock(c) ? ' correlated' : '';
@@ -804,7 +788,6 @@ function rowEl(c, rank, value) {
     <span class="rank">${rank}</span>
     ${logoAvatar(c, sectorVar)}
     ${nameCell(c, sectorVar)}
-    ${rangeCell(c)}
     <span class="trailing-cell">
       <span class="return-val ${isGain ? 'gain' : 'loss'}"></span>
       <span class="price-mini">${fmtRangePrice(c.price)}</span>
@@ -822,7 +805,6 @@ function buildUnavailableRow(c) {
     <span class="rank">&mdash;</span>
     ${logoAvatar(c, sectorVar)}
     ${nameCell(c, sectorVar)}
-    ${rangeCell(c)}
     <span class="trailing-cell">
       <span class="return-val na">N/A</span>
       <span class="price-mini">${fmtRangePrice(c.price)}</span>
@@ -1647,6 +1629,7 @@ function renderDetailFacts(company) {
 // spacing and hairlines instead of inventing a layout; a block that needs its
 // own shape can return whatever markup it likes.
 const DETAIL_BLOCKS = [
+  { key: 'range', title: '52-week range', render: blockRange },
   { key: 'returns', title: 'Return by window', render: blockReturns },
   { key: 'standing', title: 'Standing on the board', render: blockStanding },
   { key: 'profile', title: 'Company', render: blockProfile },
@@ -1659,6 +1642,36 @@ function statRow(label, value, cls = '') {
 function signClass(v) {
   if (!(typeof v === 'number') || v === 0) return '';
   return v > 0 ? 'gain' : 'loss';
+}
+
+// Where today's close sits between the year's extremes. This was an 88px
+// column on every board row until it moved here; at that width the price
+// labels were 9px and the bar competed with the return for attention. Full
+// width it can actually be read.
+function blockRange(company) {
+  const pct = rangePct(company);
+  if (pct === null) return null; // no 52-week figures — the card drops itself
+  // The thumb sits at the true position; the price label is pulled in from
+  // the edges so it can't be clipped when the close is at a yearly extreme.
+  const labelPct = Math.max(9, Math.min(91, pct));
+  return `
+    <div class="range-bar">
+      <span class="range-bar-now" style="left: ${labelPct.toFixed(1)}%">${fmtRangePrice(company.price)}</span>
+      <span class="range-bar-track">
+        <span class="range-cap lo"></span>
+        <span class="range-cap hi"></span>
+        <span class="range-thumb" style="left: ${pct.toFixed(1)}%"></span>
+      </span>
+      <span class="range-bar-ends">
+        <span>${fmtRangePrice(company.low52)}</span>
+        <span>${fmtRangePrice(company.high52)}</span>
+      </span>
+    </div>
+    ${statRow('Position', `${Math.round(pct)}% of the range`)}
+    ${statRow('Off the high', fmtPct(((company.price - company.high52) / company.high52) * 100),
+    signClass(company.price - company.high52))}
+    ${statRow('Above the low', fmtPct(((company.price - company.low52) / company.low52) * 100),
+    signClass(company.price - company.low52))}`;
 }
 
 // Every window the API carries, not just the one the board happens to be
@@ -1723,9 +1736,7 @@ function blockProfile(company) {
   if (sizeIndex >= 0) rows.push(statRow('Size rank', `${sizeIndex + 1} of ${universe.length}`));
   rows.push(statRow('Sector', company.sector || 'Uncategorized'));
   rows.push(statRow('Beta', typeof company.beta === 'number' ? company.beta.toFixed(2) : 'N/A'));
-  if (company.low52 && company.high52) {
-    rows.push(statRow('52-week range', `${fmtRangePrice(company.low52)} – ${fmtRangePrice(company.high52)}`));
-  }
+  // The 52-week figures have their own block above, with the bar.
   if (company.ipoDate) rows.push(statRow('Listed', fmtChartDate(company.ipoDate)));
   return rows.join('');
 }
