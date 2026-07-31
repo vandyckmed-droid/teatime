@@ -142,13 +142,23 @@
     <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
     <div class="sheet" id="detail-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="detail-name">
       <!-- Generous grab strip, not just the 5px pill: this is the thumb target
-           for dragging the sheet back down (see initDetailDismiss in app.js). -->
+           for dragging the sheet back down (see initDetailDismiss in app.js).
+           The two controls live in the strip rather than floating over the
+           content below it — with a button at each end there was no longer
+           room to overlap the header without landing on the logo. Expand sits
+           opposite Close because they do opposite things, and Close has been
+           in the right corner since the sheet existed. -->
       <div class="sheet-grab" id="sheet-grab">
+        <button type="button" class="sheet-btn" id="sheet-expand" aria-label="Expand to full screen" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="sheet-expand-icon">
+            <path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/>
+          </svg>
+        </button>
         <div class="sheet-handle" aria-hidden="true"></div>
+        <button type="button" class="sheet-btn" id="sheet-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
       </div>
-      <button type="button" class="sheet-close" id="sheet-close" aria-label="Close">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
 
       <div class="sheet-scroll">
         <div class="detail-header">
@@ -182,6 +192,10 @@
         </div>
 
         <div class="detail-facts" id="detail-facts"></div>
+
+        <!-- Full-screen only. Filled from DETAIL_BLOCKS in app.js — the place
+             to add a new panel of data without touching this file. -->
+        <div class="detail-extras" id="detail-extras" hidden></div>
       </div>
     </div>
   </main>

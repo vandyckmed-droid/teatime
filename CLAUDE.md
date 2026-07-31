@@ -219,6 +219,15 @@ Concretely:
   reads stored values back key by key and drops anything no longer listed, so
   a removed setting takes its saved value with it instead of leaving a dead
   key in `localStorage`.
+- `DETAIL_BLOCKS` in `public/app.js` is the same idea for the full-screen
+  per-ticker view, and it exists specifically to be a dumping ground — the
+  owner's framing: "a graveyard of data and experiments." Each entry is one
+  card; adding a panel is adding an entry, removing it is deleting the entry,
+  and nothing else in the app refers to them. A `render` that returns null
+  drops its own card, and one that throws is caught and skipped rather than
+  taking the page down. Put new per-company data here rather than
+  engineering it into the row or the card — that's the whole point of the
+  view existing.
 - `METRICS` / `CHART_RANGES` in `src/config.js` / `public/app.js` are the
   same pattern for return windows. Ranks/Watchlist ranking is a custom
   date range (Settings-driven); the per-ticker chart sheet has its own

@@ -767,27 +767,87 @@ button { font: inherit; color: inherit; }
    touch-action: none because the gesture is ours — without it the browser
    claims the vertical pan before a pointermove ever arrives. */
 .sheet-grab {
-  flex-shrink: 0; padding-bottom: 6px;
+  flex-shrink: 0;
+  padding: var(--s2) var(--s3) 6px;
+  display: flex; align-items: center;
   touch-action: none; cursor: grab;
 }
 .sheet-grab:active { cursor: grabbing; }
+/* Centred by the equal-width buttons either side of it, not by its own
+   margins — auto margins keep it centred even if one button changes size. */
 .sheet-handle {
   width: 38px; height: 5px; border-radius: var(--r-full); background: var(--surface-3);
-  margin: var(--s2) auto 0; flex-shrink: 0;
+  margin: 0 auto; flex-shrink: 0;
   transition: background 140ms ease, width 140ms var(--ease-out);
 }
 /* Grows and brightens while dragging, so the sheet reads as "held". */
 .sheet.dragging .sheet-handle { background: var(--text-3); width: 46px; }
 .sheet.dragging { transition: none; }
-.sheet-close {
-  position: absolute; top: var(--s4); right: var(--s4); z-index: 1;
+/* Both strip controls share one shape — same size, same disc, same press. */
+.sheet-btn {
+  flex-shrink: 0;
   width: 30px; height: 30px; border-radius: 50%; border: none;
   background: var(--surface-2); color: var(--text-2);
   display: flex; align-items: center; justify-content: center; cursor: pointer;
+  /* The strip owns the drag gesture; the buttons inside it are taps. */
+  touch-action: manipulation;
   transition: transform 120ms var(--ease-out), background 120ms ease, color 120ms ease;
 }
-.sheet-close:active { transform: scale(0.88); background: var(--surface-3); color: var(--text); }
-.sheet-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sheet-btn:active { transform: scale(0.88); background: var(--surface-3); color: var(--text); }
+.sheet-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Expanded reads as "you're in a place", so the control that got you here is
+   the one lit up. */
+.sheet.is-expanded #sheet-expand { background: var(--accent); color: var(--accent-ink); }
+
+/* ── full-screen per-ticker view ──────────────────────────────────────
+   Not a second component: the same sheet, grown to fill the screen. One
+   chart, one range toggle, one swipe handler — the extras below just become
+   visible. The only structural change is losing the rounded top and the
+   height cap. */
+.sheet.is-expanded {
+  height: 100%; max-height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+}
+.sheet.is-expanded .sheet-grab { padding-top: calc(var(--s2) + env(safe-area-inset-top)); }
+/* More room for the chart once there's a screen to spend: the viewBox is
+   measured in pixels, so app.js re-renders after the class flips. */
+.sheet.is-expanded .chart-wrap { height: 232px; }
+
+.detail-extras {
+  display: flex; flex-direction: column; gap: var(--s4);
+  margin-top: var(--s5);
+}
+.detail-block {
+  border: 1px solid var(--hairline); border-radius: var(--r-lg);
+  background: var(--surface-2); box-shadow: var(--shadow-card);
+  padding: var(--s3) var(--s4) var(--s2);
+}
+.detail-block-title {
+  font-size: var(--fs-nano); font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-3);
+  margin-bottom: var(--s2);
+}
+.detail-block-note {
+  font-size: var(--fs-nano); color: var(--text-3); line-height: 1.4;
+  margin: var(--s2) 0 var(--s2);
+}
+/* One shared row shape for every block, so a new block gets the app's
+   spacing and hairlines without inventing a layout. */
+.stat-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); padding: 9px 0;
+  border-top: 1px solid var(--hairline);
+}
+.stat-row:first-of-type { border-top: none; }
+.stat-label { font-size: var(--fs-cap); font-weight: 500; color: var(--text-2); }
+.stat-value {
+  font-size: var(--fs-sub); font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.stat-value.gain { color: var(--gain); }
+.stat-value.loss { color: var(--loss); }
+.stat-value.muted { color: var(--text-3); font-weight: 600; }
 
 .sheet-scroll {
   overflow-y: auto;
@@ -807,7 +867,7 @@ button { font: inherit; color: inherit; }
   -webkit-overflow-scrolling: touch;
 }
 
-.detail-header { display: flex; align-items: center; gap: var(--s3); margin: var(--s1) 40px var(--s5) 0; }
+.detail-header { display: flex; align-items: center; gap: var(--s3); margin: 0 0 var(--s5); }
 .detail-header .logo { width: 46px; height: 46px; }
 .detail-header .logo-fallback { font-size: 15px; }
 .detail-ticker { font-size: var(--fs-h2); font-weight: 800; letter-spacing: -0.02em; color: var(--text); line-height: 1.15; }
@@ -981,7 +1041,7 @@ button { font: inherit; color: inherit; }
   .ios-switch .knob,
   .sheet,
   .sheet-backdrop,
-  .sheet-close,
+  .sheet-btn,
   .row,
   .tab-btn,
   .tab-icon,

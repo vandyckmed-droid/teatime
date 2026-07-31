@@ -72,7 +72,12 @@ Then open http://localhost:3000.
   this is what makes the static-snapshot preview channels (which have no
   backend at all) still work unmodified. The sheet shows exactly one chart —
   the price line — over a window picked by its own range pills (1M-5Y, 1M-3Y
-  in the snapshot bundle), unrelated to the ranking date range.
+  in the snapshot bundle), unrelated to the ranking date range. The arrow in
+  its top-left grows the same sheet to a full-screen scrolling page: same
+  chart, same pills, same swipe, plus a stack of data cards built from
+  `DETAIL_BLOCKS`. That list is deliberately a scratch space for per-company
+  data and experiments — add an entry to try something, delete it to take it
+  away.
 
 ## The daily archive
 
@@ -104,6 +109,10 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   `src/ranking.js` above) already remove the two biggest costs of scaling
   further — repeated FMP fetches per visitor, and shipping the full universe's
   history JSON to the browser just to rank it.
+- New per-company data panel: add an entry to `DETAIL_BLOCKS` in
+  `public/app.js` — a title and a `render(company)` returning HTML (use
+  `statRow()` for anything list-shaped). It appears as a card in the
+  full-screen ticker view with no other wiring.
 - New setting: add an entry to `SETTINGS` in `public/app.js`.
   `renderSettings()` dispatches on `type` (`'toggle'`, `'threshold'`,
   `'daterange'`); a new `type` needs one more branch there. `SETTINGS` is

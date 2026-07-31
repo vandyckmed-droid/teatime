@@ -118,6 +118,10 @@ const historyCache = new Map();
 
 const detail = {
   symbol: null,
+  // Whether the sheet is grown to the full-screen data page (see
+  // setDetailExpanded). Always false on open — expanding is a deliberate act,
+  // not a mode the sheet remembers.
+  expanded: false,
   range: DEFAULT_CHART_RANGE,
   slice: null, // the currently-rendered range's [{date, close}], oldest first
   // How far the sheet is parked below its full position: 0, or the half detent
@@ -949,6 +953,9 @@ function renderDetailContent(company) {
   renderDetailReturn(company);
   renderDetailFacts(company);
   renderDetailSegmented();
+  // No-ops unless the full-screen view is open; swiping between companies
+  // there has to refill the blocks too.
+  renderDetailExtras(company);
 
   // Usually replaced near-instantly (history is prefetched at boot), but shows
   // for real when a symbol missed the batch prefetch and needs its own fetch —
@@ -1002,6 +1009,9 @@ function openDetail(symbol, sequence) {
   sheetEl.style.transition = '';
   sheetEl.style.transform = '';
   document.getElementById('sheet-backdrop').style.opacity = '';
+  // Every open starts as the card, never full screen — same reasoning as the
+  // detent above.
+  setDetailExpanded(false);
 
   // Last gap where a render error could still surface as an open-but-blank
   // sheet: showDetailAt catches its own, but this path had none.
@@ -1201,6 +1211,9 @@ function closeDetail() {
     sheet.hidden = true;
     sheet.style.transition = '';
     sheet.style.transform = '';
+    // Dropped only once it's out of sight: collapsing a full-screen view on
+    // the way down would make the dismissal look like two separate animations.
+    setDetailExpanded(false);
   }, 320);
 }
 
@@ -1226,6 +1239,10 @@ const DISMISS_UP_DAMPING = 0.18;
 function halfDetentOffset() {
   const sheet = document.getElementById('detail-sheet');
   if (!sheet) return 0;
+  // Full screen has one resting position. Half a screen of a page built to be
+  // scrolled isn't a useful place to park it, and pulling down from there
+  // means "put the card back".
+  if (detail.expanded) return 0;
   const offset = Math.round(sheet.offsetHeight - window.innerHeight * 0.5);
   return offset > 60 ? offset : 0;
 }
@@ -1288,8 +1305,10 @@ function initDetailDismiss() {
     baseOffset = detail.detentOffset || 0;
   };
 
-  // The strip is unambiguous — anything starting there is a dismiss drag.
+  // The strip is unambiguous — anything starting there is a dismiss drag,
+  // except on the two buttons it now holds, which are taps.
   grab.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
     start(e);
     try { grab.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
   });
@@ -1344,6 +1363,17 @@ function initDetailDismiss() {
     engaged = false;
 
     const offset = Math.max(0, baseOffset + (e.clientY - startY));
+
+    // From full screen, a pull down is a step back to the card — never a
+    // dismissal. Two levels down in one gesture would be too easy to do by
+    // accident, and the card is where you'd want to carry on from anyway.
+    if (detail.expanded) {
+      sheet.classList.remove('dragging');
+      if (offset > DISMISS_COMMIT_PX) setDetailExpanded(false);
+      settleAt(0);
+      return;
+    }
+
     const half = halfDetentOffset();
     // Where the drag was heading, not where the finger stopped — used to pick
     // between detents, deliberately NOT to decide dismissal.
@@ -1410,6 +1440,176 @@ function renderDetailFacts(company) {
         <div class="detail-fact-value">${colorVar ? `<span class="fact-color-dot" style="background: var(${colorVar})"></span>` : ''}${value}</div>
       </div>`)
     .join('');
+}
+
+// ── the full-screen view's blocks ────────────────────────────────────
+// The expanded per-ticker page is a stack of cards built from this list, in
+// order. It's meant to be a dumping ground: adding a panel of data is adding
+// an entry here, taking it away is deleting the entry, and nothing else in
+// the app refers to them. `render` returns the card's inner HTML, or null to
+// leave the card out entirely — a block with nothing to say shouldn't leave
+// an empty shell behind.
+//
+// Use statRow() for anything list-shaped so a new block inherits the app's
+// spacing and hairlines instead of inventing a layout; a block that needs its
+// own shape can return whatever markup it likes.
+const DETAIL_BLOCKS = [
+  { key: 'returns', title: 'Return by window', render: blockReturns },
+  { key: 'standing', title: 'Standing on the board', render: blockStanding },
+  { key: 'profile', title: 'Company', render: blockProfile },
+];
+
+function statRow(label, value, cls = '') {
+  return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-value${cls ? ` ${cls}` : ''}">${value}</span></div>`;
+}
+
+function signClass(v) {
+  if (!(typeof v === 'number') || v === 0) return '';
+  return v > 0 ? 'gain' : 'loss';
+}
+
+// Every window the API carries, not just the one the board happens to be
+// sorted by — the board can only ever show one at a time.
+function blockReturns(company) {
+  const metrics = (state.leaderboard && state.leaderboard.metrics) || [];
+  if (!metrics.length) return null;
+  let short = false;
+  const rows = metrics.map((m) => {
+    const value = company.returns ? company.returns[m.key] : null;
+    const usable = typeof value === 'number'
+      && (!company.availability || company.availability[m.key] !== false);
+    if (!usable) {
+      short = true;
+      return statRow(m.label, '&mdash;', 'muted');
+    }
+    return statRow(m.label, fmtPct(value), signClass(value));
+  });
+  if (short) {
+    rows.push('<p class="detail-block-note">&mdash; where the company hasn\'t traded long enough for that window to mean anything.</p>');
+  }
+  return rows.join('');
+}
+
+// Where this name sits in the board as currently scored — the number the row
+// shows, plus the things the row has no room for.
+function blockStanding(company) {
+  if (!state.leaderboard) return null;
+  const scored = state.leaderboard.companies
+    .map((c) => ({ symbol: c.symbol, value: scoreFor(c) }))
+    .filter((x) => x.value !== null)
+    .sort((a, b) => b.value - a.value);
+  const index = scored.findIndex((x) => x.symbol === company.symbol);
+  const volAdjusted = !!state.settings.volAdjusted;
+
+  const rows = [];
+  if (index === -1) {
+    rows.push(statRow('Rank', 'Not ranked', 'muted'));
+  } else {
+    const score = scored[index].value;
+    rows.push(statRow('Rank', `${index + 1} of ${scored.length}`));
+    rows.push(statRow('Score', volAdjusted ? fmtScore(score) : fmtPct(score), signClass(score)));
+    rows.push(statRow('Percentile', `top ${Math.max(1, Math.round(((index + 1) / scored.length) * 100))}%`));
+  }
+  rows.push(statRow('Scored by', volAdjusted ? 'Return ÷ volatility' : 'Price return'));
+  rows.push(statRow('Window', rankDateRangeLabel()));
+  if (index === -1) {
+    rows.push('<p class="detail-block-note">Too little trading history to score over this window. Widen it in Settings, or move the end date back.</p>');
+  }
+  return rows.join('');
+}
+
+function blockProfile(company) {
+  const universe = (state.leaderboard && state.leaderboard.companies) || [];
+  const sizeIndex = universe.findIndex((c) => c.symbol === company.symbol);
+  const rows = [
+    statRow('Price', fmtPrice(company.price)),
+    statRow('Market cap', fmtCap(company.marketCap)),
+  ];
+  // The board is the largest N by market cap, in that order, so position in
+  // it is the size ranking — no extra data needed to say so.
+  if (sizeIndex >= 0) rows.push(statRow('Size rank', `${sizeIndex + 1} of ${universe.length}`));
+  rows.push(statRow('Sector', company.sector || 'Uncategorized'));
+  rows.push(statRow('Beta', typeof company.beta === 'number' ? company.beta.toFixed(2) : 'N/A'));
+  if (company.low52 && company.high52) {
+    rows.push(statRow('52-week range', `${fmtRangePrice(company.low52)} – ${fmtRangePrice(company.high52)}`));
+  }
+  if (company.ipoDate) rows.push(statRow('Listed', fmtChartDate(company.ipoDate)));
+  return rows.join('');
+}
+
+function renderDetailExtras(company) {
+  const host = document.getElementById('detail-extras');
+  if (!host) return;
+  if (!detail.expanded || !company) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  const cards = [];
+  for (const block of DETAIL_BLOCKS) {
+    let body = null;
+    try {
+      body = block.render(company);
+    } catch (err) {
+      // This list is explicitly a place for half-finished ideas, so one that
+      // throws drops its own card rather than taking the page down with it.
+      console.error(`Detail block "${block.key}" failed to render`, err);
+      continue;
+    }
+    if (!body) continue;
+    cards.push(`<section class="detail-block" data-block="${block.key}">
+        <h3 class="detail-block-title">${block.title}</h3>
+        ${body}
+      </section>`);
+  }
+  host.innerHTML = cards.join('');
+  host.hidden = cards.length === 0;
+}
+
+const EXPAND_ICON = '<path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/>';
+const COLLAPSE_ICON = '<path d="M20 10h-6V4M14 10l6-6M4 14h6v6M10 14l-6 6"/>';
+
+// Grows the sheet to fill the screen, or puts it back. Deliberately not a
+// second component: same DOM, same chart, same range pills, same swipe — the
+// blocks below simply become visible and the height cap comes off.
+function setDetailExpanded(next) {
+  const sheet = document.getElementById('detail-sheet');
+  if (!sheet) return;
+  detail.expanded = !!next;
+  sheet.classList.toggle('is-expanded', detail.expanded);
+
+  const btn = document.getElementById('sheet-expand');
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(detail.expanded));
+    btn.setAttribute('aria-label', detail.expanded ? 'Back to the card' : 'Expand to full screen');
+    const icon = document.getElementById('sheet-expand-icon');
+    if (icon) icon.innerHTML = detail.expanded ? COLLAPSE_ICON : EXPAND_ICON;
+  }
+
+  // Either direction lands at the full position. A sheet parked at the half
+  // detent carries an inline transform that would otherwise hold the
+  // full-screen view halfway down the screen.
+  detail.detentOffset = 0;
+  sheet.style.transform = '';
+  const scroll = document.querySelector('.sheet-scroll');
+  if (scroll) {
+    scroll.style.setProperty('--detent-inset', '0px');
+    scroll.scrollTop = 0;
+  }
+  const backdrop = document.getElementById('sheet-backdrop');
+  if (backdrop) backdrop.style.opacity = '';
+
+  // Nothing below is worth doing while the sheet is closed — closeDetail calls
+  // this to reset state, not to draw anything.
+  if (sheet.hidden) return;
+
+  renderDetailExtras(detail.symbol ? findCompany(detail.symbol) : null);
+  // The chart's viewBox is measured in real pixels and its wrapper just
+  // changed height, so it needs a redraw rather than a rescale.
+  requestAnimationFrame(() => {
+    if (detail.symbol && historyCache.has(detail.symbol)) renderChart();
+    positionSegmentedThumb(true);
+  });
 }
 
 // Built once, then only aria-pressed and the thumb's position change. The old
@@ -1747,12 +1947,20 @@ function fmtChartDate(dateStr) {
 function initDetailSheet() {
   document.getElementById('sheet-close').addEventListener('click', closeDetail);
   document.getElementById('sheet-backdrop').addEventListener('click', closeDetail);
+  document.getElementById('sheet-expand').addEventListener('click', () => {
+    setDetailExpanded(!detail.expanded);
+  });
   initDetailSwipe();
   initDetailDismiss();
   initClearWatchlist();
   document.addEventListener('keydown', (e) => {
     const sheetOpen = !document.getElementById('detail-sheet').hidden;
-    if (e.key === 'Escape' && sheetOpen) closeDetail();
+    // Escape steps back one level rather than always closing: from full screen
+    // it returns to the card, which is where the gesture equivalent lands too.
+    if (e.key === 'Escape' && sheetOpen) {
+      if (detail.expanded) setDetailExpanded(false);
+      else closeDetail();
+    }
     // Keyboard equivalent of the swipe.
     if (sheetOpen && e.key === 'ArrowRight') { e.preventDefault(); showDetailAt(detail.index + 1); }
     if (sheetOpen && e.key === 'ArrowLeft') { e.preventDefault(); showDetailAt(detail.index - 1); }
