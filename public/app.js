@@ -22,22 +22,14 @@ const SETTINGS = [
     type: 'choice',
     section: 'display',
     label: 'Chart',
-    description: 'Which chart a company opens to. One at a time, so the sheet stays short enough to see the board behind it.',
-    options: [
-      { value: 'price', label: 'Price' },
-      { value: 'rank', label: 'Rank' },
-    ],
-    default: 'price',
-  },
-  {
-    key: 'chartStyle',
-    type: 'choice',
-    section: 'display',
-    label: 'Price chart style',
-    description: 'A line follows the price; bars show each period’s own return above or below zero, green for up and red for down.',
+    // One switch, not two. Style and subject were never independent: with Rank
+    // showing there is no price chart for a "bars" style to apply to, so a
+    // separate style control had a dead combination and no way to say so.
+    description: 'Price as a line, price as period-return bars around zero, or this company’s rank in the pack. One at a time, so the sheet stays short enough to see the board behind it.',
     options: [
       { value: 'line', label: 'Line' },
       { value: 'bars', label: 'Bars' },
+      { value: 'rank', label: 'Rank' },
     ],
     default: 'line',
   },
@@ -172,6 +164,18 @@ function loadSettings() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{}');
     const settings = { ...defaults, ...stored };
+
+    // The chart subject and its style used to be two settings; they're one
+    // three-way choice now. Migrate rather than silently falling back to the
+    // default, and keep whichever chart was actually on screen: 'price' was
+    // only ever a container for the style, so it resolves to that style.
+    if (settings.detailChart === 'price' || stored.chartStyle) {
+      settings.detailChart = settings.detailChart === 'rank'
+        ? 'rank'
+        : (stored.chartStyle === 'bars' ? 'bars' : 'line');
+    }
+    delete settings.chartStyle;
+
     // A saved window can outlive the bounds it was saved under — the static
     // snapshot carries less history than the live server, so a range stored
     // before that reaches back past any data and scores nothing at all.
@@ -1850,7 +1854,7 @@ function renderChart() {
   }
   detail.slice = slice;
 
-  if (state.settings.chartStyle === 'bars') {
+  if (state.settings.detailChart === 'bars') {
     renderBarsChart(wrap, slice);
     return;
   }
