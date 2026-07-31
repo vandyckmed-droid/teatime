@@ -22,16 +22,24 @@ const SETTINGS = [
     type: 'choice',
     section: 'display',
     label: 'Chart',
-    // One switch, not two. Style and subject were never independent: with Rank
-    // showing there is no price chart for a "bars" style to apply to, so a
-    // separate style control had a dead combination and no way to say so.
-    description: 'Price as a line, price as period-return bars around zero, or this company’s rank in the pack. One at a time, so the sheet stays short enough to see the board behind it.',
+    description: 'Price as a line, or the volatility-adjusted return over a rolling ranking window as bars around zero.',
     options: [
       { value: 'line', label: 'Line' },
       { value: 'bars', label: 'Bars' },
-      { value: 'rank', label: 'Rank' },
     ],
     default: 'line',
+  },
+  {
+    key: 'rowVisual',
+    type: 'choice',
+    section: 'display',
+    label: 'In each row',
+    description: 'Show where the price sits in its 52-week range, or the same chart the company opens to, shrunk to fit the row.',
+    options: [
+      { value: 'range', label: '52wk' },
+      { value: 'chart', label: 'Chart' },
+    ],
+    default: 'range',
   },
   {
     key: 'rankDateRange',
@@ -136,8 +144,6 @@ const detail = {
   symbol: null,
   range: DEFAULT_CHART_RANGE,
   slice: null, // the currently-rendered range's [{date, close}], oldest first
-  // {symbol, windowDays, points: [{date, rank, of, pct}]} from loadRankHistory.
-  rankHistory: null,
   // How far the sheet is parked below its full position: 0, or the half detent
   // (see initDetailDismiss). Reset on every open.
   detentOffset: 0,
@@ -165,14 +171,13 @@ function loadSettings() {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{}');
     const settings = { ...defaults, ...stored };
 
-    // The chart subject and its style used to be two settings; they're one
-    // three-way choice now. Migrate rather than silently falling back to the
-    // default, and keep whichever chart was actually on screen: 'price' was
-    // only ever a container for the style, so it resolves to that style.
-    if (settings.detailChart === 'price' || stored.chartStyle) {
-      settings.detailChart = settings.detailChart === 'rank'
-        ? 'rank'
-        : (stored.chartStyle === 'bars' ? 'bars' : 'line');
+    // Two rounds of history behind this one setting: it was once a subject
+    // ('price'/'rank') paired with a separate style, then a three-way choice
+    // including 'rank', and now just the two chart styles. Anything that no
+    // longer names a real option resolves to the style that was in play.
+    const CHART_OPTIONS = ['line', 'bars'];
+    if (!CHART_OPTIONS.includes(settings.detailChart)) {
+      settings.detailChart = stored.chartStyle === 'bars' ? 'bars' : 'line';
     }
     delete settings.chartStyle;
 
@@ -590,14 +595,22 @@ async function refreshRankings() {
   }
 }
 
-// ── rank over time ───────────────────────────────────────────────────
-// Mirrors src/rankHistory.js: at each sampled past date, score the whole
-// universe over the ranking window slid back to end at that date, then rank the
-// symbol among everyone who had a score. Runs client-side only as the fallback
-// for the static snapshot, which has no backend — but that channel has every
-// company's history embedded, so it can do the same work the server does.
-const RANK_HISTORY_MAX_POINTS = 120;
-const RANK_HISTORY_MIN_UNIVERSE = 5;
+// ── the rolling volatility-adjusted score ────────────────────────────
+// Scoring a window that slides date by date, which both the detail sheet's
+// bars and the row sparklines are built from.
+const ROLLING_MAX_POINTS = 120;
+
+// How many days back a range key reaches. Takes the key rather than reading
+// detail.range, because the row sparklines need it for a fixed range while no
+// sheet is open.
+function chartSpanDays(rangeKey) {
+  if (rangeKey === 'ytd') {
+    const now = new Date();
+    return Math.max(31, Math.round((now - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000));
+  }
+  const range = CHART_RANGES.find((r) => r.key === rangeKey);
+  return range ? range.days : 366;
+}
 
 function addDaysStr(dateStr, delta) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -608,8 +621,8 @@ function addDaysStr(dateStr, delta) {
 
 // Sampled backwards from the newest so the latest trading day is always
 // included whatever the step works out to — that point has to agree with the
-// rank the boards are showing right now.
-function sampleRankDates(series, cutoffStr, maxPoints = RANK_HISTORY_MAX_POINTS) {
+// score the boards are showing right now.
+function sampleRollingDates(series, cutoffStr, maxPoints = ROLLING_MAX_POINTS) {
   const dates = [];
   for (const p of series) if (p.date >= cutoffStr) dates.push(p.date);
   if (dates.length === 0) return dates;
@@ -619,7 +632,7 @@ function sampleRankDates(series, cutoffStr, maxPoints = RANK_HISTORY_MAX_POINTS)
   out.reverse();
   // The boards score relative to *today*, so the newest sample must too, or the
   // last value won't match what the list is showing. Same step as
-  // computeRankHistoryClientSide.
+  // rollingVolAdjusted.
   const todayStr = daysAgoToDateStr(0);
   if (dates.length > 0 && out[out.length - 1] < todayStr) out[out.length - 1] = todayStr;
   return out;
@@ -635,7 +648,7 @@ function rollingVolAdjusted(symbol, spanDays, maxPoints) {
   if (!prepared || !cached || !cached.series) return [];
   const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
   const out = [];
-  for (const date of sampleRankDates(cached.series, daysAgoToDateStr(spanDays), maxPoints)) {
+  for (const date of sampleRollingDates(cached.series, daysAgoToDateStr(spanDays), maxPoints)) {
     const value = volAdjustedBetweenDates(
       prepared, addDaysStr(date, -startDaysAgo), addDaysStr(date, -endDaysAgo),
     );
@@ -646,79 +659,6 @@ function rollingVolAdjusted(symbol, spanDays, maxPoints) {
     out.push({ date, value });
   }
   return out;
-}
-
-function computeRankHistoryClientSide(symbol, spanDays) {
-  const target = historyCache.get(symbol);
-  if (!target || !target.series || target.series.length === 0) return null;
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const score = state.settings.volAdjusted ? volAdjustedBetweenDates : returnBetweenDates;
-
-  const pack = [];
-  for (const c of state.leaderboard.companies) {
-    const prepared = preparedFor(c.symbol);
-    if (prepared) pack.push([c.symbol, prepared]);
-  }
-
-  const scores = new Float64Array(pack.length);
-  const points = [];
-  // sampleRankDates pins the newest sample to today, so this chart's last point
-  // matches the list the user just tapped (see the note there, and the same
-  // step in src/rankHistory.js).
-  for (const date of sampleRankDates(target.series, daysAgoToDateStr(spanDays))) {
-    const startStr = addDaysStr(date, -startDaysAgo);
-    const endStr = addDaysStr(date, -endDaysAgo);
-    let mine = null;
-    let of = 0;
-    for (const [sym, prepared] of pack) {
-      const s = score(prepared, startStr, endStr);
-      if (s === null || !Number.isFinite(s)) continue;
-      scores[of] = s;
-      of += 1;
-      if (sym === symbol) mine = s;
-    }
-    if (mine === null || of < RANK_HISTORY_MIN_UNIVERSE) continue;
-    let better = 0;
-    for (let i = 0; i < of; i++) if (scores[i] > mine) better += 1;
-    const rank = better + 1;
-    points.push({ date, rank, of, pct: ((rank - 1) / (of - 1)) * 99 + 1 });
-  }
-
-  const { startDaysAgo: s, endDaysAgo: e } = state.settings.rankDateRange;
-  return { symbol, windowDays: s - e, points };
-}
-
-// Same dual-path shape as refreshRankings/refreshCorrelations. The sequence
-// guard matters more here than anywhere else: swiping through names fires one of
-// these per company, and they're the slowest call in the app.
-let rankHistorySeq = 0;
-async function loadRankHistory(symbol, spanDays) {
-  const seq = ++rankHistorySeq;
-  const fallback = async () => {
-    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
-    if (seq !== rankHistorySeq) return null;
-    return computeRankHistoryClientSide(symbol, spanDays);
-  };
-
-  if (typeof EMBEDDED_LEADERBOARD !== 'undefined') return fallback();
-
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const params = new URLSearchParams({
-    symbol,
-    startDaysAgo: String(startDaysAgo),
-    endDaysAgo: String(endDaysAgo),
-    volAdjusted: String(!!state.settings.volAdjusted),
-    spanDays: String(spanDays),
-  });
-  try {
-    const res = await fetch(`/api/rankhistory?${params}`);
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-    const data = await res.json();
-    if (seq !== rankHistorySeq) return null;
-    return data;
-  } catch {
-    return fallback();
-  }
 }
 
 // ── tab routing ──────────────────────────────────────────────────────
@@ -771,6 +711,30 @@ function updateScoreLabels() {
   document.querySelectorAll('.board-head-score').forEach((el) => {
     el.textContent = state.settings.volAdjusted ? 'Vol-adj return' : 'Return';
   });
+  // …and the middle column names whatever it's currently showing.
+  const chartHeads = { line: '1Y price', bars: 'Vol-adj, 1Y' };
+  document.querySelectorAll('.board-head-range').forEach((el) => {
+    el.textContent = state.settings.rowVisual === 'chart'
+      ? (chartHeads[state.settings.detailChart] || '1Y')
+      : '52-week range';
+  });
+}
+
+// The row sparklines need every company's daily closes, which the live server
+// otherwise never sends: /api/rank returns scores alone precisely so the
+// browser doesn't have to download the universe's history. Only fetch it when
+// something is actually going to draw it.
+let rowHistoryPending = false;
+function ensureRowHistories() {
+  if (state.settings.rowVisual !== 'chart' || !state.leaderboard || rowHistoryPending) return;
+  const symbols = state.leaderboard.companies.map((c) => c.symbol);
+  if (symbols.every((s) => historyCache.has(s))) return;
+  rowHistoryPending = true;
+  loadAllHistories(symbols).finally(() => {
+    rowHistoryPending = false;
+    renderRanksBoard();
+    renderWatchlistBoard();
+  });
 }
 
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
@@ -797,7 +761,81 @@ function rangePct(c) {
   return Math.max(0, Math.min(100, pct));
 }
 
+// ── the row's middle cell ────────────────────────────────────────────
+// Either the 52-week range, or a shrunk copy of the chart this company opens
+// to (Settings → In each row). The sparkline is drawn in the same viewBox
+// units as its cell so the geometry needs no scaling, and deliberately carries
+// no labels: at 88px it's a shape, and the numbers it would need are already
+// in the columns either side of it.
+const SPARK_W = 88;
+const SPARK_H = 34;
+const SPARK_PAD_Y = 3;
+// Enough points to keep the shape honest, few enough to stay legible at 88px.
+const SPARK_LINE_POINTS = 44;
+const SPARK_BAR_COUNT = 11;
+
+function sparkPath(series) {
+  const step = Math.max(1, Math.ceil(series.length / SPARK_LINE_POINTS));
+  const pts = [];
+  for (let i = 0; i < series.length; i += step) pts.push(series[i].close);
+  const last = series[series.length - 1].close;
+  if (pts[pts.length - 1] !== last) pts.push(last);
+  if (pts.length < 2) return null;
+
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const span = max - min || 1;
+  const innerH = SPARK_H - SPARK_PAD_Y * 2;
+  const d = pts.map((v, i) => {
+    const x = (i / (pts.length - 1)) * SPARK_W;
+    const y = SPARK_PAD_Y + innerH - ((v - min) / span) * innerH;
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return { d, gain: pts[pts.length - 1] >= pts[0] };
+}
+
+function sparkCell(c) {
+  const cached = historyCache.get(c.symbol);
+  const bars = state.settings.detailChart === 'bars';
+
+  if (bars) {
+    const values = rollingVolAdjusted(c.symbol, chartSpanDays(DEFAULT_CHART_RANGE), SPARK_BAR_COUNT);
+    if (values.length < 2) return '<span class="range-cell range-cell-empty">&mdash;</span>';
+    const hi = Math.max(0, ...values.map((v) => v.value));
+    const lo = Math.min(0, ...values.map((v) => v.value));
+    const spread = hi - lo || 1;
+    const innerH = SPARK_H - SPARK_PAD_Y * 2;
+    const yFor = (v) => SPARK_PAD_Y + innerH - ((v - lo) / spread) * innerH;
+    const zeroY = yFor(0);
+    const slot = SPARK_W / values.length;
+    const w = Math.max(2, slot * 0.62);
+    const rects = values.map((v, i) => {
+      const y = yFor(v.value);
+      return `<rect class="spark-bar ${v.value >= 0 ? 'gain' : 'loss'}" x="${(slot * (i + 0.5) - w / 2).toFixed(1)}"
+        y="${Math.min(y, zeroY).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(1, Math.abs(zeroY - y)).toFixed(1)}" />`;
+    }).join('');
+    return `
+      <span class="range-cell spark-cell">
+        <svg viewBox="0 0 ${SPARK_W} ${SPARK_H}" aria-hidden="true" preserveAspectRatio="none">
+          <line class="spark-zero" x1="0" y1="${zeroY.toFixed(1)}" x2="${SPARK_W}" y2="${zeroY.toFixed(1)}" />
+          ${rects}
+        </svg>
+      </span>`;
+  }
+
+  const slice = cached && cached.series ? sliceForRange(cached.series, DEFAULT_CHART_RANGE) : [];
+  const path = slice.length >= 2 ? sparkPath(slice) : null;
+  if (!path) return '<span class="range-cell range-cell-empty">&mdash;</span>';
+  return `
+    <span class="range-cell spark-cell">
+      <svg viewBox="0 0 ${SPARK_W} ${SPARK_H}" aria-hidden="true" preserveAspectRatio="none">
+        <path class="spark-line ${path.gain ? 'gain' : 'loss'}" d="${path.d}" />
+      </svg>
+    </span>`;
+}
+
 function rangeCell(c) {
+  if (state.settings.rowVisual === 'chart') return sparkCell(c);
   const pct = rangePct(c);
   if (pct === null) return '<span class="range-cell range-cell-empty">&mdash;</span>';
   return `
@@ -1050,6 +1088,7 @@ function updateWatchlistBadge(animate = false) {
 
 function renderAll() {
   updateScoreLabels();
+  ensureRowHistories();
   renderRanksBoard();
   renderWatchlistBoard();
 }
@@ -1085,21 +1124,6 @@ function renderDetailContent(company) {
   renderDetailReturn(company);
   renderDetailFacts(company);
   renderDetailSegmented();
-
-  // One chart at a time (Settings → "Chart in the detail sheet"). Two of them
-  // filled the sheet to its 90vh cap, which left nothing of the blurred board
-  // visible behind it and made the sheet feel like a page rather than a panel.
-  const showRank = state.settings.detailChart === 'rank';
-  document.querySelector('.chart-card:not(.rank-card)').hidden = showRank;
-  document.querySelector('.rank-card').hidden = !showRank;
-  // Empty the one that isn't showing rather than just hiding it: an SVG left in
-  // the DOM keeps its geometry and listeners alive for a card nobody can see.
-  document.getElementById(showRank ? 'chart-wrap' : 'rank-wrap').innerHTML = '';
-
-  if (showRank) {
-    refreshRankChart();
-    return;
-  }
 
   // Usually replaced near-instantly (history is prefetched at boot), but shows
   // for real when a symbol missed the batch prefetch and needs its own fetch —
@@ -1278,7 +1302,7 @@ function initDetailSwipe() {
   };
 
   sheet.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('#chart-wrap, #rank-wrap, [data-segmented="detail"], .sheet-close, .info-btn')) return;
+    if (e.target.closest('#chart-wrap, [data-segmented="detail"], .sheet-close')) return;
     if (!detail.sequence || detail.sequence.length < 2) return;
     startX = e.clientX;
     startY = e.clientY;
@@ -1448,7 +1472,7 @@ function initDetailDismiss() {
   // which is the standard "pull the sheet down from the top of its list" move.
   scroll.addEventListener('pointerdown', (e) => {
     if (scroll.scrollTop > 0) return;
-    if (e.target.closest('#chart-wrap, #rank-wrap, [data-segmented="detail"], .info-btn, button')) return;
+    if (e.target.closest('#chart-wrap, [data-segmented="detail"], button')) return;
     start(e);
   });
 
@@ -1582,10 +1606,7 @@ function renderDetailSegmented() {
         syncSegmented();
         const company = findCompany(detail.symbol);
         if (company) renderDetailReturn(company);
-        // Only redraw the chart that's actually on screen — the rank one is the
-        // expensive call in the app, and recomputing a hidden card is pure cost.
-        if (state.settings.detailChart === 'rank') refreshRankChart();
-        else renderChart();
+        renderChart();
       });
       el.appendChild(btn);
     });
@@ -1724,7 +1745,7 @@ const BAR_MIN_WIDTH = 3;
 const BAR_PAD_L = 34;
 
 function renderBarsChart(wrap, slice) {
-  const bars = rollingVolAdjusted(detail.symbol, rankSpanDays(), BAR_TARGET_COUNT);
+  const bars = rollingVolAdjusted(detail.symbol, chartSpanDays(detail.range), BAR_TARGET_COUNT);
   const caption = document.getElementById('chart-caption');
   if (bars.length === 0) {
     wrap.innerHTML = `<div class="chart-error">Not enough history to score ${detail.symbol} over the ranking window yet.</div>`;
@@ -2055,227 +2076,6 @@ function attachChartScrub(wrap, coords, chartW) {
   hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !dragging) hide(); });
 }
 
-// ── rank over time chart ─────────────────────────────────────────────
-// Same SVG-in-CSS-pixels approach as the price chart. Inverted y: percentile 1
-// (best in the pack) is at the top, so "up" means the same thing on both charts.
-// Unlike the price chart this one does get gridlines — a rank of "38" means
-// nothing without the scale to read it against, where a price is legible from
-// the line's shape alone.
-const RANK_PAD_L = 26;
-const RANK_PAD_R = 30; // room for the current-value badge at the right edge
-// Deep enough top/bottom inset to seat the "better/worse" captions outside the
-// 1..100 band. Inside it they collided with the line for exactly the companies
-// worth looking at — anything pinned near rank 1 ran straight through "Better
-// rank".
-const RANK_PAD_Y = 20;
-const RANK_HEIGHT = 162;
-const RANK_LEVELS = [1, 25, 50, 75, 100];
-
-function rankSpanDays() {
-  const range = CHART_RANGES.find((r) => r.key === detail.range);
-  if (detail.range === 'ytd') {
-    const now = new Date();
-    return Math.max(31, Math.round((now - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000));
-  }
-  return range ? range.days : 366;
-}
-
-function renderRankChart() {
-  const wrap = document.getElementById('rank-wrap');
-  if (!wrap) return;
-  const data = detail.rankHistory;
-  const points = data && data.points ? data.points : [];
-
-  const sub = document.getElementById('rank-sub');
-  if (sub) {
-    const metric = state.settings.volAdjusted ? 'vol-adjusted return' : 'return';
-    const windowDays = data && data.windowDays ? data.windowDays : null;
-    sub.textContent = windowDays
-      ? `Percentile rank (1 = best) by ${metric} over a rolling ${windowDays}-day window`
-      : `Percentile rank (1 = best) by ${metric}`;
-  }
-  const note = document.getElementById('rank-note');
-  if (note) {
-    const of = points.length ? points[points.length - 1].of : state.leaderboard.companies.length;
-    note.textContent =
-      `Each point re-ranks all ${of} companies as of that date, using the same ranking window and `
-      + `metric as the boards (Settings). The last point is this company's rank right now.`;
-  }
-
-  if (points.length < 2) {
-    wrap.innerHTML = `<div class="chart-error">Not enough history to rank ${detail.symbol} over this range.</div>`;
-    const axis = document.getElementById('rank-axis-x');
-    if (axis) axis.innerHTML = '';
-    return;
-  }
-
-  const W = Math.max(Math.round(wrap.clientWidth || 0) || CHART_FALLBACK_W, 160);
-  const H = RANK_HEIGHT;
-  const innerW = W - RANK_PAD_L - RANK_PAD_R;
-  const innerH = H - RANK_PAD_Y * 2;
-  // Fixed 1..100 scale, not fitted to the data: the whole point is where this
-  // company sits against the field, which a self-scaling axis would hide.
-  const yFor = (pct) => RANK_PAD_Y + ((pct - 1) / 99) * innerH;
-  const xFor = (i) => RANK_PAD_L + (points.length === 1 ? 0 : (i / (points.length - 1)) * innerW);
-
-  const coords = points.map((p, i) => ({ x: xFor(i), y: yFor(p.pct), ...p }));
-  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
-  const last = coords[coords.length - 1];
-  const first = coords[0];
-  // Filled downwards to the worst-rank edge: the area reads as "how much of the
-  // field is below this company", which is what a rank chart is about.
-  const areaPath = `${linePath} L${last.x.toFixed(2)},${H - RANK_PAD_Y} L${first.x.toFixed(2)},${H - RANK_PAD_Y} Z`;
-
-  const grid = RANK_LEVELS.map((level) => {
-    const y = yFor(level).toFixed(2);
-    return `<line class="rank-grid" x1="${RANK_PAD_L}" y1="${y}" x2="${W - RANK_PAD_R + 6}" y2="${y}" />`;
-  }).join('');
-  const yLabels = RANK_LEVELS.map((level) => {
-    const y = yFor(level).toFixed(2);
-    return `<text class="rank-y-label" x="${RANK_PAD_L - 6}" y="${y}" dy="0.32em" text-anchor="end">${level}</text>`;
-  }).join('');
-
-  const badgeY = Math.min(Math.max(last.y, RANK_PAD_Y + 8), H - RANK_PAD_Y - 8);
-  const badgeLabel = Math.round(last.pct);
-  const badgeW = badgeLabel >= 100 ? 26 : 20;
-
-  wrap.innerHTML = `
-    <svg class="rank-svg" viewBox="0 0 ${W} ${H}" role="img"
-         aria-label="${detail.symbol} percentile rank over time, ${detail.range}. Currently ${badgeLabel} out of 100, rank ${last.rank} of ${last.of}.">
-      <defs>
-        <linearGradient id="rank-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="currentColor" stop-opacity="0.26" />
-          <stop offset="50%" stop-color="currentColor" stop-opacity="0.06" />
-          <stop offset="92%" stop-color="currentColor" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      ${grid}
-      ${yLabels}
-      <text class="rank-edge-label better" x="${RANK_PAD_L + 2}" y="${RANK_PAD_Y}" dy="-0.55em">Better rank</text>
-      <text class="rank-edge-label worse" x="${RANK_PAD_L + 2}" y="${H - RANK_PAD_Y}" dy="1.35em">Worse rank</text>
-      <path class="rank-area" fill="url(#rank-grad)" d="${areaPath}" />
-      <path class="rank-line" id="rank-line-path" d="${linePath}" />
-      <line class="chart-crosshair-line" id="rank-crosshair-line" x1="0" y1="${RANK_PAD_Y}" x2="0" y2="${H - RANK_PAD_Y}" />
-      <circle class="chart-crosshair-dot" id="rank-crosshair-dot" r="4" />
-      <g class="rank-badge">
-        <rect x="${(last.x + 5).toFixed(2)}" y="${(badgeY - 9).toFixed(2)}" width="${badgeW}" height="18" rx="5" />
-        <text x="${(last.x + 5 + badgeW / 2).toFixed(2)}" y="${badgeY.toFixed(2)}" dy="0.34em" text-anchor="middle">${badgeLabel}</text>
-      </g>
-      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="rank-hit" />
-    </svg>
-    <div class="chart-tooltip" id="rank-tooltip"></div>
-  `;
-
-  const axis = document.getElementById('rank-axis-x');
-  if (axis) {
-    const midIdx = Math.floor((points.length - 1) / 2);
-    axis.innerHTML =
-      `<span>${fmtChartDate(points[0].date)}</span>` +
-      `<span>${fmtChartDate(points[midIdx].date)}</span>` +
-      `<span>${fmtChartDate(points[points.length - 1].date)}</span>`;
-  }
-
-  const linePathEl = wrap.querySelector('#rank-line-path');
-  if (linePathEl) {
-    const length = linePathEl.getTotalLength();
-    linePathEl.style.strokeDasharray = String(length);
-    linePathEl.style.setProperty('--dash-length', String(length));
-  }
-
-  attachRankScrub(wrap, coords, W);
-}
-
-// Same own-drag-state pointer handling as the price chart's scrub — see the
-// comment on attachChartScrub for why e.pressure can't be the gate.
-function attachRankScrub(wrap, coords, chartW) {
-  const svg = wrap.querySelector('svg');
-  const hit = wrap.querySelector('#rank-hit');
-  const line = wrap.querySelector('#rank-crosshair-line');
-  const dot = wrap.querySelector('#rank-crosshair-dot');
-  const tooltip = wrap.querySelector('#rank-tooltip');
-  if (!svg || !hit) return;
-
-  function showAt(clientX) {
-    const rect = svg.getBoundingClientRect();
-    const relX = ((clientX - rect.left) / rect.width) * chartW;
-    // Nearest by x rather than by index: the points are evenly spaced in x, but
-    // the plot area is inset on both sides, so index arithmetic would drift.
-    let best = 0;
-    for (let i = 1; i < coords.length; i++) {
-      if (Math.abs(coords[i].x - relX) < Math.abs(coords[best].x - relX)) best = i;
-    }
-    const c = coords[best];
-    line.setAttribute('x1', c.x);
-    line.setAttribute('x2', c.x);
-    line.style.opacity = '1';
-    dot.setAttribute('cx', c.x);
-    dot.setAttribute('cy', c.y);
-    dot.style.opacity = '1';
-
-    const pxRatio = rect.width / chartW;
-    tooltip.style.left = `${Math.min(Math.max(c.x * pxRatio, 66), rect.width - 66)}px`;
-    tooltip.style.opacity = '1';
-    tooltip.innerHTML = '';
-    const dateEl = document.createElement('span');
-    dateEl.textContent = `${fmtChartDate(c.date)} — `;
-    const rankEl = document.createElement('b');
-    rankEl.textContent = `#${c.rank} of ${c.of}`;
-    tooltip.appendChild(dateEl);
-    tooltip.appendChild(rankEl);
-  }
-
-  let dragging = false;
-  hit.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    try { hit.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
-    showAt(e.clientX);
-    e.preventDefault();
-  });
-  hit.addEventListener('pointermove', (e) => {
-    if (dragging || e.pointerType === 'mouse') showAt(e.clientX);
-  });
-  hit.addEventListener('pointerup', () => { dragging = false; });
-  hit.addEventListener('pointercancel', () => { dragging = false; });
-  hit.addEventListener('pointerleave', (e) => {
-    if (e.pointerType !== 'mouse' || dragging) return;
-    line.style.opacity = '0';
-    dot.style.opacity = '0';
-    tooltip.style.opacity = '0';
-  });
-}
-
-// Kept separate from renderRankChart so the skeleton can go up immediately and
-// the (slow) computation can land later, or be superseded by a swipe.
-function refreshRankChart() {
-  const wrap = document.getElementById('rank-wrap');
-  if (!wrap) return;
-  wrap.innerHTML = chartSkeletonHTML();
-  detail.rankHistory = null; // don't let a resize re-render the previous company's
-  const opened = detail.symbol;
-  const range = detail.range;
-  loadRankHistory(opened, rankSpanDays()).then((data) => {
-    if (detail.symbol !== opened || detail.range !== range) return;
-    detail.rankHistory = data;
-    renderRankChart();
-  }).catch(() => {
-    if (detail.symbol !== opened || detail.range !== range) return;
-    detail.rankHistory = null;
-    renderRankChart();
-  });
-}
-
-function initRankInfo() {
-  const btn = document.getElementById('rank-info-btn');
-  const note = document.getElementById('rank-note');
-  if (!btn || !note) return;
-  btn.addEventListener('click', () => {
-    const open = note.hidden;
-    note.hidden = !open;
-    btn.setAttribute('aria-expanded', String(open));
-    btn.classList.toggle('open', open);
-  });
-}
-
 function fmtChartDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -2287,7 +2087,6 @@ function initDetailSheet() {
   initDetailSwipe();
   initDetailDismiss();
   initClearWatchlist();
-  initRankInfo();
   document.addEventListener('keydown', (e) => {
     const sheetOpen = !document.getElementById('detail-sheet').hidden;
     if (e.key === 'Escape' && sheetOpen) closeDetail();
@@ -2306,11 +2105,7 @@ function initDetailSheet() {
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(() => {
       resizeRaf = null;
-      if (state.settings.detailChart === 'rank') {
-        if (detail.rankHistory) renderRankChart();
-      } else if (historyCache.has(detail.symbol)) {
-        renderChart();
-      }
+      if (historyCache.has(detail.symbol)) renderChart();
       positionSegmentedThumb(true);
     });
   });
@@ -2374,6 +2169,8 @@ function renderSettings() {
           state.settings[setting.key] = btn.dataset.value;
           saveSettings();
           renderSettings();
+          // The rows can depend on this choice (see rowVisual), so redraw them.
+          if (state.leaderboard && state.rankingsLoaded) renderAll();
         });
       });
     }

@@ -408,6 +408,24 @@ button { font: inherit; color: inherit; }
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 2.5px color-mix(in oklab, var(--accent) 20%, transparent);
 }
+/* ── the row's chart alternative ──────────────────────────────────────
+   Same 88px cell, no labels: at this size it's a shape, and every number it
+   could carry is already in the columns either side. */
+.spark-cell { padding-top: 0; display: flex; align-items: center; }
+.spark-cell svg { display: block; width: 100%; height: 34px; overflow: visible; }
+.spark-line {
+  fill: none; stroke-width: 1.6;
+  stroke-linejoin: round; stroke-linecap: round;
+  /* Non-scaling so preserveAspectRatio="none" can't stretch the stroke into
+     different weights horizontally and vertically. */
+  vector-effect: non-scaling-stroke;
+}
+.spark-line.gain { stroke: var(--gain); }
+.spark-line.loss { stroke: var(--loss); }
+.spark-bar.gain { fill: var(--gain); }
+.spark-bar.loss { fill: var(--loss); }
+.spark-zero { stroke: var(--hairline-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+
 .range-ends {
   display: flex; justify-content: space-between;
   margin-top: 2px;
@@ -991,78 +1009,6 @@ button { font: inherit; color: inherit; }
   margin: 10px var(--s1) 0;
 }
 
-/* ── rank over time ───────────────────────────────────────────────────
-   Titled, unlike the price chart above it: a percentile-rank axis isn't
-   self-evident the way a price line is, so it gets a heading, a one-line
-   explanation of the window, and an ⓘ for the longer version. */
-.rank-card { padding: var(--s3) var(--s2) var(--s2); }
-.rank-head { display: flex; align-items: center; gap: 7px; padding: 0 var(--s2); }
-.rank-title {
-  font-size: var(--fs-sub); font-weight: 700; letter-spacing: -0.01em;
-  color: var(--text); margin: 0;
-}
-.info-btn {
-  flex-shrink: 0;
-  width: 19px; height: 19px; padding: 0; border-radius: 50%;
-  border: 1px solid var(--hairline-strong);
-  background: transparent; color: var(--text-3);
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
-}
-.info-btn:active { transform: scale(0.9); }
-.info-btn.open { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 50%, transparent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
-.info-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.rank-sub {
-  margin: 3px var(--s2) 0;
-  font-size: var(--fs-nano); font-weight: 500; color: var(--text-3); line-height: 1.35;
-}
-.rank-note {
-  margin: var(--s2) var(--s2) 0;
-  padding: var(--s2) 9px;
-  border-radius: var(--r-sm);
-  background: var(--surface-3);
-  font-size: var(--fs-nano); font-weight: 500; color: var(--text-2); line-height: 1.45;
-}
-.rank-wrap { position: relative; height: 162px; margin-top: var(--s2); }
-.rank-wrap svg { display: block; width: 100%; height: 100%; touch-action: none; overflow: visible; }
-/* Always the accent: this axis has no gain/loss direction — 1 is good whether
-   the company climbed to it or slid down to it. */
-.rank-svg { color: var(--accent); }
-
-/* Gridlines, not the price chart's discrete ticks: a rank needs its scale
-   present to be read at all. Kept dashed and dim so they stay behind the line. */
-.rank-grid {
-  stroke: var(--hairline-strong); stroke-width: 1; stroke-dasharray: 2 5;
-  animation: chart-fade-in 400ms ease-out 200ms both;
-}
-.rank-y-label {
-  fill: var(--text-3); font-size: 9.5px; font-weight: 600;
-  font-family: var(--font-sans); font-variant-numeric: tabular-nums;
-  animation: chart-fade-in 400ms ease-out 200ms both;
-}
-.rank-edge-label {
-  font-size: 9px; font-weight: 600; font-family: var(--font-sans);
-  letter-spacing: 0.02em;
-  animation: chart-fade-in 400ms ease-out 300ms both;
-}
-.rank-edge-label.better { fill: var(--accent); opacity: 0.75; }
-.rank-edge-label.worse { fill: var(--loss); opacity: 0.6; }
-
-.rank-area { animation: chart-area-in 520ms ease-out 120ms both; }
-.rank-line {
-  fill: none; stroke: currentColor; stroke-width: 2;
-  stroke-linejoin: round; stroke-linecap: round;
-  animation: chart-line-in 700ms var(--ease-out) both;
-}
-/* The current standing, pinned to the line's end — the one number worth reading
-   off this chart without scrubbing it. */
-.rank-badge { animation: chart-fade-in 300ms ease-out 560ms both; }
-.rank-badge rect { fill: var(--accent); }
-.rank-badge text {
-  fill: var(--accent-ink); font-size: 11px; font-weight: 800;
-  font-family: var(--font-sans); font-variant-numeric: tabular-nums;
-}
-
 /* ── detail facts ─────────────────────────────────────────────────────── */
 .detail-facts { display: flex; flex-wrap: wrap; gap: var(--s3); }
 .detail-fact {
@@ -1094,12 +1040,6 @@ button { font: inherit; color: inherit; }
   .chart-tick,
   .chart-bar,
   .chart-zero,
-  .rank-line,
-  .rank-area,
-  .rank-grid,
-  .rank-y-label,
-  .rank-edge-label,
-  .rank-badge,
   .tab-badge.pop,
   .tab-btn[aria-selected="true"] .icon-filled,
   .add-btn.just-checked { animation: none; }
