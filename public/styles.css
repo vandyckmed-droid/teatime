@@ -814,6 +814,40 @@ button { font: inherit; color: inherit; }
    measured in pixels, so app.js re-renders after the class flips. */
 .sheet.is-expanded .chart-wrap { height: 232px; }
 
+/* ── portfolio card (Watchlist tab) ───────────────────────────────────
+   The one place in the app showing the owner's own money rather than the
+   market. Reuses .stat-row from the detail blocks so the two read as the
+   same kind of surface. */
+.portfolio-card {
+  border: 1px solid var(--hairline); border-radius: var(--r-lg);
+  background: var(--surface-2); box-shadow: var(--shadow-card);
+  padding: var(--s4) var(--s4) var(--s2);
+  margin: 0 0 var(--s5);
+}
+.portfolio-label {
+  font-size: var(--fs-nano); font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-3);
+  margin-bottom: var(--s2);
+}
+.portfolio-balance {
+  font-size: 32px; font-weight: 800; letter-spacing: -0.03em; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.05;
+}
+.portfolio-change {
+  display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap;
+  margin: var(--s2) 0 var(--s3);
+  font-size: var(--fs-cap); font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.portfolio-change .delta { color: var(--text-3); }
+.portfolio-change .gain { color: var(--gain); }
+.portfolio-change .loss { color: var(--loss); }
+.portfolio-change .since { font-weight: 500; color: var(--text-3); }
+.portfolio-note {
+  font-size: var(--fs-nano); color: var(--text-3); line-height: 1.45;
+  margin: var(--s2) 0 var(--s2);
+}
+
 .detail-extras {
   display: flex; flex-direction: column; gap: var(--s4);
   margin-top: var(--s5);

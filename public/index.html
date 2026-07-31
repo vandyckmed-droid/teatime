@@ -62,6 +62,11 @@
         <div class="nav-title">Watchlist</div>
         <p class="sub">Tap a green check to remove one.</p>
 
+        <!-- The owner's own account, from data/portfolio/balances.csv via
+             /api/portfolio. Hidden until that call succeeds, so the tab is
+             unchanged when there's nothing recorded. -->
+        <div class="portfolio-card" id="portfolio-card" hidden></div>
+
         <div class="section-label" id="watchlist-score-label" hidden>
           <span class="section-label-key">Saved</span>
         </div>

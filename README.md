@@ -56,15 +56,27 @@ Then open http://localhost:3000.
   whole universe. The formulas live in `returnBetween`/`volAdjustedBetween`,
   which take explicit dates and a `prepareSeries`-flattened series so a window
   can be scored thousands of times without re-filtering an array per call.
+- `src/portfolio.js` — the one part of this app that isn't about the market:
+  it reads the owner's own account balances from `data/portfolio/balances.csv`
+  (maintained by hand) and derives return, annualized volatility, and the
+  exposure multiple that would have run at a 15% volatility target. Daily
+  returns are only taken across genuinely consecutive trading sessions, so a
+  missing day in the record can't masquerade as one very volatile day. Figures
+  come from those dates and dollar amounts alone — deliberately not
+  reconciled against the broker's own headline rate of return, which uses a
+  baseline and a method the file doesn't contain.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
   `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
-  and `GET /api/meta`, all reading from `src/dataStore.js`'s scheduled-refresh
-  store. History endpoints only serve symbols in the current leaderboard
-  universe — this is a leaderboard companion, not an open proxy for arbitrary
-  FMP queries.
+  `GET /api/portfolio` and `GET /api/meta`. All but `/api/portfolio` read from
+  `src/dataStore.js`'s scheduled-refresh store; that one reads the CSV off
+  disk on each call, since it changes only when the file is edited. History
+  endpoints only serve symbols in the current leaderboard universe — this is
+  a leaderboard companion, not an open proxy for arbitrary FMP queries.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
-  bottom sheet that opens a price chart when you tap a company. Ranks and
+  bottom sheet that opens a price chart when you tap a company. The Watchlist
+  tab leads with a card showing the owner's own portfolio (see
+  `src/portfolio.js`), which stays hidden if no balances are recorded. Ranks and
   Watchlist rank by a custom date range (set in Settings, adjustable via
   +/− steppers); scoring is computed server-side via `/api/rank` and cached
   in `state.rankScores`. The frontend falls back to the old client-side

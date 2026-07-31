@@ -876,6 +876,73 @@ function renderRanksCallout(unavailable) {
   box.hidden = false;
 }
 
+// ── portfolio card ───────────────────────────────────────────────────
+// The owner's own balance history (data/portfolio/balances.csv, summarized by
+// src/portfolio.js). Everything shown is derived from those dates and dollar
+// figures alone — deliberately not reconciled against the broker's own
+// headline rate of return, which uses a baseline and a method we don't have.
+let portfolioSummary = null;
+
+async function loadPortfolio() {
+  // Absent on the static snapshot, where the assembler embeds it instead.
+  if (typeof EMBEDDED_PORTFOLIO !== 'undefined') return EMBEDDED_PORTFOLIO;
+  const res = await fetch('/api/portfolio');
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json();
+}
+
+function fmtMoney(v) {
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function fmtMoneySigned(v) {
+  return `${v >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v))}`;
+}
+function fmtLongDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d))
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderPortfolioCard() {
+  const card = document.getElementById('portfolio-card');
+  if (!card) return;
+  const p = portfolioSummary;
+  if (!p) {
+    card.hidden = true;
+    return;
+  }
+  const dir = p.totalReturnPct >= 0 ? 'gain' : 'loss';
+  const rows = [
+    statRow('Annualized return', fmtPct(p.annualizedReturnPct), signClass(p.annualizedReturnPct)),
+    statRow('Volatility', p.annualizedVolPct === null ? 'N/A' : `${p.annualizedVolPct.toFixed(1)}% annualized`),
+  ];
+  if (p.exposureScale) {
+    // Straight arithmetic, not a recommendation: target ÷ realized.
+    rows.push(statRow(`${p.targetVolPct}% vol target`, `${p.exposureScale.toFixed(2)}× exposure`));
+  }
+  if (p.best !== null && p.worst !== null) {
+    rows.push(statRow('Best / worst day',
+      `<span class="gain">${fmtPct(p.best)}</span> / <span class="loss">${fmtPct(p.worst)}</span>`));
+  }
+  rows.push(statRow('Sessions recorded', `${p.sessions}`));
+
+  const skipped = p.skippedSteps
+    ? ` ${p.skippedSteps} step${p.skippedSteps === 1 ? '' : 's'} spanning a gap in the record ${p.skippedSteps === 1 ? 'is' : 'are'} left out of the volatility figure.`
+    : '';
+
+  card.innerHTML = `
+    <div class="portfolio-label">Your portfolio</div>
+    <div class="portfolio-balance">${fmtMoney(p.endBalance)}</div>
+    <div class="portfolio-change">
+      <span class="${dir}">${fmtPct(p.totalReturnPct)}</span>
+      <span class="delta">${fmtMoneySigned(p.changeDollars)}</span>
+      <span class="since">since ${fmtLongDate(p.start)}</span>
+    </div>
+    ${rows.join('')}
+    <p class="portfolio-note">Computed from ${p.sessions} recorded daily balances through ${fmtLongDate(p.end)}, not from the broker's own figure.${skipped}</p>`;
+  card.hidden = false;
+}
+
 function renderWatchlistBoard() {
   const label = document.getElementById('watchlist-score-label');
   const head = document.getElementById('watchlist-board-head');
@@ -2152,6 +2219,12 @@ async function init() {
   updateWatchlistBadge();
 
   document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
+
+  // Independent of the market data: it comes off disk, not from FMP, so it
+  // neither waits for the board nor fails with it.
+  loadPortfolio()
+    .then((data) => { portfolioSummary = data; renderPortfolioCard(); })
+    .catch(() => { /* nothing recorded yet — the card stays hidden */ });
 
   try {
     const data = await loadLeaderboard();

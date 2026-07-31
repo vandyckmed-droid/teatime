@@ -259,6 +259,17 @@ Concretely:
   near-identical caps. Growing the universe surfaces more of these, not
   fewer: re-check the drop list rather than assuming the two rules still
   cover it.
+- The owner's own account balances live in `data/portfolio/balances.csv`,
+  maintained by hand from brokerage screenshots and summarized by
+  `src/portfolio.js` behind `GET /api/portfolio` (embedded as
+  `EMBEDDED_PORTFOLIO` in the snapshot bundle). Two standing rules: figures
+  are derived from those dates and dollar amounts alone and are *not* to be
+  reconciled against the broker's own rate of return, which uses a baseline
+  the file doesn't contain; and daily returns are only taken across
+  genuinely consecutive trading sessions, so a missing day can't masquerade
+  as one very volatile day. Its holiday set is 2026-only — extend it when
+  the series runs into 2027. New rows are appended and everything downstream
+  picks them up on the next request.
 - Daily board snapshots accrue in `data/snapshots/` via `scripts/snapshot.js`
   and the one workflow in the repo (`.github/workflows/daily-snapshot.yml`).
   Append-only and deliberately stores inputs rather than one ranking — extend

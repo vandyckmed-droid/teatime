@@ -25,19 +25,18 @@ bottom and keep it that way.
 
 ## What's in here now
 
-87 rows, 2026-02-26 through 2026-07-08, transcribed by hand from ten
-screenshots of the brokerage's "Table view" — five taken 2026-07-31 07:28
-and five more at 08:24 that filled in the gaps between them. The balances
+124 rows, 2026-01-02 through 2026-07-08, transcribed by hand from fourteen
+screenshots of the brokerage's "Table view" taken 2026-07-31. The balances
 are read directly off those screenshots: no rounding, no interpolation.
 
-The two batches overlap on 11 dates, which were transcribed twice
-independently. **All 11 agree to the cent** — as good a check on the
-transcription as this data allows.
+Batches overlapped on 13 dates, transcribed twice independently. **All 13
+agree to the cent** — as good a check on the transcription as this data
+allows.
 
 ## Coverage
 
-Near-continuous. Of the 86 row-to-row steps, **82 are true single-session
-moves**. Only four dates inside the span are missing:
+Effectively complete for 2026 so far. Of the 123 row-to-row steps, **119 are
+true single-session moves**. Four dates inside the span are missing:
 
 | Missing | Why |
 | --- | --- |
@@ -46,27 +45,39 @@ moves**. Only four dates inside the span are missing:
 | 2026-05-07 | fell between two screenshot windows |
 | 2026-06-26 | absent from the brokerage's own table — both captures of that stretch skip from 06/25 to 06/29 |
 
-Nothing before 2026-02-26 has been captured, so this is not the full year to
-date — it starts about two months into 2026.
+2026-01-02 is the year's first trading session, so the series starts at the
+beginning of the year. It does *not* include the 2025 year-end balance,
+which is what a true year-to-date figure would be measured from — see the
+note on the broker's number below.
 
-Weekends and the 2026 market holidays inside the span (Apr 3 Good Friday,
-May 25 Memorial Day, Jun 19 Juneteenth, Jul 3 for Independence Day) are
-correctly absent, not missing.
+Weekends and the 2026 market holidays inside the span (Jan 1, Jan 19 MLK,
+Feb 16 Presidents' Day, Apr 3 Good Friday, May 25 Memorial Day, Jun 19
+Juneteenth, Jul 3 for Independence Day) are correctly absent, not missing.
 
-## Two traps when this is finally used
+## Two traps when this is used
 
 1. **Four steps span two sessions, not one.** 2026-03-23→03-25,
    04-21→04-23, 05-06→05-08 and 06-25→06-29 each cover two days' movement.
-   Including them as one-day returns overstates volatility slightly. With
-   82 clean steps available, drop them rather than adjust them.
-2. **Total return can't be read off the endpoints.** First to last is
-   +5.13%, but that's late February onward — it is *not* year-to-date and
-   says nothing about the path.
+   Counting them as one-day returns overstates volatility. `src/portfolio.js`
+   excludes them and reports how many it dropped; anything else reading this
+   file should do the same.
+2. **The first row is not the year-to-date baseline.** Return is measured
+   from the 2026-01-02 close, so the first session of the year is already
+   inside it.
 
-The brokerage itself reported **+18.45% year-to-date** as of 2026-07-31 on
-every one of those screenshots. Worth keeping as a check: whatever this file
-produces for the same window should land near it, and a large disagreement
-means the gap handling above is wrong rather than that the broker is.
+## On the broker's own number
+
+Every screenshot shows the brokerage reporting **+18.45% "this year"**. This
+file's own figures say **+13.9%** from 2026-01-02 to 2026-07-08.
+
+They are not meant to agree, and the difference is not evidence of an error
+here. The broker measures from the 2025 year-end balance, which isn't in this
+file, and may weight for cash flows. Working backwards, +18.45% to today's
+$30,788.95 implies a starting point near $25,993 — about $1,000 below the
+2026-01-02 balance recorded here.
+
+Everything computed from this file is derived from these dates and dollar
+figures alone. That's deliberate, and it's what the app shows.
 
 Also unknown from this data alone: whether any **deposits or withdrawals**
 happened in the period. A contribution looks exactly like a gain in a
@@ -81,7 +92,11 @@ the coverage table above. Overlapping a few rows with what's already here is
 worth doing deliberately — re-reading the same dates is the only way to
 catch a transcription slip.
 
-The series now runs forward from 2026-02-26; extending the end is the
-routine update. The three screenshot-boundary dates above are worth grabbing
-if the table is ever scrolled past them again, and the full year to date
-would need the stretch before 2026-02-26.
+Extending the end is the routine update, and everything downstream picks it
+up automatically: `src/portfolio.js` re-reads this file on every request, so
+the app's portfolio card reflects new rows as soon as they're saved (the
+published snapshot needs a rebuild, as always).
+
+Two one-off gaps are still worth filling if the chance comes up: the three
+screenshot-boundary dates above, and the 2025 year-end balance, which is
+what would make a true year-to-date figure possible.

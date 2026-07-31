@@ -6,6 +6,7 @@ const config = require('./src/config');
 const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
 const { correlationsAgainst } = require('./src/correlation');
+const { getPortfolio } = require('./src/portfolio');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -191,6 +192,18 @@ const server = http.createServer((req, res) => {
       endDaysAgo: Number(params.get('endDaysAgo')),
       volAdjusted: params.get('volAdjusted') === 'true',
     });
+    return;
+  }
+  // The owner's own balance history, read off disk rather than from the
+  // scheduled data store — it has nothing to do with FMP and changes only
+  // when the CSV is edited by hand.
+  if (req.url.startsWith('/api/portfolio')) {
+    const portfolio = getPortfolio();
+    if (!portfolio) {
+      sendJSON(res, 404, { error: 'No portfolio balances recorded.' });
+      return;
+    }
+    sendJSON(res, 200, portfolio);
     return;
   }
   if (req.url.startsWith('/api/meta')) {
