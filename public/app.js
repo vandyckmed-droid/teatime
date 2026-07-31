@@ -147,7 +147,16 @@ function loadSettings() {
   const defaults = Object.fromEntries(SETTINGS.map((s) => [s.key, s.default]));
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{}');
-    return { ...defaults, ...stored };
+    const settings = { ...defaults, ...stored };
+    // A saved window can outlive the bounds it was saved under — the static
+    // snapshot carries less history than the live server, so a range stored
+    // before that reaches back past any data and scores nothing at all.
+    const range = settings.rankDateRange;
+    if (range && typeof range.startDaysAgo === 'number') {
+      range.startDaysAgo = Math.min(range.startDaysAgo, DATE_RANGE_MAX_DAYS_AGO);
+      range.endDaysAgo = Math.min(range.endDaysAgo, range.startDaysAgo - DATE_RANGE_MIN_GAP);
+    }
+    return settings;
   } catch {
     return defaults;
   }

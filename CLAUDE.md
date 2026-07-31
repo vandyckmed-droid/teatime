@@ -54,15 +54,23 @@ experience: full screen, no Safari chrome, tinted status bar.
      `EMBEDDED_HISTORY` for the requested symbols instead of calling
      `/api/history/batch`.
    No fonts to embed — system fonts need no asset.
+   Embedded history is trimmed to ~3 years and stored as bare `[date, close]`
+   pairs, rehydrated by a `decodeEmbeddedHistory` helper the assembler adds.
+   Both matter: five years of the API's object-per-point shape made this file
+   12MB, most of it the words "date" and "close" repeated 300,000 times. The
+   trim has two consequences the assembler handles, and any future range
+   change has to keep handling — the 5Y chart range is removed from the
+   bundle's `CHART_RANGES`, and `DATE_RANGE_MAX_DAYS_AGO` is capped inside the
+   embedded span, so nothing in the bundle can ask for data that isn't there.
 4. Test the assembled file by opening it with Playwright over `file://`
    (proves it truly has no network dependency) before publishing.
 5. Copy the assembled file to `docs/index.html` and commit it straight to
    `main` (that's the whole deploy — no build step, no Actions workflow).
 
-One cost worth knowing about: each redeploy commits a new ~2.5MB HTML file
-(the embedded data is what makes it self-contained), so `docs/index.html`'s
-history adds up in repo size over many iterations. Not a problem at this
-scale; flag it if it ever becomes one.
+One cost worth knowing about: each redeploy commits a new ~4MB HTML file (the
+embedded data is what makes it self-contained), so `docs/index.html`'s history
+adds up in repo size over many iterations. Not a problem at this scale; flag
+it if it ever becomes one.
 
 ## Standing authority (no need to ask)
 
