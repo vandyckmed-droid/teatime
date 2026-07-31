@@ -264,11 +264,12 @@ Concretely:
   channel above, since it has no backend to answer `/api/rank` at all;
   `EMBEDDED_LEADERBOARD` being defined is the signal that bundle uses to
   skip the live-endpoint attempt outright rather than let it fail into the
-  console every load. The detail sheet's bars view and the row
-  sparklines both come from `rollingVolAdjusted` in the browser — the same
-  window the boards score by, slid date by date — so they need no endpoint of
-  their own; the row variant needs every company's history, which is why it
-  fetches it (`ensureRowHistories`) only when something will actually draw it. This holds well past a few hundred companies now; the
-  remaining cost to watch as `universeSize` keeps growing is the once-daily
-  refresh cycle's own wall-clock time (bounded by `config.fmpConcurrency`)
-  and the size of the in-memory store, not per-visitor load.
+  console every load. The detail sheet's bars view and the row sparklines
+  both come from `rollingVolAdjusted` in the browser — the same window the
+  boards score by, slid date by date — so they need no endpoint of their own;
+  the row variant needs every company's history, which is why it fetches it
+  (`ensureRowHistories`) only when something will actually draw it. This
+  holds well past a few hundred companies now; the remaining cost to watch as
+  `universeSize` keeps growing is the once-daily refresh cycle's own
+  wall-clock time (bounded by `config.fmpConcurrency`) and the size of the
+  in-memory store, not per-visitor load.
