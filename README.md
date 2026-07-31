@@ -16,8 +16,9 @@ Then open http://localhost:3000.
 
 ## How it works
 
-- `src/fmpClient.js` — thin wrapper around FMP's `stable` API (company screener,
-  price-change, profile, historical daily prices).
+- `src/fmpClient.js` — thin wrapper around FMP's `stable` API (company
+  screener, price-change, profile, historical daily prices). Retries 429/5xx
+  with backoff and honours `Retry-After`; everything else fails fast.
 - `src/leaderboard.js` — builds the universe: largest companies by market cap
   (NYSE/NASDAQ, ETFs/funds excluded, duplicate share classes deduped to the
   larger-cap line), with trailing returns for every configured window. A
@@ -72,11 +73,12 @@ Then open http://localhost:3000.
 `.github/workflows/daily-snapshot.yml` at 09:00 UTC. It's the only workflow in
 the repo — publishing the Pages bundle is still a plain commit.
 
-The app keeps no history of itself: `src/dataStore.js` holds the current day in
-memory and each refresh overwrites it, so yesterday's board is otherwise gone.
-Each file stores the day's ranked list plus the per-company facts and full
-returns map behind it, so a later question can be answered without assuming
-today what it will be. Schema and caveats: `data/snapshots/README.md`.
+The app keeps no history of itself: `src/dataStore.js` holds the current day
+in memory and each refresh overwrites it, so yesterday's board is otherwise
+gone. Each file stores the day's ranked list plus the per-company facts and
+full returns map behind it, so a later question can be answered without
+assuming today what it will be. Schema and caveats:
+`data/snapshots/README.md`.
 
 Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
 `API_KEY=... node scripts/snapshot.js` (it no-ops if the day's file exists;
@@ -95,9 +97,10 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   `src/ranking.js` above) already remove the two biggest costs of scaling
   further — repeated FMP fetches per visitor, and shipping the full universe's
   history JSON to the browser just to rank it.
-- New setting: add an entry to `SETTINGS` in `public/app.js` — `renderSettings()`
-  dispatches on `type` (`'toggle'`, `'daterange'`, ...); a new `type` needs one
-  more branch there.
+- New setting: add an entry to `SETTINGS` in `public/app.js`.
+  `renderSettings()` dispatches on `type` (`'toggle'`, `'choice'`,
+  `'daterange'`, ...) and routes the row by its optional `section`; a new
+  `type` needs one more branch there.
 - Different universe (e.g. a specific sector, or largest by revenue instead of
   market cap): adjust the screener call in `src/leaderboard.js`.
 
