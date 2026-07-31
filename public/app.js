@@ -609,14 +609,42 @@ function addDaysStr(dateStr, delta) {
 // Sampled backwards from the newest so the latest trading day is always
 // included whatever the step works out to — that point has to agree with the
 // rank the boards are showing right now.
-function sampleRankDates(series, cutoffStr) {
+function sampleRankDates(series, cutoffStr, maxPoints = RANK_HISTORY_MAX_POINTS) {
   const dates = [];
   for (const p of series) if (p.date >= cutoffStr) dates.push(p.date);
   if (dates.length === 0) return dates;
-  const step = Math.max(1, Math.ceil(dates.length / RANK_HISTORY_MAX_POINTS));
+  const step = Math.max(1, Math.ceil(dates.length / maxPoints));
   const out = [];
   for (let i = dates.length - 1; i >= 0; i -= step) out.push(dates[i]);
   out.reverse();
+  // The boards score relative to *today*, so the newest sample must too, or the
+  // last value won't match what the list is showing. Same step as
+  // computeRankHistoryClientSide.
+  const todayStr = daysAgoToDateStr(0);
+  if (dates.length > 0 && out[out.length - 1] < todayStr) out[out.length - 1] = todayStr;
+  return out;
+}
+
+// The vol-adjusted score as of each of a set of dates: at every one, the
+// Settings ranking window is slid back to end there and scored, exactly as
+// src/ranking.js does for the board. So the newest value here *is* the score
+// the board shows for this company — not an approximation of it.
+function rollingVolAdjusted(symbol, spanDays, maxPoints) {
+  const prepared = preparedFor(symbol);
+  const cached = historyCache.get(symbol);
+  if (!prepared || !cached || !cached.series) return [];
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const out = [];
+  for (const date of sampleRankDates(cached.series, daysAgoToDateStr(spanDays), maxPoints)) {
+    const value = volAdjustedBetweenDates(
+      prepared, addDaysStr(date, -startDaysAgo), addDaysStr(date, -endDaysAgo),
+    );
+    // Dates without enough history behind them to fill the window are dropped
+    // rather than plotted as zero — no score and a score of zero are different
+    // facts, and zero is a meaningful value on this axis.
+    if (value === null || !Number.isFinite(value)) continue;
+    out.push({ date, value });
+  }
   return out;
 }
 
@@ -634,13 +662,10 @@ function computeRankHistoryClientSide(symbol, spanDays) {
 
   const scores = new Float64Array(pack.length);
   const points = [];
-  const dates = sampleRankDates(target.series, daysAgoToDateStr(spanDays));
-  // The boards score relative to *today*, not to the last trading day, so the
-  // newest point must too — otherwise the chart's last rank disagrees with the
-  // list the user just tapped. See the same step in src/rankHistory.js.
-  const todayStr = daysAgoToDateStr(0);
-  if (dates.length > 0 && dates[dates.length - 1] < todayStr) dates[dates.length - 1] = todayStr;
-  for (const date of dates) {
+  // sampleRankDates pins the newest sample to today, so this chart's last point
+  // matches the list the user just tapped (see the note there, and the same
+  // step in src/rankHistory.js).
+  for (const date of sampleRankDates(target.series, daysAgoToDateStr(spanDays))) {
     const startStr = addDaysStr(date, -startDaysAgo);
     const endStr = addDaysStr(date, -endDaysAgo);
     let mine = null;
@@ -1677,92 +1702,90 @@ function chartSkeletonHTML() {
     </div>`;
 }
 
-// ── bars: period returns around a zero line ─────────────────────────
-// The line answers "what did the price do"; the bars answer "which stretches
-// were up and which were down", which the line only shows as slope. Each bar is
-// one period's own return, so they sit either side of zero instead of drifting
-// with the price — that's the whole point of the alternative view.
+// ── bars: the rolling vol-adjusted score around a zero line ──────────
+// Each bar is the company's volatility-adjusted return — annualized mean daily
+// return ÷ annualized volatility — measured over the Settings ranking window
+// ending on that bar's date. So the bars answer "how has this company's
+// risk-adjusted standing moved", where the line only shows raw price.
 //
-// Buckets, not one bar per trading day: a year is ~250 closes and a 344px chart
-// can't render 250 separate bars, only a solid block that reads as an area
-// chart with extra steps.
+// Two windows are in play and they do different jobs, which is the thing to
+// keep straight: the ranking window (Settings) sets how far back each bar
+// looks, and the range pills set how far back the *chart* goes. Same split as
+// the rank chart.
+//
+// The rightmost bar is the score the board itself shows for this company: it
+// uses the identical window against the identical prepared series, so it's the
+// same number, not a near miss.
 const BAR_TARGET_COUNT = 26;
 const BAR_MIN_WIDTH = 3;
-// Left gutter for the "0%" label. The line chart's price labels sit above and
+// Left gutter for the zero label. The line chart's price labels sit above and
 // below the data band so they need none, but zero lands *inside* the band —
 // without a gutter it prints over the first couple of bars.
-const BAR_PAD_L = 30;
-
-function bucketReturns(slice) {
-  const size = Math.max(1, Math.ceil((slice.length - 1) / BAR_TARGET_COUNT));
-  const buckets = [];
-  for (let start = 0; start < slice.length - 1; start += size) {
-    const end = Math.min(start + size, slice.length - 1);
-    const from = slice[start].close;
-    const to = slice[end].close;
-    if (!(from > 0)) continue;
-    buckets.push({
-      pct: ((to - from) / from) * 100,
-      startDate: slice[start].date,
-      endDate: slice[end].date,
-    });
-  }
-  return buckets;
-}
+const BAR_PAD_L = 34;
 
 function renderBarsChart(wrap, slice) {
-  const bars = bucketReturns(slice);
+  const bars = rollingVolAdjusted(detail.symbol, rankSpanDays(), BAR_TARGET_COUNT);
+  const caption = document.getElementById('chart-caption');
   if (bars.length === 0) {
-    wrap.innerHTML = '<div class="chart-error">Not enough trading history yet for this range.</div>';
+    wrap.innerHTML = `<div class="chart-error">Not enough history to score ${detail.symbol} over the ranking window yet.</div>`;
+    if (caption) caption.hidden = true;
+    const axis = document.getElementById('chart-axis-x');
+    if (axis) axis.innerHTML = '';
     return;
+  }
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  if (caption) {
+    caption.hidden = false;
+    caption.textContent =
+      `Volatility-adjusted return over a rolling ${startDaysAgo - endDaysAgo}-day window`;
   }
 
   const { w: W, h: H } = chartSize();
   const innerH = H - CHART_PAD_Y * 2;
   const innerW = W - BAR_PAD_L - CHART_PAD_X;
 
-  // Zero is always on the scale, but the scale isn't forced symmetric: a range
-  // that only went up would waste half the chart on empty negative space.
-  const hi = Math.max(0, ...bars.map((b) => b.pct));
-  const lo = Math.min(0, ...bars.map((b) => b.pct));
+  // Zero is always on the scale, but the scale isn't forced symmetric: a stretch
+  // spent entirely above zero would waste half the chart on empty space.
+  const hi = Math.max(0, ...bars.map((b) => b.value));
+  const lo = Math.min(0, ...bars.map((b) => b.value));
   const spread = hi - lo || 1;
-  const yFor = (pct) => CHART_PAD_Y + innerH - ((pct - lo) / spread) * innerH;
+  const yFor = (v) => CHART_PAD_Y + innerH - ((v - lo) / spread) * innerH;
   const zeroY = yFor(0);
 
   const slot = innerW / bars.length;
   const barW = Math.max(BAR_MIN_WIDTH, slot * 0.66);
   const coords = bars.map((b, i) => {
     const cx = BAR_PAD_L + slot * (i + 0.5);
-    const y = yFor(b.pct);
+    const y = yFor(b.value);
     return {
       ...b,
       cx,
       x: cx - barW / 2,
-      // Never shorter than a hairline: a flat period should still read as a
-      // bar sitting on zero rather than vanishing.
+      // Never shorter than a hairline: a score sitting at zero should still
+      // read as a bar on the axis rather than vanishing.
       y: Math.min(y, zeroY),
       height: Math.max(1.5, Math.abs(zeroY - y)),
     };
   });
 
-  const rects = coords.map((c) => `<rect class="chart-bar ${c.pct >= 0 ? 'gain' : 'loss'}"
+  const rects = coords.map((c) => `<rect class="chart-bar ${c.value >= 0 ? 'gain' : 'loss'}"
     x="${c.x.toFixed(2)}" y="${c.y.toFixed(2)}" width="${barW.toFixed(2)}" height="${c.height.toFixed(2)}"
     rx="${Math.min(2, barW / 3).toFixed(2)}" />`).join('');
 
-  const total = ((slice[slice.length - 1].close - slice[0].close) / slice[0].close) * 100;
+  const latest = bars[bars.length - 1].value;
   // Against the wrapper's full height, which is what `top` resolves against —
   // not against the inner band, which would drop the label below its own line.
   const zeroPct = (zeroY / H) * 100;
-  // Dropped when zero is effectively an edge of the scale (a range that only
-  // went one way), where it would print on top of the min or max label.
+  // Dropped when zero is effectively an edge of the scale, where it would print
+  // on top of the min or max label.
   const zeroCrowded = zeroY - CHART_PAD_Y < 16 || H - CHART_PAD_Y - zeroY < 16;
 
   wrap.innerHTML = `
-    <div class="chart-axis-y max">${fmtPct(hi)}</div>
-    ${zeroCrowded ? '' : `<div class="chart-axis-y zero" style="top: ${zeroPct.toFixed(2)}%">0%</div>`}
-    <div class="chart-axis-y min">${fmtPct(lo)}</div>
+    <div class="chart-axis-y max">${fmtScore(hi)}</div>
+    ${zeroCrowded ? '' : `<div class="chart-axis-y zero" style="top: ${zeroPct.toFixed(2)}%">0.00</div>`}
+    <div class="chart-axis-y min">${fmtScore(lo)}</div>
     <svg class="chart-svg bars" viewBox="0 0 ${W} ${H}" role="img"
-         aria-label="${detail.symbol} period returns, ${detail.range}. ${bars.length} bars, ${fmtPct(total)} overall.">
+         aria-label="${detail.symbol} rolling volatility-adjusted return, ${detail.range}. ${bars.length} bars, currently ${fmtScore(latest)}.">
       <line class="chart-zero" x1="${BAR_PAD_L - 4}" y1="${zeroY.toFixed(2)}" x2="${W}" y2="${zeroY.toFixed(2)}" />
       ${rects}
       <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${H}" />
@@ -1775,9 +1798,9 @@ function renderBarsChart(wrap, slice) {
   if (axisXEl) {
     const mid = coords[Math.floor((coords.length - 1) / 2)];
     axisXEl.innerHTML =
-      `<span>${fmtChartDate(coords[0].startDate)}</span>` +
-      `<span>${fmtChartDate(mid.endDate)}</span>` +
-      `<span>${fmtChartDate(coords[coords.length - 1].endDate)}</span>`;
+      `<span>${fmtChartDate(coords[0].date)}</span>` +
+      `<span>${fmtChartDate(mid.date)}</span>` +
+      `<span>${fmtChartDate(coords[coords.length - 1].date)}</span>`;
   }
 
   attachBarScrub(wrap, coords, W);
@@ -1811,12 +1834,12 @@ function attachBarScrub(wrap, coords, chartW) {
     tooltip.style.opacity = '1';
     tooltip.innerHTML = '';
     const dateEl = document.createElement('span');
-    dateEl.textContent = `${fmtChartDate(c.endDate)} — `;
-    const pctEl = document.createElement('b');
-    pctEl.textContent = fmtPct(c.pct);
-    pctEl.className = c.pct >= 0 ? 'gain' : 'loss';
+    dateEl.textContent = `${fmtChartDate(c.date)} — `;
+    const valEl = document.createElement('b');
+    valEl.textContent = fmtScore(c.value);
+    valEl.className = c.value >= 0 ? 'gain' : 'loss';
     tooltip.appendChild(dateEl);
-    tooltip.appendChild(pctEl);
+    tooltip.appendChild(valEl);
   }
 
   let dragging = false;
@@ -1858,6 +1881,9 @@ function renderChart() {
     renderBarsChart(wrap, slice);
     return;
   }
+
+  const caption = document.getElementById('chart-caption');
+  if (caption) caption.hidden = true;
 
   const { w: W, h: H } = chartSize();
   const closes = slice.map((p) => p.close);
