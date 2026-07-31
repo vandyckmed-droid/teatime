@@ -847,8 +847,6 @@ button { font: inherit; color: inherit; }
 }
 .detail-return.gain { color: var(--gain); }
 .detail-return.loss { color: var(--loss); }
-.detail-return.gain::before { content: '▲ '; font-size: 8px; vertical-align: 1px; }
-.detail-return.loss::before { content: '▼ '; font-size: 8px; vertical-align: 1px; }
 
 /* ── chart ────────────────────────────────────────────────────────────
    The SVG's viewBox is measured in CSS pixels by renderChart (1 unit = 1px)
@@ -914,6 +912,35 @@ button { font: inherit; color: inherit; }
   animation: chart-fade-in 300ms ease-out 560ms both;
 }
 @keyframes chart-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── bars variant ─────────────────────────────────────────────────────
+   Each bar is one period's return, so colour is per-bar rather than per-chart:
+   unlike the line, a single view holds both directions at once. */
+.chart-bar {
+  animation: chart-bar-in 420ms var(--ease-out) both;
+  transition: opacity 120ms ease;
+}
+.chart-bar.gain { fill: var(--gain); }
+.chart-bar.loss { fill: var(--loss); }
+/* Scrubbing dims the rest rather than brightening one — at these sizes a
+   brighter bar is hard to pick out, a dimmed field is not. */
+.chart-svg.bars:has(.is-active) .chart-bar { opacity: 0.32; }
+.chart-svg.bars .chart-bar.is-active { opacity: 1; }
+@keyframes chart-bar-in { from { opacity: 0; transform: scaleY(0.55); } to { opacity: 1; transform: scaleY(1); } }
+/* Grown from the zero line, not from the top of the viewBox, so the animation
+   reads as bars extending out of the axis in whichever direction they go. */
+.chart-svg.bars { transform-box: fill-box; }
+.chart-bar { transform-origin: center; transform-box: fill-box; }
+/* Solid, unlike the dashed price baseline: here it's a real axis that bars are
+   measured from, not a reference level drawn behind the data. */
+.chart-zero {
+  stroke: var(--hairline-strong); stroke-width: 1;
+  animation: chart-fade-in 400ms ease-out both;
+}
+.chart-axis-y.zero {
+  transform: translateY(-50%);
+  color: var(--text-3); font-weight: 600;
+}
 
 .chart-crosshair-line { stroke: var(--text-2); stroke-width: 1; stroke-opacity: 0.5; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 .chart-crosshair-dot { fill: var(--text); stroke: var(--surface-2); stroke-width: 2.5; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
@@ -1061,6 +1088,8 @@ button { font: inherit; color: inherit; }
   .chart-startpoint,
   .chart-axis-y,
   .chart-tick,
+  .chart-bar,
+  .chart-zero,
   .rank-line,
   .rank-area,
   .rank-grid,

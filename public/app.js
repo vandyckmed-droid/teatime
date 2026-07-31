@@ -30,6 +30,18 @@ const SETTINGS = [
     default: 'price',
   },
   {
+    key: 'chartStyle',
+    type: 'choice',
+    section: 'display',
+    label: 'Price chart style',
+    description: 'A line follows the price; bars show each period’s own return above or below zero, green for up and red for down.',
+    options: [
+      { value: 'line', label: 'Line' },
+      { value: 'bars', label: 'Bars' },
+    ],
+    default: 'line',
+  },
+  {
     key: 'rankDateRange',
     type: 'daterange',
     label: 'Ranking date range',
@@ -1494,14 +1506,16 @@ function renderDetailReturn(company) {
   const el = document.getElementById('detail-return');
   const value = company.returns[detail.range];
   const available = company.availability[detail.range] && typeof value === 'number';
-  const rangeLabel = CHART_RANGES.find((r) => r.key === detail.range)?.label || detail.range;
   if (!available) {
     el.className = 'detail-return na';
-    el.textContent = `N/A over ${rangeLabel}`;
+    el.textContent = 'N/A';
     return;
   }
+  // No range suffix and no arrow: the range toggle sits directly beneath this,
+  // and the sign is already in the number and the colour. Both were saying
+  // something the eye had just read.
   el.className = `detail-return ${value >= 0 ? 'gain' : 'loss'}`;
-  el.textContent = `${fmtPct(value)} · ${rangeLabel}`;
+  el.textContent = fmtPct(value);
 }
 
 function renderDetailFacts(company) {
@@ -1659,6 +1673,168 @@ function chartSkeletonHTML() {
     </div>`;
 }
 
+// ── bars: period returns around a zero line ─────────────────────────
+// The line answers "what did the price do"; the bars answer "which stretches
+// were up and which were down", which the line only shows as slope. Each bar is
+// one period's own return, so they sit either side of zero instead of drifting
+// with the price — that's the whole point of the alternative view.
+//
+// Buckets, not one bar per trading day: a year is ~250 closes and a 344px chart
+// can't render 250 separate bars, only a solid block that reads as an area
+// chart with extra steps.
+const BAR_TARGET_COUNT = 26;
+const BAR_MIN_WIDTH = 3;
+// Left gutter for the "0%" label. The line chart's price labels sit above and
+// below the data band so they need none, but zero lands *inside* the band —
+// without a gutter it prints over the first couple of bars.
+const BAR_PAD_L = 30;
+
+function bucketReturns(slice) {
+  const size = Math.max(1, Math.ceil((slice.length - 1) / BAR_TARGET_COUNT));
+  const buckets = [];
+  for (let start = 0; start < slice.length - 1; start += size) {
+    const end = Math.min(start + size, slice.length - 1);
+    const from = slice[start].close;
+    const to = slice[end].close;
+    if (!(from > 0)) continue;
+    buckets.push({
+      pct: ((to - from) / from) * 100,
+      startDate: slice[start].date,
+      endDate: slice[end].date,
+    });
+  }
+  return buckets;
+}
+
+function renderBarsChart(wrap, slice) {
+  const bars = bucketReturns(slice);
+  if (bars.length === 0) {
+    wrap.innerHTML = '<div class="chart-error">Not enough trading history yet for this range.</div>';
+    return;
+  }
+
+  const { w: W, h: H } = chartSize();
+  const innerH = H - CHART_PAD_Y * 2;
+  const innerW = W - BAR_PAD_L - CHART_PAD_X;
+
+  // Zero is always on the scale, but the scale isn't forced symmetric: a range
+  // that only went up would waste half the chart on empty negative space.
+  const hi = Math.max(0, ...bars.map((b) => b.pct));
+  const lo = Math.min(0, ...bars.map((b) => b.pct));
+  const spread = hi - lo || 1;
+  const yFor = (pct) => CHART_PAD_Y + innerH - ((pct - lo) / spread) * innerH;
+  const zeroY = yFor(0);
+
+  const slot = innerW / bars.length;
+  const barW = Math.max(BAR_MIN_WIDTH, slot * 0.66);
+  const coords = bars.map((b, i) => {
+    const cx = BAR_PAD_L + slot * (i + 0.5);
+    const y = yFor(b.pct);
+    return {
+      ...b,
+      cx,
+      x: cx - barW / 2,
+      // Never shorter than a hairline: a flat period should still read as a
+      // bar sitting on zero rather than vanishing.
+      y: Math.min(y, zeroY),
+      height: Math.max(1.5, Math.abs(zeroY - y)),
+    };
+  });
+
+  const rects = coords.map((c) => `<rect class="chart-bar ${c.pct >= 0 ? 'gain' : 'loss'}"
+    x="${c.x.toFixed(2)}" y="${c.y.toFixed(2)}" width="${barW.toFixed(2)}" height="${c.height.toFixed(2)}"
+    rx="${Math.min(2, barW / 3).toFixed(2)}" />`).join('');
+
+  const total = ((slice[slice.length - 1].close - slice[0].close) / slice[0].close) * 100;
+  // Against the wrapper's full height, which is what `top` resolves against —
+  // not against the inner band, which would drop the label below its own line.
+  const zeroPct = (zeroY / H) * 100;
+  // Dropped when zero is effectively an edge of the scale (a range that only
+  // went one way), where it would print on top of the min or max label.
+  const zeroCrowded = zeroY - CHART_PAD_Y < 16 || H - CHART_PAD_Y - zeroY < 16;
+
+  wrap.innerHTML = `
+    <div class="chart-axis-y max">${fmtPct(hi)}</div>
+    ${zeroCrowded ? '' : `<div class="chart-axis-y zero" style="top: ${zeroPct.toFixed(2)}%">0%</div>`}
+    <div class="chart-axis-y min">${fmtPct(lo)}</div>
+    <svg class="chart-svg bars" viewBox="0 0 ${W} ${H}" role="img"
+         aria-label="${detail.symbol} period returns, ${detail.range}. ${bars.length} bars, ${fmtPct(total)} overall.">
+      <line class="chart-zero" x1="${BAR_PAD_L - 4}" y1="${zeroY.toFixed(2)}" x2="${W}" y2="${zeroY.toFixed(2)}" />
+      ${rects}
+      <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${H}" />
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="chart-hit" />
+    </svg>
+    <div class="chart-tooltip" id="chart-tooltip"></div>
+  `;
+
+  const axisXEl = document.getElementById('chart-axis-x');
+  if (axisXEl) {
+    const mid = coords[Math.floor((coords.length - 1) / 2)];
+    axisXEl.innerHTML =
+      `<span>${fmtChartDate(coords[0].startDate)}</span>` +
+      `<span>${fmtChartDate(mid.endDate)}</span>` +
+      `<span>${fmtChartDate(coords[coords.length - 1].endDate)}</span>`;
+  }
+
+  attachBarScrub(wrap, coords, W);
+}
+
+// Same own-drag-state handling as the other two scrubs (see attachChartScrub on
+// why e.pressure can't be the gate). Highlights whole bars rather than tracking
+// a point, since a bar is a period, not an instant.
+function attachBarScrub(wrap, coords, chartW) {
+  const svg = wrap.querySelector('svg');
+  const hit = wrap.querySelector('#chart-hit');
+  const line = wrap.querySelector('#crosshair-line');
+  const tooltip = wrap.querySelector('#chart-tooltip');
+  if (!svg || !hit) return;
+
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((clientX - rect.left) / rect.width) * chartW;
+    let best = 0;
+    for (let i = 1; i < coords.length; i++) {
+      if (Math.abs(coords[i].cx - relX) < Math.abs(coords[best].cx - relX)) best = i;
+    }
+    const c = coords[best];
+    svg.querySelectorAll('.chart-bar').forEach((el, i) => el.classList.toggle('is-active', i === best));
+    line.setAttribute('x1', c.cx);
+    line.setAttribute('x2', c.cx);
+    line.style.opacity = '1';
+
+    const pxRatio = rect.width / chartW;
+    tooltip.style.left = `${Math.min(Math.max(c.cx * pxRatio, 70), rect.width - 70)}px`;
+    tooltip.style.opacity = '1';
+    tooltip.innerHTML = '';
+    const dateEl = document.createElement('span');
+    dateEl.textContent = `${fmtChartDate(c.endDate)} — `;
+    const pctEl = document.createElement('b');
+    pctEl.textContent = fmtPct(c.pct);
+    pctEl.className = c.pct >= 0 ? 'gain' : 'loss';
+    tooltip.appendChild(dateEl);
+    tooltip.appendChild(pctEl);
+  }
+
+  let dragging = false;
+  hit.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    try { hit.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+    showAt(e.clientX);
+    e.preventDefault();
+  });
+  hit.addEventListener('pointermove', (e) => {
+    if (dragging || e.pointerType === 'mouse') showAt(e.clientX);
+  });
+  hit.addEventListener('pointerup', () => { dragging = false; });
+  hit.addEventListener('pointercancel', () => { dragging = false; });
+  hit.addEventListener('pointerleave', (e) => {
+    if (e.pointerType !== 'mouse' || dragging) return;
+    line.style.opacity = '0';
+    tooltip.style.opacity = '0';
+    svg.querySelectorAll('.chart-bar.is-active').forEach((el) => el.classList.remove('is-active'));
+  });
+}
+
 function renderChart() {
   const wrap = document.getElementById('chart-wrap');
   const cached = historyCache.get(detail.symbol);
@@ -1673,6 +1849,11 @@ function renderChart() {
     return;
   }
   detail.slice = slice;
+
+  if (state.settings.chartStyle === 'bars') {
+    renderBarsChart(wrap, slice);
+    return;
+  }
 
   const { w: W, h: H } = chartSize();
   const closes = slice.map((p) => p.close);
