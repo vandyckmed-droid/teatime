@@ -25,39 +25,43 @@ bottom and keep it that way.
 
 ## What's in here now
 
-50 rows, 2026-02-26 through 2026-07-08, transcribed by hand from five
-screenshots of the brokerage's "Table view" taken 2026-07-31. The balances
-are read directly off those screenshots — no rounding, no interpolation.
+87 rows, 2026-02-26 through 2026-07-08, transcribed by hand from ten
+screenshots of the brokerage's "Table view" — five taken 2026-07-31 07:28
+and five more at 08:24 that filled in the gaps between them. The balances
+are read directly off those screenshots: no rounding, no interpolation.
 
-## The gaps matter
+The two batches overlap on 11 dates, which were transcribed twice
+independently. **All 11 agree to the cent** — as good a check on the
+transcription as this data allows.
 
-**This series is not contiguous.** The screenshots captured five windows of
-about ten trading days each as the table was scrolled, so there are five
-stretches with no data at all:
+## Coverage
 
-| Missing span | Trading days lost (approx) |
+Near-continuous. Of the 86 row-to-row steps, **82 are true single-session
+moves**. Only four dates inside the span are missing:
+
+| Missing | Why |
 | --- | --- |
-| 2026-03-12 → 2026-03-24 | 9 |
-| 2026-04-09 → 2026-04-22 | 9 |
-| 2026-05-07 → 2026-05-20 | 10 |
-| 2026-06-05 → 2026-06-22 | 12 |
-| after 2026-07-08 | to date |
+| 2026-03-24 | fell between two screenshot windows |
+| 2026-04-22 | fell between two screenshot windows |
+| 2026-05-07 | fell between two screenshot windows |
+| 2026-06-26 | absent from the brokerage's own table — both captures of that stretch skip from 06/25 to 06/29 |
 
-Of the 49 row-to-row steps in the file, **45 are genuine one-trading-day
-moves** and 4 span a gap. That's a usable base for a first volatility
-estimate, but only if the four are excluded.
+Nothing before 2026-02-26 has been captured, so this is not the full year to
+date — it starts about two months into 2026.
 
-This is the one thing that can quietly produce wrong numbers later. Two
-traps to avoid when this data is finally used:
+Weekends and the 2026 market holidays inside the span (Apr 3 Good Friday,
+May 25 Memorial Day, Jun 19 Juneteenth, Jul 3 for Independence Day) are
+correctly absent, not missing.
 
-1. **Daily returns must only be taken between consecutive rows that are
-   actually consecutive trading days.** A naive `balance[i]/balance[i-1]`
-   treats the 2026-03-11 → 2026-03-25 jump as a single day's move, which
-   inflates measured volatility. Drop any pair more than ~4 calendar days
-   apart (covering weekends and holidays) before computing anything.
-2. **Total return can't be read off the endpoints.** Start-to-end across a
-   gapped series is fine as a rough figure, but it isn't year-to-date, and
-   it says nothing about the path.
+## Two traps when this is finally used
+
+1. **Four steps span two sessions, not one.** 2026-03-23→03-25,
+   04-21→04-23, 05-06→05-08 and 06-25→06-29 each cover two days' movement.
+   Including them as one-day returns overstates volatility slightly. With
+   82 clean steps available, drop them rather than adjust them.
+2. **Total return can't be read off the endpoints.** First to last is
+   +5.13%, but that's late February onward — it is *not* year-to-date and
+   says nothing about the path.
 
 The brokerage itself reported **+18.45% year-to-date** as of 2026-07-31 on
 every one of those screenshots. Worth keeping as a check: whatever this file
@@ -72,7 +76,12 @@ performance, that has to be recorded before return figures mean anything.
 ## Keeping it up to date
 
 The owner maintains this by hand from the same screen. To add a batch:
-append the new rows in `date,balance` form, keeping date order, and update
-the coverage note above if a new gap opens. Filling in the missing spans
-above is more valuable than extending the end — a continuous run is what
-volatility work needs.
+merge the new rows in `date,balance` form, keeping date order, and update
+the coverage table above. Overlapping a few rows with what's already here is
+worth doing deliberately — re-reading the same dates is the only way to
+catch a transcription slip.
+
+The series now runs forward from 2026-02-26; extending the end is the
+routine update. The three screenshot-boundary dates above are worth grabbing
+if the table is ever scrolled past them again, and the full year to date
+would need the stretch before 2026-02-26.
