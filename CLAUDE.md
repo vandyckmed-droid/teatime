@@ -233,6 +233,13 @@ Concretely:
   date range (Settings-driven); the per-ticker chart sheet has its own
   window toggle. No standing rule on how connected these two should be —
   judge it fresh each time a feature touches both.
+- `RANK_WINDOW_PRESETS` in `public/app.js` backs the pills above the Ranks
+  board; a new preset is a new entry. They and the Settings steppers are two
+  views of one stored value, so each re-renders the other, and a pill lights
+  only on an exact match — a stepper nudge leaves them all dark, which is
+  the honest reading of "the window is no longer one of these". Day counts
+  are approximate on purpose (the owner's framing): "12M" names a window, it
+  isn't a claim about a calendar year.
 - Backend history/leaderboard dedupe and "insufficient history" handling are
   centralized (`src/leaderboard.js`, `src/history.js`) — extend those rather
   than special-casing a symbol or a window inline.

@@ -30,6 +30,16 @@ const SETTINGS = [
 // coarser steps since it usually ranges over months; "end" moves in finer
 // steps since it's typically being nudged near the present. The max keeps
 // "start" within the 5-year history the backend fetches per symbol.
+// Preset ranking windows, offered as pills above the Ranks board. Adding one
+// is adding an entry here. The day counts are trading-day-ish approximations
+// on purpose — "12M" names a window, it isn't a claim about a calendar year —
+// and the end offset keeps each window clear of the last few sessions, which
+// is where FMP's most recent closes are least settled.
+const RANK_WINDOW_PRESETS = [
+  { key: '12M', label: '12M', startDaysAgo: 250, endDaysAgo: 20 },
+  { key: '6M', label: '6M', startDaysAgo: 130, endDaysAgo: 16 },
+];
+
 const DATE_RANGE_STEP_START = 10;
 const DATE_RANGE_STEP_END = 2;
 const DATE_RANGE_MAX_DAYS_AGO = 1800;
@@ -626,7 +636,50 @@ function rankDateRangeShort() {
 // styles.css): a fixed caps key on the left, the live ranking window in mono on
 // the right. Split like that it fits one line, which the old single run of
 // uppercased text did not.
+// The pills and the Settings steppers are two views of one setting, so each
+// re-renders the other. A pill is lit only on an exact match — nudge a
+// stepper and the pills go dark, which is the honest reading of "the window
+// is no longer one of these".
+function renderWindowPills() {
+  const host = document.getElementById('ranks-window-pills');
+  if (!host) return;
+  if (!host.querySelector('button')) {
+    host.innerHTML = RANK_WINDOW_PRESETS.map((p) => `
+      <button type="button" class="window-pill" data-preset="${p.key}" aria-pressed="false">${p.label}</button>`).join('');
+    host.querySelectorAll('.window-pill').forEach((btn) => {
+      btn.addEventListener('click', () => applyWindowPreset(btn.dataset.preset));
+    });
+  }
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  host.querySelectorAll('.window-pill').forEach((btn) => {
+    const p = RANK_WINDOW_PRESETS.find((x) => x.key === btn.dataset.preset);
+    const active = !!p && p.startDaysAgo === startDaysAgo && p.endDaysAgo === endDaysAgo;
+    btn.setAttribute('aria-pressed', String(active));
+  });
+}
+
+async function applyWindowPreset(key) {
+  const preset = RANK_WINDOW_PRESETS.find((p) => p.key === key);
+  if (!preset) return;
+  const range = state.settings.rankDateRange;
+  if (range.startDaysAgo === preset.startDaysAgo && range.endDaysAgo === preset.endDaysAgo) return;
+  // Clamped exactly as a stored window is, so a preset can't reach past the
+  // history the static snapshot carries.
+  range.startDaysAgo = Math.min(preset.startDaysAgo, DATE_RANGE_MAX_DAYS_AGO);
+  range.endDaysAgo = Math.max(0, Math.min(preset.endDaysAgo, range.startDaysAgo - DATE_RANGE_MIN_GAP));
+  saveSettings();
+  renderWindowPills();
+  renderDateRangeSetting();
+  if (state.leaderboard && state.rankingsLoaded) {
+    // Both sequence their own requests, so rapid taps each fire but only the
+    // latest response applies — same as the steppers.
+    await Promise.all([refreshRankings(), refreshCorrelations()]);
+    renderAll();
+  }
+}
+
 function updateScoreLabels() {
+  renderWindowPills();
   const key = state.settings.volAdjusted ? 'Ranked by vol-adj return' : 'Ranked by return';
   const html =
     `<span class="section-label-key">${key}</span>` +
@@ -2177,6 +2230,7 @@ function renderDateRangeSetting() {
       }
       saveSettings();
       renderDateRangeSetting();
+      renderWindowPills();
       if (state.leaderboard && state.rankingsLoaded) {
         // Both of these sequence their own requests, so rapid stepper clicks
         // each fire but only the latest response applies.
@@ -2216,6 +2270,9 @@ async function init() {
   initTabBar();
   initDetailSheet();
   renderSettings();
+  // Before the board arrives, so the window controls are there to read (and
+  // to set) while the skeleton rows are still up.
+  renderWindowPills();
   updateWatchlistBadge();
 
   document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);

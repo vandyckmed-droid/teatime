@@ -27,8 +27,15 @@
           <span id="as-of">Loading&hellip;</span>
         </div>
 
-        <div class="section-label" id="ranks-score-label">
-          <span class="section-label-key">Largest by market cap</span>
+        <!-- The label and the window pills stick to the top as one unit, so
+             the control that sets the ranking window stays reachable however
+             far the board is scrolled. Pills come from RANK_WINDOW_PRESETS
+             in app.js. -->
+        <div class="board-header">
+          <div class="section-label" id="ranks-score-label">
+            <span class="section-label-key">Largest by market cap</span>
+          </div>
+          <div class="window-pills" id="ranks-window-pills" role="group" aria-label="Ranking window"></div>
         </div>
 
         <!-- Column headers, sharing the row's exact column widths (see

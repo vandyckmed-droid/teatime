@@ -78,8 +78,9 @@ Then open http://localhost:3000.
   tab leads with a card showing the owner's own portfolio (see
   `src/portfolio.js`), which stays hidden if no balances are recorded. Ranks and
   Watchlist rank by a custom date range (set in Settings, adjustable via
-  +/− steppers); scoring is computed server-side via `/api/rank` and cached
-  in `state.rankScores`. The frontend falls back to the old client-side
+  +/− steppers, or in one tap from the 12M/6M pills that sit with the Ranks
+  board's sticky header — `RANK_WINDOW_PRESETS` in `public/app.js`); scoring
+  is computed server-side via `/api/rank` and cached in `state.rankScores`. The frontend falls back to the old client-side
   computation (over batch-fetched history) if `/api/rank` isn't reachable —
   this is what makes the static-snapshot preview channels (which have no
   backend at all) still work unmodified. The sheet shows exactly one chart —
@@ -125,6 +126,9 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   `public/app.js` — a title and a `render(company)` returning HTML (use
   `statRow()` for anything list-shaped). It appears as a card in the
   full-screen ticker view with no other wiring.
+- New preset ranking window: add an entry to `RANK_WINDOW_PRESETS` in
+  `public/app.js` (key, label, `startDaysAgo`, `endDaysAgo`) and it appears
+  as a pill above the Ranks board.
 - New setting: add an entry to `SETTINGS` in `public/app.js`.
   `renderSettings()` dispatches on `type` (`'toggle'`, `'threshold'`,
   `'daterange'`); a new `type` needs one more branch there. `SETTINGS` is
