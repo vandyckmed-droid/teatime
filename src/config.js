@@ -38,7 +38,7 @@ module.exports = {
   // changes with no other code to touch up to a few hundred companies; past
   // that, the fetch-everything-on-load architecture itself needs to change
   // (see CLAUDE.md's Extensibility patterns section).
-  universeSize: 300,
+  universeSize: 400,
   screenerCandidatePool: 750,
   // NOTE when resizing: screenerMinMarketCap below is the real ceiling on how
   // big the universe can get, and it binds long before screenerCandidatePool
@@ -49,7 +49,10 @@ module.exports = {
   // universeSize: 250 at 234. Check the headroom before bumping.
   //
   // Measured on the move to 300 (2026-07-31): $30B returns 339 candidates,
-  // $22B returns 441, $15B returns 559.
+  // $22B returns 441, $15B returns 559. Re-measured on the move to 400
+  // (2026-08-01): $22B had drifted to 437 — not enough — so the floor dropped
+  // to $15B, which returned 560 (~545 after the junk filter): comfortable
+  // headroom for 400, and the next resize should re-measure again.
   // Caps how many FMP requests this server has in flight at once (leaderboard
   // per-company calls, and batch history fetches). Keeps growth in
   // universeSize from turning into a burst of N simultaneous outbound
@@ -66,11 +69,11 @@ module.exports = {
   // safety net — this just stops provoking it.
   fmpConcurrency: 6,
 
-  // $22B leaves ~440 candidates before dedupe — real headroom above
-  // universeSize: 300, with room for market caps to drift down without the
-  // board silently coming up short. ($30B would have supplied only 339, a
-  // margin thin enough that a broad selloff could eat it.)
-  screenerMinMarketCap: 22e9,
+  // $15B leaves ~560 candidates before dedupe — real headroom above
+  // universeSize: 400, with room for market caps to drift down without the
+  // board silently coming up short. ($22B supplied only 437 when 400 was set,
+  // a margin a moderate selloff could eat.)
+  screenerMinMarketCap: 15e9,
   country: 'US',
   exchanges: 'NYSE,NASDAQ',
   metrics: METRICS,

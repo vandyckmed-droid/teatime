@@ -17,15 +17,22 @@ function dollarVolume(row) {
 // row, so neither costs a request:
 //
 //  - What it trades. A real company of this size turns over millions of
-//    dollars a day; these lines do tens of thousands. The gap in the live
-//    pool is an order of magnitude wide (nothing between $0.5M and $2.6M),
-//    so the floor isn't finely tuned and doesn't need re-tuning as the
-//    universe grows. It also drops a couple of genuine-but-untradeable
-//    listings (Formula One's class A, whose class K line trades normally),
-//    which is the right answer for a board about what you could actually buy.
+//    dollars a day; these lines do far less. This floor DID need re-tuning
+//    when the universe grew, despite what an earlier note here claimed — the
+//    $15B cap floor set for universeSize: 400 surfaced note lines trading
+//    $1-2.3M a day (PPL's and Southern's notes, Reinsurance Group's
+//    debenture) that sailed over the old $1M floor with no name tell. Two
+//    would have reached the board: dedupe can't catch Southern's "Series 2"
+//    line (its name string differs from the parent's) or RGA's debenture
+//    (the real RGA sits below the cap floor, so its junk line stood alone in
+//    the pool). Measured 2026-08-01: junk tops out at $2.3M/day ($6.6M for
+//    one line dedupe catches anyway), and the thinnest real company
+//    (Cheniere Partners) trades $8.9M — so $4M sits in the gap with ~2x
+//    margin each way. Re-measure whenever the cap floor moves; this is the
+//    filter that drifts with it.
 //  - What it's called. Some preferred lines do trade actively, so for those
 //    the name is the only tell.
-const MIN_DOLLAR_VOLUME = 1e6;
+const MIN_DOLLAR_VOLUME = 4e6;
 const NON_COMMON_NAME = /\b(notes?|debentures?|preferred|subordinated|depositary|perpetual|pfd|jrsub)\b|\d\s*%/i;
 
 function isOperatingCompany(row) {
@@ -125,7 +132,9 @@ async function getLeaderboard() {
       sector: c.sector,
       // FMP's finer classification under sector ("Biotechnology", "Drug
       // Manufacturers - General", ...). Already on the screener row, so it
-      // costs nothing; consumed by the biotech dimmer in public/app.js.
+      // costs nothing. A biotech dimmer consumed it briefly (built and rolled
+      // back at the owner's request); it stays because the daily archive files
+      // it, same footing as annVolPct.
       industry: c.industry || null,
       price: c.price,
       marketCap: c.marketCap,

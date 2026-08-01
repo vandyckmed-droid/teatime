@@ -93,7 +93,7 @@ experience: full screen, no Safari chrome, tinted status bar.
 5. Copy the assembled file to `docs/index.html` and commit it straight to
    `main` (that's the whole deploy — no build step, no Actions workflow).
 
-One cost worth knowing about: each redeploy commits a new ~4MB HTML file (the
+One cost worth knowing about: each redeploy commits a new ~7MB HTML file (the
 embedded data is what makes it self-contained), so `docs/index.html`'s history
 adds up in repo size over many iterations. Not a problem at this scale; flag
 it if it ever becomes one.
@@ -299,26 +299,18 @@ Concretely:
   brighter than its neighbours with nothing explaining why is just a rendering
   bug as far as the reader can tell. The mega-cap cutoff is an absolute $200B
   rather than "top 50" so it doesn't silently change meaning every time
-  `universeSize` moves; it happened to catch 53 of 300 when set. Flags now
-  have two effects: `'orb'` (the default — a glow behind the logo) and
-  `'dim'`, which reuses the diversification filter's exact treatment — row
-  faded to 0.4, add control disabled with the reason on its label, skipped by
-  "add next ranked" — driven by a flag `test` instead of a correlation. Dim
-  flags keep their own `.dimmed` class beside `.correlated` so a test can tell
-  the mechanisms apart, never touch `data-flags` (orbs only), and never apply
-  to a held name — a dim blocks *adding*, it doesn't judge what you hold, and
-  the callout counts only rows actually dimmed. First dim flag: biotechnology,
-  by FMP's `industry` tag ("Biotechnology", which reads narrowly — Amgen and
-  Gilead are "Drug Manufacturers - General"), carried on the leaderboard
-  payload from the screener row at zero API cost and retained through the
-  slow-facts cadence like sector. A high-volatility orb (60%+ trailing-1Y
-  annualized) lived here briefly and was replaced by the dimmer at the owner's
-  request; its input `annVolPct` (computed in `src/dataStore.js` at refresh,
-  `trailingAnnualizedVolPct` in `src/ranking.js`) stays on the payload because
-  the daily archive files it — and it remains the worked example of the
-  pattern any history-needing flag requires: a flag `test` runs client-side
-  against the company object and the static snapshot can fetch nothing, so
-  inputs must be server-computed and payload-carried.
+  `universeSize` moves; it happened to catch 53 of 300 when set. Two second
+  flags have been built here and rolled back at the owner's request — a
+  high-volatility orb (60%+ trailing-1Y annualized, violet) and a biotech
+  dimmer (an `effect: 'dim'` variant that reused the diversification filter's
+  faded-and-unaddable treatment) — so the registry is orb-only again, with
+  one entry; both shapes are in the history if wanted back. Two leftovers
+  from those experiments are kept deliberately: `annVolPct` and `industry`
+  ride the leaderboard payload because the daily archive files them (an
+  archive stores inputs), and they remain the worked example of the pattern
+  any data-needing flag requires — a flag `test` runs client-side against
+  the company object and the static snapshot can fetch nothing, so inputs
+  must be server-computed and payload-carried.
 - `src/correlation.js` answers one question — `correlationsAgainst`, the
   universe against the held set, which is what fades a board row. Signed,
   never `|r|`: a strong negative is diversification, and taking the absolute
@@ -372,20 +364,28 @@ Concretely:
   the screener only had 234 US names to give, so `universeSize: 250` silently
   delivered 234. It bounds the candidate pool only (the top N by market cap
   is still taken from whatever comes back), so lowering it doesn't make the
-  board less selective. Check the headroom before bumping — at $22B (the
-  floor set for `universeSize: 300`) the screener returns ~440 names, ~425
-  after the junk-listing filter below.
+  board less selective. Check the headroom before bumping — at $15B (the
+  floor set for `universeSize: 400` on 2026-08-01) the screener returns ~560
+  names, ~530 after the junk-listing filter and dedupe below; $22B had
+  drifted to 437 by then, which is why the floor moved.
 - That filter is the other thing to know when growing the universe. FMP's
   screener returns bond and preferred lines alongside operating companies,
   and they carry their *parent's* market cap, so they sort in as a second
   copy of a company already on the board (AT&T's "5.35% GLB NTS 66" was
   sitting at rank 76). `src/leaderboard.js` drops them on two signals from
   the screener row itself — debt/preferred wording in the name, and under
-  $1M a day of trading — and picks between a company's remaining lines by
+  $4M a day of trading — and picks between a company's remaining lines by
   what trades rather than by market cap, since duplicate lines report
   near-identical caps. Growing the universe surfaces more of these, not
   fewer: re-check the drop list rather than assuming the two rules still
-  cover it.
+  cover it. The move to 400 proved the point twice over: the volume floor
+  (then $1M) had to rise to $4M, because the lower cap floor admitted note
+  lines trading $1-2.3M a day with no name tell — two of which dedupe could
+  not catch (Southern's "Series 2" line has a different name string than its
+  parent; RGA's debenture stood alone because the real RGA sat below the cap
+  floor). The gap measured 2026-08-01: junk tops out at $2.3M, the thinnest
+  real company (Cheniere Partners) trades $8.9M. Re-measure the volume floor
+  whenever the cap floor moves — it drifts with it.
 - The owner's own account balances live in `data/portfolio/balances.csv`,
   maintained by hand from brokerage screenshots and summarized by
   `src/portfolio.js` behind `GET /api/portfolio` (embedded as

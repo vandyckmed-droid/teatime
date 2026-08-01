@@ -25,8 +25,9 @@ Then open http://localhost:3000.
   screener also returns bond and preferred lines carrying their *parent's*
   market cap — AT&T's "5.35% GLB NTS 66" sorts in beside AT&T itself. Names
   that read as debt or preferred stock are dropped, as is anything trading
-  under $1M a day (a real company this size trades millions; these trade
-  tens of thousands). Remaining duplicate lines of one company — share
+  under $4M a day (a real company this size trades $9M+ a day; these lines
+  trade a fraction of that, and the floor gets re-measured whenever the
+  market-cap floor moves — see the comment on it in `src/leaderboard.js`). Remaining duplicate lines of one company — share
   classes like GOOGL/GOOG, BRK-A/BRK-B — collapse to whichever line actually
   trades, not the higher market cap: the lines report near-identical caps,
   so that tiebreak decided nothing and let a $10k-a-day listing stand in for
@@ -183,18 +184,15 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
 - New row flag: add an entry to `ROW_FLAGS` in `public/app.js` — a `key`, a
   short `label`, a `title` and `description` for its Settings row, a
   `test(company)`, optionally a `note(count)` for the board callout, and an
-  `effect`. Two effects exist. `'orb'` (the default) draws a coloured bloom
+  `effect` (only `'orb'` exists today). An orb flag draws a coloured bloom
   around the logo disc — one CSS rule setting `--flag-orb` on
   `.row[data-flags~="yourkey"]` plus a `.flag-sample-orb` rule for the
   Settings preview; a different kind of object from the saved-row ring on the
-  card's edge, so a row that is both wears both. `'dim'` reuses the
-  diversification filter's treatment — the row fades, its add control is
-  disabled with the reason on the label, and "add next ranked" skips it — with
-  no CSS beyond the shared `.dimmed` rule, and held names always exempt.
-  Either way the one entry yields the board mark, the Settings switch, the
-  live count and the callout line. Current entries: mega caps at $200B and up
-  (amber orb), and biotechnology dimmed via FMP's `industry` tag, which the
-  leaderboard payload carries from the screener row at zero API cost.
+  card's edge, so a row that is both wears both. The one entry yields the
+  board mark, the Settings switch, the live count and the callout line.
+  Current entry: mega caps at $200B and up (amber orb). A high-volatility orb
+  and a biotech dimmer were each built here and rolled back at the owner's
+  request; their shapes are in the history.
 - New per-company data panel: add an entry to `DETAIL_BLOCKS` in
   `public/app.js` — a title and a `render(company)` returning HTML (use
   `statRow()` for anything list-shaped). It appears as a card in the

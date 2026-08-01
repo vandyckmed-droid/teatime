@@ -26,7 +26,7 @@ const SETTINGS = [
     key: 'flags',
     type: 'flags',
     label: 'Flags',
-    description: 'Marks and filters on the board that call out — or fade out — a company for something other than its return.',
+    description: 'Marks on the board that call out a company for something other than its return.',
     default: {},
   },
   {
@@ -203,22 +203,6 @@ const ROW_FLAGS = [
     note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a gold orb &mdash; `
       + `mega caps, worth <b>$200B</b> or more.`,
   },
-  {
-    // effect: 'dim' — not an orb. The row fades and its add control is
-    // disabled, exactly the diversification filter's treatment, driven by a
-    // fact instead of a correlation. A name already on the watchlist is never
-    // dimmed: a dim blocks *adding*, it doesn't judge what you hold.
-    key: 'biotech',
-    effect: 'dim',
-    label: 'biotechnology',
-    title: 'Dim biotechnology',
-    description: 'Fade out (and block adding) any company classified as biotechnology — '
-      + 'the data provider\'s own industry tag, which reads it narrowly: drug '
-      + 'manufacturers like Amgen and Gilead don\'t count. Saved names are never dimmed.',
-    test: (c) => c.industry === 'Biotechnology',
-    note: (n) => `<b>${n}</b> biotechnology ${n === 1 ? 'name is' : 'names are'} dimmed and `
-      + `can't be added &mdash; switch this off in Settings (Flags).`,
-  },
 ];
 
 // Absent from the stored overrides means "on": a flag added to the registry
@@ -238,15 +222,6 @@ function rowFlags(c) {
       return false; // a broken flag drops itself rather than taking the board down
     }
   });
-}
-
-// The dim-effect flags, resolved for one company: the first active one that
-// matches, or null. Mirrors correlationBlock — held names are exempt for the
-// same reason there, and callers treat the two identically (fade the row,
-// disable its add control, skip it in "add next ranked").
-function dimBlock(c) {
-  if (state.watchlist.has(c.symbol)) return null;
-  return rowFlags(c).find((f) => f.effect === 'dim') || null;
 }
 
 // How many companies a flag would mark, ignoring whether it is switched on —
@@ -967,16 +942,12 @@ const CHECK_PATH = 'M5 12.6l4.7 4.6L19 7.8';
 function addButton(c) {
   const checked = state.watchlist.has(c.symbol);
   const justChecked = checked && c.symbol === lastToggledSymbol;
-  const corr = correlationBlock(c);
-  const dim = dimBlock(c);
-  const blocked = corr || dim;
+  const blocked = correlationBlock(c);
   // The reason rides on the label rather than the row: at 393pt there is no
   // room for a per-row note, and the count is explained in the callout instead.
-  const label = dim
-    ? `Dimmed as ${dim.label}: ${c.name} — switch this off in Settings to add it`
-    : corr
-      ? `Too correlated to add: ${c.name} moves with ${corr.against} (r ${corr.value.toFixed(2)})`
-      : `${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}`;
+  const label = blocked
+    ? `Too correlated to add: ${c.name} moves with ${blocked.against} (r ${blocked.value.toFixed(2)})`
+    : `${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}`;
   return `
     <span class="select-cell">
       <button type="button" class="add-btn${checked ? ' checked' : ''}${justChecked ? ' just-checked' : ''}"
@@ -996,21 +967,15 @@ function addButton(c) {
 function baseRow(c, extraClass) {
   const row = document.createElement('div');
   const blocked = correlationBlock(c) ? ' correlated' : '';
-  // Dim-effect flags reuse the correlation filter's visual treatment (see
-  // .row.dimmed in styles.css) but keep their own class, so a test can tell
-  // which mechanism faded a row.
-  const dim = dimBlock(c) ? ' dimmed' : '';
-  row.className = `row${extraClass}${blocked}${dim}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
+  row.className = `row${extraClass}${blocked}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
-  // Orb flags are a visual signal, so they also go in the accessible name —
-  // a glow nobody can hear is a glow half the point of. Dim flags stay off
-  // the row's name; their reason rides the add control, as the correlation
-  // filter's does.
-  const orbFlags = rowFlags(c).filter((f) => f.effect !== 'dim');
-  if (orbFlags.length) row.dataset.flags = orbFlags.map((f) => f.key).join(' ');
-  const suffix = orbFlags.length ? ` (${orbFlags.map((f) => f.label).join(', ')})` : '';
+  // The flags are a visual signal, so they also go in the accessible name —
+  // a glow nobody can hear is a glow half the point of.
+  const flags = rowFlags(c);
+  if (flags.length) row.dataset.flags = flags.map((f) => f.key).join(' ');
+  const suffix = flags.length ? ` (${flags.map((f) => f.label).join(', ')})` : '';
   row.setAttribute('aria-label', `${c.name}${suffix}: view chart`);
   return row;
 }
@@ -1144,10 +1109,7 @@ function renderRanksCallout(unavailable) {
   // just a mysteriously brighter row.
   for (const flag of ROW_FLAGS) {
     if (!flag.note) continue;
-    // For a dim flag the honest count is rows actually dimmed — a held name
-    // matches the test but is exempt, and the callout describes the board.
-    const n = state.leaderboard.companies.filter((c) => rowFlags(c).includes(flag)
-      && (flag.effect !== 'dim' || !state.watchlist.has(c.symbol))).length;
+    const n = state.leaderboard.companies.filter((c) => rowFlags(c).includes(flag)).length;
     if (n > 0) notes.push(flag.note(n));
   }
 
@@ -1312,7 +1274,6 @@ function nextRankedCandidate() {
   for (const { c } of scored) {
     if (state.watchlist.has(c.symbol)) continue;
     if (correlationBlock(c)) continue;
-    if (dimBlock(c)) continue;
     return c;
   }
   return null;
@@ -2780,10 +2741,9 @@ function renderFlagSettings() {
     const note = document.createElement('p');
     note.id = 'flags-note';
     note.className = 'settings-note';
-    note.innerHTML = 'A flag marks a company for something other than its return &mdash; an orb '
-      + 'behind its logo, or a dim that blocks adding it &mdash; and never affects the ranking. '
-      + 'More land here as they are built: each is a config entry in <code>public/app.js</code> '
-      + '(<code>ROW_FLAGS</code>) plus one CSS rule for its look.';
+    note.innerHTML = 'A flag marks a company for something other than its return, and never '
+      + 'affects the ranking. More land here as they are built &mdash; each is a config entry '
+      + 'in <code>public/app.js</code> (<code>ROW_FLAGS</code>) plus one CSS rule for its colour.';
     container.insertAdjacentElement('afterend', note);
   }
 }
