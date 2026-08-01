@@ -115,3 +115,21 @@ what would make a true year-to-date figure possible.
   these daily moves with SPY's move on the same date. Only sessions present in
   both count, and the four gap-spanning steps above are excluded there too, so
   a filled-in gap doesn't just add a row — it adds a pair to the beta window.
+
+## Holdings (`holdings.csv`)
+
+Optional companion to the balances: what the account actually holds, in
+dollars, so the app can compare real positions against its suggested plan.
+Append-only by date, like the balances — each batch of rows shares a date,
+and the latest date is treated as the current picture:
+
+```csv
+date,symbol,dollars
+2026-08-02,NVDA,4200.00
+2026-08-02,SNDK,3100.50
+```
+
+Maintained the same way as the balances: the owner sends the brokerage's
+positions screen, rows get transcribed, nothing is ever rewritten. Until a
+first batch lands the file is just this header, and the app's "held vs plan"
+card explains itself instead of showing a comparison.

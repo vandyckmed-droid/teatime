@@ -88,6 +88,9 @@
              empty rather than broken when there's nothing recorded. -->
         <div class="subview" data-subview="portfolio">
           <div class="portfolio-card" id="portfolio-card" hidden></div>
+          <!-- Log-regression channel over the balance, built by
+               renderProjectionCard() in app.js. -->
+          <div class="portfolio-card" id="projection-card" hidden></div>
         </div>
 
         <div class="subview" data-subview="watchlist" hidden>
@@ -117,6 +120,12 @@
             <button type="button" class="action-btn" id="add-next">Add next ranked</button>
             <button type="button" class="danger-btn" id="clear-watchlist">Clear watchlist</button>
           </div>
+
+          <!-- Insights over the saved set, built by renderWatchlistInsights()
+               in app.js: sector mix, HRP-weighted plan, held vs plan. -->
+          <div class="portfolio-card" id="watchlist-sectors" hidden></div>
+          <div class="portfolio-card" id="watchlist-plan" hidden></div>
+          <div class="portfolio-card" id="watchlist-held" hidden></div>
         </div>
       </div>
     </section>

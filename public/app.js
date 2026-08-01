@@ -814,7 +814,7 @@ function setInvestingView(view, { persist = true } = {}) {
   positionSegmentedThumb('investing');
   // The chart measures its wrapper in pixels, which reads 0 while the view is
   // hidden — so it has to be drawn after the view is shown, not before.
-  if (chosen.key === 'portfolio') renderPortfolioChart();
+  if (chosen.key === 'portfolio') { renderPortfolioChart(); renderProjectionCard(); }
 }
 
 function initInvestingViews() {
@@ -1242,6 +1242,7 @@ function renderPortfolioCard() {
     ${rows.join('')}
     <p class="portfolio-note">Computed from ${p.sessions} recorded daily balances through ${fmtLongDate(p.end)}, not from the broker's own figure.${skipped}</p>`;
   card.hidden = false;
+  renderProjectionCard();
 
   card.querySelectorAll('[data-portfolio-window]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1252,6 +1253,474 @@ function renderPortfolioCard() {
   });
   // After the card is in the DOM: the chart measures its wrapper in pixels.
   renderPortfolioChart();
+}
+
+// ── projection: a log-regression channel over the balance ────────────
+// The most standard "where is this heading" chart in portfolio analysis: fit
+// a straight line to the *logarithm* of the balance (constant compounding is
+// a straight line in log space), draw the band the series actually wobbles in
+// around that line, and extend both three months forward. It is arithmetic on
+// the recorded balances — "if the trend and the wobble stay what they were" —
+// not a forecast of anything else, and the card says so.
+const PROJECTION_FORWARD_SESSIONS = 63; // ~3 months of trading days
+
+function fitLogChannel(series) {
+  if (!series || series.length < 40) return null; // under ~2 months the "trend" is noise
+  const n = series.length;
+  const ys = series.map(([, b]) => Math.log(b));
+  const xm = (n - 1) / 2;
+  const ym = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  for (let i = 0; i < n; i++) { sxy += (i - xm) * (ys[i] - ym); sxx += (i - xm) ** 2; }
+  const slope = sxy / sxx;
+  const intercept = ym - slope * xm;
+  const residuals = ys.map((y, i) => y - (intercept + slope * i));
+  const sigma = Math.sqrt(residuals.reduce((a, r) => a + r * r, 0) / (n - 2));
+  return { slope, intercept, sigma, n };
+}
+
+// The next k trading-day dates after dateStr — weekends skipped, holidays
+// ignored on purpose (they'd shift a chart label by a day, nothing more).
+function futureSessions(dateStr, k) {
+  const out = [];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  while (out.length < k) {
+    dt.setUTCDate(dt.getUTCDate() + 1);
+    const day = dt.getUTCDay();
+    if (day === 0 || day === 6) continue;
+    out.push(dt.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+// Its own renderer, deliberately not a call of drawLineChart: this is a
+// channel chart (shaded band + solid history + dashed projection + a today
+// divider), not a line chart, and bolting four overlay options onto the one
+// shared renderer would cost every other chart clarity to save this one a
+// function. Geometry conventions match drawLineChart's.
+function drawProjectionChart(wrap, series, fit) {
+  const w = wrap.clientWidth || 345;
+  const h = wrap.clientHeight || 150;
+  const total = fit.n + PROJECTION_FORWARD_SESSIONS;
+  const line = (i, k) => fit.intercept + fit.slope * i + k * fit.sigma;
+
+  let min = Infinity;
+  let max = -Infinity;
+  for (const [, b] of series) { min = Math.min(min, Math.log(b)); max = Math.max(max, Math.log(b)); }
+  for (const i of [0, fit.n - 1, total - 1]) {
+    min = Math.min(min, line(i, -2));
+    max = Math.max(max, line(i, 2));
+  }
+  const pad = (max - min) * 0.05 || 0.01;
+  min -= pad; max += pad;
+
+  const X = (i) => (i / (total - 1)) * w;
+  const Y = (v) => h - ((v - min) / (max - min)) * h;
+  const channel = (k) => `${X(0)},${Y(line(0, k))} ${X(total - 1)},${Y(line(total - 1, k))}`;
+
+  const history = series.map(([, b], i) => `${X(i).toFixed(1)},${Y(Math.log(b)).toFixed(1)}`).join(' ');
+  const todayX = X(fit.n - 1).toFixed(1);
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">
+      <polygon class="proj-band outer" points="${channel(2)} ${channel(-2).split(' ').reverse().join(' ')}"></polygon>
+      <polygon class="proj-band inner" points="${channel(1)} ${channel(-1).split(' ').reverse().join(' ')}"></polygon>
+      <line class="proj-mid" x1="${X(0)}" y1="${Y(line(0, 0))}" x2="${X(total - 1)}" y2="${Y(line(total - 1, 0))}"></line>
+      <line class="proj-today" x1="${todayX}" y1="0" x2="${todayX}" y2="${h}"></line>
+      <polyline class="proj-history" points="${history}"></polyline>
+    </svg>`;
+}
+
+function renderProjectionCard() {
+  const card = document.getElementById('projection-card');
+  if (!card) return;
+  const p = portfolioSummary;
+  const fit = p && Array.isArray(p.series) ? fitLogChannel(p.series) : null;
+  if (!fit) {
+    card.hidden = true;
+    return;
+  }
+
+  const trendAnnualPct = (Math.exp(fit.slope * TRADING_DAYS_PER_YEAR) - 1) * 100;
+  const endI = fit.n - 1 + PROJECTION_FORWARD_SESSIONS;
+  const mid = Math.exp(fit.intercept + fit.slope * endI);
+  const lo = Math.exp(fit.intercept + fit.slope * endI - fit.sigma);
+  const hi = Math.exp(fit.intercept + fit.slope * endI + fit.sigma);
+  const endDate = futureSessions(p.end, PROJECTION_FORWARD_SESSIONS)[PROJECTION_FORWARD_SESSIONS - 1];
+
+  card.innerHTML = `
+    <div class="portfolio-label">Projection</div>
+    <div class="proj-chart" id="projection-wrap"></div>
+    <div class="proj-axis">
+      <span>${fmtLongDate(p.start)}</span>
+      <span>today</span>
+      <span>${fmtLongDate(endDate)}</span>
+    </div>
+    ${statRow('Trend', `${trendAnnualPct >= 0 ? '+' : ''}${trendAnnualPct.toFixed(1)}%/yr`, signClass(trendAnnualPct))}
+    ${statRow(`On trend by ${fmtLongDate(endDate)}`, fmtMoney(mid))}
+    ${statRow('Usual wobble around it', `${fmtMoney(lo)} – ${fmtMoney(hi)}`)}
+    <p class="portfolio-note">A straight line fitted to your balance's compounding path, with the band it
+    has actually wandered in (darker: typical, lighter: rare), extended three months. Pure arithmetic on the
+    recorded balances — it assumes the trend and the wobble stay what they were, which no market promises.</p>`;
+  card.hidden = false;
+  drawProjectionChart(document.getElementById('projection-wrap'), p.series, fit);
+}
+
+// ── watchlist insights: sectors, a weighted plan, held vs plan ───────
+// All three cards compute client-side from history the app already has
+// (historyCache via loadAllHistories), which is what lets the static snapshot
+// show them with no backend — the same reason the ranking fallback exists.
+
+// Aligned daily returns for the held names: inner join on date over the
+// trailing ~1Y, so every column of the covariance matrix describes the same
+// sessions. Names without enough shared history are dropped and named.
+const PLAN_WINDOW_SESSIONS = 250;
+const PLAN_MIN_SESSIONS = 60;
+
+function alignedReturnsFor(symbols) {
+  const maps = symbols.map((s) => {
+    const ser = (historyCache.get(s) || {}).series || [];
+    return new Map(ser.slice(-(PLAN_WINDOW_SESSIONS + 1)).map((pt) => [pt.date, pt.close]));
+  });
+  const usable = [];
+  const dropped = [];
+  symbols.forEach((sym, i) => {
+    if (maps[i].size >= PLAN_MIN_SESSIONS + 1) usable.push({ sym, map: maps[i] });
+    else dropped.push(sym);
+  });
+  if (usable.length === 0) return { symbols: [], returns: [], dropped };
+  let dates = [...usable[0].map.keys()];
+  for (const u of usable) dates = dates.filter((d) => u.map.has(d));
+  dates.sort();
+  const returns = usable.map(() => []);
+  for (let i = 1; i < dates.length; i++) {
+    usable.forEach((u, k) => {
+      returns[k].push(u.map.get(dates[i]) / u.map.get(dates[i - 1]) - 1);
+    });
+  }
+  if (dates.length - 1 < PLAN_MIN_SESSIONS) {
+    return { symbols: [], returns: [], dropped: symbols.slice() };
+  }
+  return { symbols: usable.map((u) => u.sym), returns, dropped };
+}
+
+function covarianceMatrix(returns) {
+  const n = returns.length;
+  const m = returns[0].length;
+  const means = returns.map((r) => r.reduce((a, b) => a + b, 0) / m);
+  const cov = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = i; j < n; j++) {
+      let sum = 0;
+      for (let k = 0; k < m; k++) sum += (returns[i][k] - means[i]) * (returns[j][k] - means[j]);
+      cov[i][j] = sum / (m - 1);
+      cov[j][i] = cov[i][j];
+    }
+  }
+  return cov;
+}
+
+// Hierarchical risk parity (López de Prado), with average linkage — more
+// stable orderings than the original single linkage, which chains: one
+// borderline pair can drag two unrelated clusters together.
+//
+// Three steps: cluster the names by how they move together, order them so
+// neighbours are similar (the merge order gives this), then split the list in
+// half repeatedly, giving each half budget in inverse proportion to its risk.
+// No expected returns anywhere — it only asks "what moves with what, and how
+// much", which is why it's the standard answer for weighting a list of picks
+// you already believe in.
+function hrpWeights(cov) {
+  const n = cov.length;
+  if (n === 1) return [1];
+  const corr = cov.map((row, i) => row.map((v, j) => v / Math.sqrt(cov[i][i] * cov[j][j])));
+  const dist = corr.map((row) => row.map((r) => Math.sqrt(Math.max(0, (1 - r) / 2))));
+
+  // Average-linkage agglomeration; each cluster keeps its items in merge
+  // order, and the final cluster's order is the quasi-diagonal seriation.
+  let clusters = Array.from({ length: n }, (_, i) => [i]);
+  const linkage = (a, b) => {
+    let sum = 0;
+    for (const i of a) for (const j of b) sum += dist[i][j];
+    return sum / (a.length * b.length);
+  };
+  while (clusters.length > 1) {
+    let bi = 0;
+    let bj = 1;
+    let best = Infinity;
+    for (let i = 0; i < clusters.length; i++) {
+      for (let j = i + 1; j < clusters.length; j++) {
+        const d = linkage(clusters[i], clusters[j]);
+        if (d < best) { best = d; bi = i; bj = j; }
+      }
+    }
+    const merged = clusters[bi].concat(clusters[bj]);
+    clusters = clusters.filter((_, k) => k !== bi && k !== bj);
+    clusters.push(merged);
+  }
+  const order = clusters[0];
+
+  // Recursive bisection over the ordered list. Within a cluster, risk is the
+  // variance of its inverse-variance-weighted mix — the cheapest defensible
+  // stand-in for "how risky is this half as a unit".
+  const clusterVar = (idxs) => {
+    const ivp = idxs.map((i) => 1 / cov[i][i]);
+    const tot = ivp.reduce((a, b) => a + b, 0);
+    const w = ivp.map((v) => v / tot);
+    let v = 0;
+    for (let a = 0; a < idxs.length; a++) {
+      for (let b = 0; b < idxs.length; b++) v += w[a] * w[b] * cov[idxs[a]][idxs[b]];
+    }
+    return v;
+  };
+  const weights = new Array(n).fill(1);
+  const stack = [order];
+  while (stack.length) {
+    const idxs = stack.pop();
+    if (idxs.length < 2) continue;
+    const half = Math.floor(idxs.length / 2);
+    const left = idxs.slice(0, half);
+    const right = idxs.slice(half);
+    const vl = clusterVar(left);
+    const vr = clusterVar(right);
+    const alpha = 1 - vl / (vl + vr);
+    for (const i of left) weights[i] *= alpha;
+    for (const i of right) weights[i] *= 1 - alpha;
+    stack.push(left, right);
+  }
+  const total = weights.reduce((a, b) => a + b, 0);
+  return weights.map((w) => w / total);
+}
+
+function portfolioVolAnnualPct(weights, cov) {
+  let v = 0;
+  for (let i = 0; i < weights.length; i++) {
+    for (let j = 0; j < weights.length; j++) v += weights[i] * weights[j] * cov[i][j];
+  }
+  return Math.sqrt(v * TRADING_DAYS_PER_YEAR) * 100;
+}
+
+const PLAN_TARGET_VOL_PCT = 15; // the owner's stated target, same as the portfolio card's
+
+// %/$ is a per-visit choice, like the chart windows — not worth persisting.
+let planShowDollars = false;
+// The computed plan, kept so the toggle can re-render without recomputing,
+// and keyed by the held set so a watchlist edit recomputes.
+let planCache = null;
+
+function sectorCounts(companies) {
+  const counts = new Map();
+  for (const c of companies) {
+    const key = c.sector || 'Other';
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function renderSectorCard(companies) {
+  const el = document.getElementById('watchlist-sectors');
+  if (!el) return;
+  if (companies.length === 0) { el.hidden = true; return; }
+  const counts = sectorCounts(companies);
+  const max = counts[0][1];
+  const bars = counts.map(([sector, n]) => {
+    const v = SECTOR_VAR[sector] || '--sector-default';
+    return `
+      <div class="sector-bar-row">
+        <span class="sector-bar-label"><span class="dot" style="background: var(${v})"></span>${sector}</span>
+        <span class="sector-bar-track"><span class="sector-bar-fill" style="width: ${(n / max) * 100}%; background: var(${v})"></span></span>
+        <span class="sector-bar-count">${n}</span>
+      </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="portfolio-label">Sectors</div>
+    ${bars}
+    <p class="portfolio-note">${counts.length} sector${counts.length === 1 ? '' : 's'} across ${companies.length} saved name${companies.length === 1 ? '' : 's'}.</p>`;
+  el.hidden = false;
+}
+
+async function computePlan(companies) {
+  const held = companies.map((c) => c.symbol);
+  await loadAllHistories(held);
+  const { symbols, returns, dropped } = alignedReturnsFor(held);
+  if (symbols.length === 0) return { key: held.join(','), symbols: [], dropped };
+  if (symbols.length === 1) {
+    return { key: held.join(','), symbols, weights: [1], volPct: null, scale: null, dropped };
+  }
+  const cov = covarianceMatrix(returns);
+  const weights = hrpWeights(cov);
+  const volPct = portfolioVolAnnualPct(weights, cov);
+  const scale = volPct > 0 ? PLAN_TARGET_VOL_PCT / volPct : null;
+  return { key: held.join(','), symbols, weights, volPct, scale, dropped };
+}
+
+function renderPlanCard(plan) {
+  const el = document.getElementById('watchlist-plan');
+  if (!el) return;
+  if (!plan || plan.symbols.length === 0) {
+    if (plan && plan.dropped && plan.dropped.length) {
+      el.innerHTML = `<div class="portfolio-label">Suggested weights</div>
+        <p class="portfolio-note">Not enough shared price history yet to weight these names.</p>`;
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+    }
+    return;
+  }
+
+  const balance = portfolioSummary ? portfolioSummary.endBalance : null;
+  const canDollars = balance !== null && plan.scale !== null;
+  if (!canDollars) planShowDollars = false;
+
+  const ranked = plan.symbols
+    .map((sym, i) => ({ sym, w: plan.weights[i] }))
+    .sort((a, b) => b.w - a.w);
+  const maxW = ranked[0].w;
+
+  const rows = ranked.map(({ sym, w }) => {
+    const value = planShowDollars
+      ? fmtMoney(balance * plan.scale * w)
+      : `${(w * 100).toFixed(1)}%`;
+    return `
+      <div class="sector-bar-row">
+        <span class="sector-bar-label plan-sym">${sym}</span>
+        <span class="sector-bar-track"><span class="sector-bar-fill plan-fill" style="width: ${(w / maxW) * 100}%"></span></span>
+        <span class="sector-bar-count plan-amt">${value}</span>
+      </div>`;
+  }).join('');
+
+  const toggle = canDollars ? `
+    <div class="plan-toggle" role="group" aria-label="Show weights as">
+      <button type="button" class="window-pill" data-plan-mode="pct" aria-pressed="${!planShowDollars}">%</button>
+      <button type="button" class="window-pill" data-plan-mode="usd" aria-pressed="${planShowDollars}">$</button>
+    </div>` : '';
+
+  const volLine = plan.volPct === null ? '' : statRow('This mix, left alone', `${plan.volPct.toFixed(1)}% volatility`);
+  const scaleLine = plan.scale === null ? '' : statRow(`Scaled to ${PLAN_TARGET_VOL_PCT}%`, `${plan.scale.toFixed(2)}× exposure`);
+  const dollarsLine = planShowDollars
+    ? statRow('Dollars total', fmtMoney(balance * plan.scale), 'muted')
+    : '';
+  const droppedNote = plan.dropped.length
+    ? ` ${plan.dropped.join(', ')} ${plan.dropped.length === 1 ? 'is' : 'are'} left out — not enough shared history yet.`
+    : '';
+
+  el.innerHTML = `
+    <div class="portfolio-label">Suggested weights</div>
+    ${toggle}
+    ${rows}
+    ${volLine}
+    ${scaleLine}
+    ${dollarsLine}
+    <p class="portfolio-note">Sized by hierarchical risk parity: names are grouped by how they move
+    together, and each group gets budget in inverse proportion to its risk — so one crowded trade can't
+    dominate. ${planShowDollars ? `Dollar figures are your last recorded balance times the ${PLAN_TARGET_VOL_PCT}% target scaling, so they can add to more than the balance — that is the leverage the target implies.` : ''}${droppedNote}
+    Arithmetic on the last year of daily moves, not advice.</p>`;
+  el.hidden = false;
+
+  el.querySelectorAll('[data-plan-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const wantDollars = btn.dataset.planMode === 'usd';
+      if (wantDollars === planShowDollars) return;
+      planShowDollars = wantDollars;
+      renderPlanCard(planCache);
+      renderHeldCard(planCache);
+    });
+  });
+}
+
+// Held vs plan: only as good as the holdings record (see
+// data/portfolio/holdings.csv) — until one exists, the card says how to start
+// rather than pretending. Weights compare against the HRP plan above; "on
+// target" is within 3 points, which is about the noise floor of eyeballing a
+// brokerage screen.
+const HELD_TOLERANCE_PP = 3;
+
+function renderHeldCard(plan) {
+  const el = document.getElementById('watchlist-held');
+  if (!el) return;
+  const holdings = portfolioSummary && portfolioSummary.holdings;
+  if (!holdings || !holdings.positions || holdings.positions.length === 0) {
+    if (!plan || plan.symbols.length === 0) { el.hidden = true; return; }
+    el.innerHTML = `
+      <div class="portfolio-label">Held vs plan</div>
+      <p class="portfolio-note">Nothing recorded yet. Send the brokerage's positions screen (each holding and
+      its dollar value) and this card will show where the account sits against the plan above — overweight,
+      underweight, missing, or extra.</p>`;
+    el.hidden = false;
+    return;
+  }
+
+  const total = holdings.positions.reduce((a, h) => a + h.dollars, 0);
+  if (!(total > 0) || !plan || plan.symbols.length === 0) { el.hidden = true; return; }
+  const planBySym = new Map(plan.symbols.map((sym, i) => [sym, plan.weights[i]]));
+  const heldBySym = new Map(holdings.positions.map((h) => [h.symbol, h.dollars / total]));
+
+  const rows = [];
+  for (const [sym, planW] of planBySym) {
+    const heldW = heldBySym.get(sym) ?? 0;
+    const diff = (heldW - planW) * 100;
+    let verdict;
+    let cls = '';
+    if (!heldBySym.has(sym)) { verdict = 'not held'; cls = 'muted'; }
+    else if (Math.abs(diff) <= HELD_TOLERANCE_PP) { verdict = 'on target'; }
+    else if (diff > 0) { verdict = `${diff.toFixed(0)}pt overweight`; cls = 'loss'; }
+    else { verdict = `${(-diff).toFixed(0)}pt underweight`; cls = 'loss'; }
+    rows.push(statRow(sym, `${(heldW * 100).toFixed(1)}% vs ${(planW * 100).toFixed(1)}% — ${verdict}`, cls));
+  }
+  for (const [sym, heldW] of heldBySym) {
+    if (!planBySym.has(sym)) {
+      rows.push(statRow(sym, `${(heldW * 100).toFixed(1)}% held — not on the watchlist`, 'muted'));
+    }
+  }
+
+  el.innerHTML = `
+    <div class="portfolio-label">Held vs plan</div>
+    ${rows.join('')}
+    <p class="portfolio-note">Holdings as recorded ${fmtLongDate(holdings.asOf)}, compared with the suggested
+    weights above. Within ${HELD_TOLERANCE_PP} points counts as on target.</p>`;
+  el.hidden = false;
+}
+
+// One request-sequence guard for the whole insights strip, same pattern as
+// refreshCorrelations — a stale async compute must never paint over a newer
+// watchlist.
+let planRequestSeq = 0;
+async function renderWatchlistInsights(companies) {
+  renderSectorCard(companies);
+  const planEl = document.getElementById('watchlist-plan');
+  const heldEl = document.getElementById('watchlist-held');
+  if (companies.length === 0) {
+    if (planEl) planEl.hidden = true;
+    if (heldEl) heldEl.hidden = true;
+    planCache = null;
+    return;
+  }
+  const key = companies.map((c) => c.symbol).join(',');
+  if (planCache && planCache.key === key) {
+    renderPlanCard(planCache);
+    renderHeldCard(planCache);
+    return;
+  }
+  if (planEl && planEl.hidden) {
+    planEl.innerHTML = '<div class="portfolio-label">Suggested weights</div><p class="portfolio-note">Working it out…</p>';
+    planEl.hidden = false;
+  }
+  const seq = ++planRequestSeq;
+  try {
+    const plan = await computePlan(companies);
+    if (seq !== planRequestSeq) return;
+    planCache = plan;
+    renderPlanCard(plan);
+    renderHeldCard(plan);
+  } catch {
+    if (seq !== planRequestSeq) return;
+    if (planEl) {
+      planEl.innerHTML = '<div class="portfolio-label">Suggested weights</div><p class="portfolio-note">Couldn\'t work these out just now.</p>';
+      planEl.hidden = false;
+    }
+  }
 }
 
 // ── add the next ranked name ─────────────────────────────────────────
@@ -1326,6 +1795,7 @@ function renderWatchlistBoard() {
   const rowsEl = document.getElementById('watchlist-rows');
   const companies = state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol));
 
+  renderWatchlistInsights(companies);
   if (companies.length === 0) {
     label.hidden = true;
     head.hidden = true;

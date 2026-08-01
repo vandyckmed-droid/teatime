@@ -118,8 +118,18 @@ Then open http://localhost:3000.
   segmented control — Portfolio, a card of the owner's own account (see
   `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M and rows
   for return, volatility, beta vs SPY, the 15% vol-target multiple and the
-  best/worst day, hidden entirely if no balances are recorded; and Watchlist,
-  the saved names. They
+  best/worst day, hidden entirely if no balances are recorded, plus a
+  Projection card — a log-regression channel over the balance (OLS on
+  ln(balance), ±1σ/±2σ bands, extended 63 sessions) with its own renderer,
+  deliberately not a `drawLineChart` call since a channel chart isn't a line
+  chart; and Watchlist,
+  the saved names with an insights strip beneath them: sector mix, suggested
+  weights (hierarchical risk parity, average linkage, over the trailing year
+  of daily returns, scaled to a 15% vol target, with a %/$ toggle priced off
+  the last recorded balance), and held-vs-plan (compares
+  `data/portfolio/holdings.csv` against those weights once holdings are
+  recorded). All of it computes client-side from history the app already has,
+  which is what lets the static snapshot show it with no backend. They
   were one scroll until the portfolio card grew tall enough to push the names
   off the bottom of the screen. Which view you were last on is remembered, and
   a stored view that no longer exists falls back to the first one.

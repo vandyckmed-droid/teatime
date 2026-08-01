@@ -340,7 +340,24 @@ Concretely:
   the correlation threshold moves.
 - `drawLineChart` in `public/app.js` draws every line chart in the app — the
   per-ticker price line and the portfolio balance line. A third chart should
-  be a fourth call, not a second renderer. Two things it has to keep doing:
+  be a fourth call, not a second renderer. One deliberate exception exists:
+  `drawProjectionChart`, the portfolio's log-regression channel, because a
+  channel (two shaded bands + dashed centre + today divider + history line)
+  isn't a line chart, and bolting four overlay options onto the shared
+  renderer would cost every other chart clarity to save one function.
+- The watchlist insights strip (sectors / HRP plan / held-vs-plan, rendered by
+  `renderWatchlistInsights`) computes everything client-side from
+  `historyCache` — covariance, average-linkage clustering, recursive
+  bisection — precisely so the static snapshot can show it with no backend.
+  Don't move that math server-side without keeping a client fallback, and
+  keep the guard pattern it uses: one request-sequence counter for the strip,
+  and a plan cache keyed by the held set, same shape as `refreshCorrelations`.
+  Vol targeting is 15% (`PLAN_TARGET_VOL_PCT`), matching the portfolio card;
+  the dollar mode prices weights off the last recorded balance times the
+  target scaling, and says plainly when that implies leverage.
+- `data/portfolio/holdings.csv` is the held-vs-plan card's input: append-only
+  by date like the balances, latest date wins, dollars per symbol. Until the
+  owner records a first batch it's a header and the card explains itself. Two things it has to keep doing:
   the element ids the detail chart carries (`#chart-line-path` and friends)
   are emitted for that chart only, since ids must be unique and both charts
   can be on screen at once, and every internal lookup is scoped to the

@@ -1051,6 +1051,52 @@ button { font: inherit; color: inherit; }
 }
 .portfolio-chart .chart-wrap { height: 156px; }
 .portfolio-chart .chart-axis-x { margin-top: 8px; }
+/* ── projection channel (see drawProjectionChart in app.js) ──────────
+   The band is the accent at whisper opacity — it's "your own trend", so it
+   borrows the identity green rather than introducing a new hue; the dashed
+   centre line and the today divider do the explaining. */
+.proj-chart { height: 150px; margin: var(--s2) 0 2px; }
+.proj-chart svg { display: block; }
+.proj-band.outer { fill: color-mix(in oklab, var(--accent) 7%, transparent); }
+.proj-band.inner { fill: color-mix(in oklab, var(--accent) 12%, transparent); }
+.proj-mid {
+  stroke: color-mix(in oklab, var(--accent) 55%, transparent);
+  stroke-width: 1.5; stroke-dasharray: 4 4; fill: none;
+}
+.proj-today { stroke: var(--hairline-strong); stroke-width: 1; }
+.proj-history { stroke: var(--accent); stroke-width: 2; fill: none; stroke-linejoin: round; }
+.proj-axis {
+  display: flex; justify-content: space-between;
+  font-size: var(--fs-nano); color: var(--text-3);
+  margin-bottom: var(--s2);
+}
+
+/* ── sector / weight bars (watchlist insights) ─────────────────────── */
+.sector-bar-row {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 5px 0;
+}
+.sector-bar-label {
+  flex: 0 0 122px; display: flex; align-items: center; gap: 6px;
+  font-size: var(--fs-cap); color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sector-bar-label .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sector-bar-label.plan-sym { flex-basis: 56px; font-weight: 700; color: var(--text); }
+.sector-bar-track {
+  flex: 1 1 auto; height: 6px; border-radius: 3px;
+  background: var(--surface-3); overflow: hidden;
+}
+.sector-bar-fill { display: block; height: 100%; border-radius: 3px; }
+.sector-bar-fill.plan-fill { background: color-mix(in oklab, var(--accent) 65%, transparent); }
+.sector-bar-count {
+  flex: 0 0 auto; min-width: 22px; text-align: right;
+  font-size: var(--fs-cap); font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sector-bar-count.plan-amt { min-width: 64px; }
+.plan-toggle { display: flex; gap: 6px; margin: var(--s2) 0 var(--s2); }
+
 .portfolio-note {
   font-size: var(--fs-nano); color: var(--text-3); line-height: 1.45;
   margin: var(--s2) 0 var(--s2);
