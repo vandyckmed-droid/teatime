@@ -26,7 +26,7 @@ bottom and keep it that way.
 
 ## What's in here now
 
-140 rows, 2026-01-02 through 2026-07-30, transcribed by hand from sixteen
+141 rows, 2026-01-02 through 2026-07-31, transcribed by hand from seventeen
 screenshots of the brokerage's "Table view". The balances are read directly
 off those screenshots: no rounding, no interpolation.
 
@@ -36,7 +36,7 @@ allows.
 
 ## Coverage
 
-Effectively complete for 2026 so far. Of the 139 row-to-row steps, **135 are
+Effectively complete for 2026 so far. Of the 140 row-to-row steps, **136 are
 true single-session moves**. Four dates inside the span are missing:
 
 | Missing | Why |
@@ -46,8 +46,12 @@ true single-session moves**. Four dates inside the span are missing:
 | 2026-05-07 | fell between two screenshot windows |
 | 2026-06-26 | absent from the brokerage's own table — both captures of that stretch skip from 06/25 to 06/29 |
 
-Plus **2026-07-31**, the most recent session, which simply hasn't been
-captured yet — the last screenshot ends at 07/30.
+The series runs to the last completed session. 2026-07-31 was captured from a
+"Total account value" summary card rather than the table view, which shows the
+change since the previous close alongside the balance — a free check on the
+transcription, and it agreed: $31,210.88 with a −$61.53 change is exactly the
+recorded 07-30 balance of $31,272.41. Worth taking whenever that card is the
+one to hand.
 
 2026-01-02 is the year's first trading session, so the series starts at the
 beginning of the year. It does *not* include the 2025 year-end balance,
@@ -72,7 +76,7 @@ Juneteenth, Jul 3 for Independence Day) are correctly absent, not missing.
 ## On the broker's own number
 
 Every screenshot shows the brokerage reporting **+18.45% "this year"**. This
-file's own figures say **+15.7%** from 2026-01-02 to 2026-07-30.
+file's own figures say **+15.5%** from 2026-01-02 to 2026-07-31.
 
 They are not meant to agree, and the difference is not evidence of an error
 here. The broker measures from the 2025 year-end balance, which isn't in this
@@ -103,3 +107,11 @@ published snapshot needs a rebuild, as always).
 Two one-off gaps are still worth filling if the chance comes up: the three
 screenshot-boundary dates above, and the 2025 year-end balance, which is
 what would make a true year-to-date figure possible.
+
+## What reads this now
+
+- The portfolio card's balance, return, volatility and vol-target multiple.
+- **Beta vs SPY** (`computeBeta` in `src/portfolio.js`), which pairs each of
+  these daily moves with SPY's move on the same date. Only sessions present in
+  both count, and the four gap-spanning steps above are excluded there too, so
+  a filled-in gap doesn't just add a row — it adds a pair to the beta window.
