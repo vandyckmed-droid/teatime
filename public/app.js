@@ -107,6 +107,16 @@ const CHART_RANGES = [
 ];
 const DEFAULT_CHART_RANGE = '1Y';
 
+// Windows the range bar can be read over. A new one is a new entry; the day
+// counts are approximate in the same spirit as RANK_WINDOW_PRESETS.
+const RANGE_WINDOWS = [
+  { key: '12M', label: '12M', days: 366 },
+  { key: '6M', label: '6M', days: 186 },
+  { key: '3M', label: '3M', days: 93 },
+  { key: '1M', label: '1M', days: 31 },
+];
+const DEFAULT_RANGE_WINDOW = '12M';
+
 const state = {
   leaderboard: null,
   activeTab: 'ranks',
@@ -133,6 +143,10 @@ const detail = {
   // not a mode the sheet remembers.
   expanded: false,
   range: DEFAULT_CHART_RANGE,
+  // Which window the 52-week bar is drawn over (see RANGE_WINDOWS). Kept
+  // across a swipe like `range` is — comparing two companies over the same
+  // window is the point of swiping.
+  rangeWindow: DEFAULT_RANGE_WINDOW,
   slice: null, // the currently-rendered range's [{date, close}], oldest first
   // How far the sheet is parked below its full position: 0, or the half detent
   // (see initDetailDismiss). Reset on every open.
@@ -712,12 +726,6 @@ function logoAvatar(c, sectorVar) {
 // Where today's price sits inside the 52-week range, as a percentage. Clamped
 // because `price` is the latest close while the range can be intraday, so a
 // fresh high/low can put the price a hair outside its own range.
-function rangePct(c) {
-  if (!Number.isFinite(c.low52) || !Number.isFinite(c.high52) || c.high52 <= c.low52) return null;
-  const pct = ((c.price - c.low52) / (c.high52 - c.low52)) * 100;
-  return Math.max(0, Math.min(100, pct));
-}
-
 // Ticker is the identity now (big, first); the legal name is the subtitle and
 // the sector is a colored dot plus a short label, so the whole block stays one
 // narrow column beside the logo.
@@ -1143,6 +1151,9 @@ function renderDetailContent(company) {
     // A fast swipe can land a stale fetch after the next company is showing.
     if (detail.symbol !== opened) return;
     renderChart();
+    // The range block reads the same history, and on a cold open it was
+    // rendered before this resolved.
+    renderDetailExtras(company);
   }).catch((err) => {
     if (detail.symbol !== opened) return;
     wrap.innerHTML = `<div class="chart-error">Couldn't load chart: ${err.message}</div>`;
@@ -1630,7 +1641,9 @@ function renderDetailFacts(company) {
 // own shape can return whatever markup it likes.
 const DETAIL_BLOCKS = [
   { key: 'rating', title: 'Analyst rating', render: blockRating },
-  { key: 'range', title: '52-week range', render: blockRange },
+  // Not "52-week range" any more — the window is a toggle now, and a card
+  // headed 52-week while showing a 1M span would be lying.
+  { key: 'range', title: 'Price range', render: blockRange },
   { key: 'returns', title: 'Return by window', render: blockReturns },
   { key: 'standing', title: 'Standing on the board', render: blockStanding },
   { key: 'profile', title: 'Company', render: blockProfile },
@@ -1717,17 +1730,52 @@ function blockRating(company) {
   return meter + rows.filter(Boolean).join('');
 }
 
-// Where today's close sits between the year's extremes. This was an 88px
+// High and low over a window, from the symbol's own daily closes. Every
+// window is measured the same way, which is why this doesn't fall back to
+// FMP's 52-week figures for the 12M case: those are intraday extremes, and
+// mixing the two would make one pill disagree with the rest by a few percent
+// for no reason the reader could see.
+function rangeOver(symbol, days) {
+  const cached = historyCache.get(symbol);
+  if (!cached || !Array.isArray(cached.series)) return null;
+  const cutoff = daysAgoToDateStr(days);
+  let low = Infinity;
+  let high = -Infinity;
+  let count = 0;
+  for (const p of cached.series) {
+    if (p.date < cutoff || !(p.close > 0)) continue;
+    if (p.close < low) low = p.close;
+    if (p.close > high) high = p.close;
+    count += 1;
+  }
+  if (count < 2 || !(high > low)) return null;
+  return { low, high, count };
+}
+
+// Where today's price sits between a window's extremes. This was an 88px
 // column on every board row until it moved here; at that width the price
 // labels were 9px and the bar competed with the return for attention. Full
-// width it can actually be read.
+// width it can carry a window toggle and three derived figures.
 function blockRange(company) {
-  const pct = rangePct(company);
-  if (pct === null) return null; // no 52-week figures — the card drops itself
+  const active = RANGE_WINDOWS.find((w) => w.key === detail.rangeWindow) || RANGE_WINDOWS[0];
+  const span = rangeOver(company.symbol, active.days);
+  const pills = RANGE_WINDOWS.map((w) => `
+    <button type="button" class="window-pill" data-range-window="${w.key}"
+      aria-pressed="${w.key === active.key}">${w.label}</button>`).join('');
+  const head = `<div class="range-windows" role="group" aria-label="Range window">${pills}</div>`;
+
+  // History not in yet, or a company too new for this window — keep the pills
+  // so the reader can pick a shorter one rather than dropping the card.
+  if (!span) {
+    return `${head}${statRow('Range', 'Not enough history for this window', 'muted')}`;
+  }
+
+  const pct = Math.max(0, Math.min(100, ((company.price - span.low) / (span.high - span.low)) * 100));
   // The thumb sits at the true position; the price label is pulled in from
-  // the edges so it can't be clipped when the close is at a yearly extreme.
+  // the edges so it can't be clipped when the price is at an extreme.
   const labelPct = Math.max(9, Math.min(91, pct));
   return `
+    ${head}
     <div class="range-bar">
       <span class="range-bar-now" style="left: ${labelPct.toFixed(1)}%">${fmtRangePrice(company.price)}</span>
       <span class="range-bar-track">
@@ -1736,15 +1784,16 @@ function blockRange(company) {
         <span class="range-thumb" style="left: ${pct.toFixed(1)}%"></span>
       </span>
       <span class="range-bar-ends">
-        <span>${fmtRangePrice(company.low52)}</span>
-        <span>${fmtRangePrice(company.high52)}</span>
+        <span>${fmtRangePrice(span.low)}</span>
+        <span>${fmtRangePrice(span.high)}</span>
       </span>
     </div>
     ${statRow('Position', `${Math.round(pct)}% of the range`)}
-    ${statRow('Off the high', fmtPct(((company.price - company.high52) / company.high52) * 100),
-    signClass(company.price - company.high52))}
-    ${statRow('Above the low', fmtPct(((company.price - company.low52) / company.low52) * 100),
-    signClass(company.price - company.low52))}`;
+    ${statRow('Off the high', fmtPct(((company.price - span.high) / span.high) * 100),
+    signClass(company.price - span.high))}
+    ${statRow('Above the low', fmtPct(((company.price - span.low) / span.low) * 100),
+    signClass(company.price - span.low))}
+    <p class="detail-block-note">High and low are daily closes over the ${active.label} window (${span.count} sessions), so they sit just inside the intraday extremes a broker quotes.</p>`;
 }
 
 // Every window the API carries, not just the one the board happens to be
@@ -1841,6 +1890,17 @@ function renderDetailExtras(company) {
   }
   host.innerHTML = cards.join('');
   host.hidden = cards.length === 0;
+
+  // Blocks are rebuilt wholesale, so any controls inside them are wired here
+  // rather than once at boot.
+  host.querySelectorAll('[data-range-window]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (detail.rangeWindow === btn.dataset.rangeWindow) return;
+      detail.rangeWindow = btn.dataset.rangeWindow;
+      const current = detail.symbol ? findCompany(detail.symbol) : null;
+      if (current) renderDetailExtras(current);
+    });
+  });
 }
 
 const EXPAND_ICON = '<path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/>';

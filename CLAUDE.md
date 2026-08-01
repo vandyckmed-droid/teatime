@@ -239,6 +239,14 @@ Concretely:
   held. A saved name leaves only by its own check or Clear watchlist — keep
   it that way, and don't add anything that prunes the set when the window or
   the correlation threshold moves.
+- `RANGE_WINDOWS` in `public/app.js` is the same shape again, for the price
+  range card's own toggle. Its high/low come from the symbol's daily closes
+  over the window, deliberately *not* from FMP's 52-week figures for the 12M
+  case: those are intraday extremes, and mixing the two would make one pill
+  disagree with the rest for no visible reason. Both constants must stay
+  declared above the `detail` object, which reads their defaults — a `const`
+  below it throws a temporal-dead-zone error at load and leaves the board
+  blank.
 - `RANK_WINDOW_PRESETS` in `public/app.js` backs the pills above the Ranks
   board; a new preset is a new entry. They and the Settings steppers are two
   views of one stored value, so each re-renders the other, and a pill lights

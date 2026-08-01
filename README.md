@@ -103,8 +103,8 @@ Then open http://localhost:3000.
   in the snapshot bundle), unrelated to the ranking date range. The arrow in
   its top-left grows the same sheet to a full-screen scrolling page: same
   chart, same pills, same swipe, plus a stack of data cards built from
-  `DETAIL_BLOCKS` — analyst rating, 52-week range, return by window, standing
-  on the board, company facts. That list is deliberately a scratch space for
+  `DETAIL_BLOCKS` — analyst rating, price range (with its own 12M/6M/3M/1M
+  toggle), return by window, standing on the board, company facts. That list is deliberately a scratch space for
   per-company data and experiments: add an entry to try something, delete it
   to take it away, and a block with nothing to say for a given company drops
   its own card.

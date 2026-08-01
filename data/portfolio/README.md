@@ -2,8 +2,9 @@
 
 `balances.csv` — the owner's own account balance, one row per trading day,
 kept for later work on realized return, volatility, and volatility targeting
-(e.g. scaling exposure to a 15% annualized target). Nothing in the app reads
-it yet; this is a store, not a feature.
+(e.g. scaling exposure to a 15% annualized target). Summarized by
+`src/portfolio.js` and shown as the portfolio card on the app's Watchlist
+tab.
 
 ## Format
 
@@ -25,17 +26,17 @@ bottom and keep it that way.
 
 ## What's in here now
 
-124 rows, 2026-01-02 through 2026-07-08, transcribed by hand from fourteen
-screenshots of the brokerage's "Table view" taken 2026-07-31. The balances
-are read directly off those screenshots: no rounding, no interpolation.
+140 rows, 2026-01-02 through 2026-07-30, transcribed by hand from sixteen
+screenshots of the brokerage's "Table view". The balances are read directly
+off those screenshots: no rounding, no interpolation.
 
-Batches overlapped on 13 dates, transcribed twice independently. **All 13
+Batches overlapped on 17 dates, transcribed twice independently. **All 17
 agree to the cent** — as good a check on the transcription as this data
 allows.
 
 ## Coverage
 
-Effectively complete for 2026 so far. Of the 123 row-to-row steps, **119 are
+Effectively complete for 2026 so far. Of the 139 row-to-row steps, **135 are
 true single-session moves**. Four dates inside the span are missing:
 
 | Missing | Why |
@@ -44,6 +45,9 @@ true single-session moves**. Four dates inside the span are missing:
 | 2026-04-22 | fell between two screenshot windows |
 | 2026-05-07 | fell between two screenshot windows |
 | 2026-06-26 | absent from the brokerage's own table — both captures of that stretch skip from 06/25 to 06/29 |
+
+Plus **2026-07-31**, the most recent session, which simply hasn't been
+captured yet — the last screenshot ends at 07/30.
 
 2026-01-02 is the year's first trading session, so the series starts at the
 beginning of the year. It does *not* include the 2025 year-end balance,
@@ -68,13 +72,12 @@ Juneteenth, Jul 3 for Independence Day) are correctly absent, not missing.
 ## On the broker's own number
 
 Every screenshot shows the brokerage reporting **+18.45% "this year"**. This
-file's own figures say **+13.9%** from 2026-01-02 to 2026-07-08.
+file's own figures say **+15.7%** from 2026-01-02 to 2026-07-30.
 
 They are not meant to agree, and the difference is not evidence of an error
 here. The broker measures from the 2025 year-end balance, which isn't in this
-file, and may weight for cash flows. Working backwards, +18.45% to today's
-$30,788.95 implies a starting point near $25,993 — about $1,000 below the
-2026-01-02 balance recorded here.
+file, and may weight for cash flows. Working backwards from their figure puts
+that starting point about $1,000 below the 2026-01-02 balance recorded here.
 
 Everything computed from this file is derived from these dates and dollar
 figures alone. That's deliberate, and it's what the app shows.

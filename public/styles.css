@@ -440,6 +440,9 @@ button { font: inherit; color: inherit; }
    an 88px column on every board row until it moved here — at that width the
    price labels were 9px and the bar competed with the return for attention.
    Full width it reads properly, and the rows got the space back. */
+/* Reuses .window-pill from the Ranks board — same control, same job: pick a
+   window. */
+.range-windows { display: flex; gap: var(--s2); margin: 0 0 var(--s2); }
 .range-bar { position: relative; padding: 24px 4px 0; margin-bottom: var(--s3); }
 .range-bar-now {
   position: absolute; top: 0;
