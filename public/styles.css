@@ -151,6 +151,23 @@ button { font: inherit; color: inherit; }
   padding: calc(var(--s6) + env(safe-area-inset-top)) var(--gutter) calc(96px + env(safe-area-inset-bottom));
 }
 
+/* Status-bar scrim. The app runs standalone with a black-translucent status
+   bar, so the page extends *under* the clock and the battery — fine at the
+   top of the scroll, where .wrap's safe-area padding keeps content clear, but
+   once you scroll anything passing through that strip collides with them. On
+   Ranks the sticky board header happened to cover it; on Investing the
+   portfolio card's sub-line ran straight into the time.
+   Below the tab bar (50) and the detail sheet (60/61), which handle their own
+   safe areas; above the sticky section headers (20), which sit under it. */
+.statusbar-scrim {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+  height: env(safe-area-inset-top);
+  background: color-mix(in oklab, var(--bg) 90%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  pointer-events: none;
+}
+
 /* ── large-title nav header ───────────────────────────────────────────── */
 .nav-title {
   font-size: var(--fs-title);

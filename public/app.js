@@ -313,14 +313,28 @@ function daysAgoToDate(daysAgo) {
 function daysAgoToDateStr(daysAgo) {
   return daysAgoToDate(daysAgo).toISOString().slice(0, 10);
 }
+// ── calendar dates are rendered in UTC, always ───────────────────────
+// Every date in this app is a *calendar date* off the data — a trading
+// session, a balance entry, a window edge — not a moment in time. They're
+// built at UTC midnight, so formatting them in the device's zone renders
+// them a day early anywhere west of Greenwich: the owner's phone showed a
+// series starting "Jan 1" that begins on 2026-01-02, and a portfolio "through
+// Jul 30" whose last balance is Jul 31. Every suite here ran in UTC, where
+// the bug is invisible.
+//
+// `timeZone: 'UTC'` is the whole fix, and it belongs on every formatter that
+// takes a YYYY-MM-DD. The one exception below is fmtDate(), which formats the
+// leaderboard's asOf — a real instant, correctly shown in local time.
+const CAL_DATE_OPTS = { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' };
+
 function fmtStepperDate(daysAgo) {
-  return daysAgoToDate(daysAgo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return daysAgoToDate(daysAgo).toLocaleDateString('en-US', CAL_DATE_OPTS);
 }
 // Two-digit year, for the sticky section header where the whole range has to
 // share one line with its label.
 function fmtCompactDate(daysAgo) {
   return daysAgoToDate(daysAgo)
-    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+    .toLocaleDateString('en-US', { ...CAL_DATE_OPTS, year: '2-digit' })
     .replace(/,\s*(\d\d)$/, " '$1"); // "Nov 22, 25" → "Nov 22 '25"
 }
 
@@ -1099,8 +1113,7 @@ function fmtMoneySigned(v) {
 }
 function fmtLongDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d))
-    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', CAL_DATE_OPTS);
 }
 
 let portfolioWindow = 'ALL';
@@ -2671,7 +2684,7 @@ function attachChartScrub(wrap, coords, chartW, tooltipFor) {
 
 function fmtChartDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', CAL_DATE_OPTS);
 }
 
 function initDetailSheet() {

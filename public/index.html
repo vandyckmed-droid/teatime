@@ -18,6 +18,11 @@
 <body>
   <main class="app">
 
+    <!-- Covers the strip the status bar sits over, so scrolled content can't
+         collide with the clock. See .statusbar-scrim in styles.css. Zero
+         height on any device without a top inset. -->
+    <div class="statusbar-scrim" aria-hidden="true"></div>
+
     <!-- ───────────────────────── Ranks ───────────────────────── -->
     <section class="panel" id="panel-ranks" data-panel="ranks">
       <div class="wrap">
