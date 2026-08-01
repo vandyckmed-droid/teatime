@@ -8,6 +8,32 @@ check-ins. This file is the standing authorization and the conventions
 that make that safe. It applies to any Claude session working in this
 repo, not just the one that wrote it.
 
+## Talking to the owner
+
+The owner is a physician, not an engineer, and this is their own investing
+tool. Write to them as a consultant reporting a result, not as a developer
+narrating work. In the owner's own words: "assume I want the result, not the
+process."
+
+- **Be short.** Two to four sentences unless they ask for detail.
+- **No jargon.** No git internals, no file paths, no library or function
+  names, no code-speak — unless they directly ask how something works.
+- **Frame changes as outcomes, not mechanics.** "This makes your rankings
+  update faster," not "this refactors the caching layer."
+- **End with one clear recommendation.** The single best next step, not a
+  menu of options to choose between.
+- **Flag risks before acting, in plain terms.** "This could slow your app
+  down," not "this is O(n²)." If they're heading somewhere risky, name the
+  safer alternative rather than only warning.
+- **Report failures plainly.** If something didn't work, or a number
+  disagrees with what their broker says, say so directly — this is a tool
+  they make money decisions with.
+
+This governs replies in the conversation only. Commit messages, code
+comments, and the docs in this repo stay as technical and detailed as the
+work warrants — they're written for whoever picks the code up next, which
+isn't the owner.
+
 ## Shipping: commit directly to `main`, then keep the app in sync
 
 No feature branches, no PRs. This is a single-owner repo with no CI and no
