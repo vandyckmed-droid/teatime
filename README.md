@@ -65,12 +65,17 @@ Then open http://localhost:3000.
   come from those dates and dollar amounts alone — deliberately not
   reconciled against the broker's own headline rate of return, which uses a
   baseline and a method the file doesn't contain.
+- `src/ratings.js` — published analyst sentiment per ticker, recorded by hand
+  in `data/ratings/ratings.csv` and append-only by (date, symbol), so a
+  company rated again later keeps every earlier reading. Nothing here feeds
+  the ranking; the boards score price return and only that.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
   `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
-  `GET /api/portfolio` and `GET /api/meta`. All but `/api/portfolio` read from
-  `src/dataStore.js`'s scheduled-refresh store; that one reads the CSV off
-  disk on each call, since it changes only when the file is edited. History
+  `GET /api/portfolio`, `GET /api/ratings` and `GET /api/meta`. The first four
+  read from `src/dataStore.js`'s scheduled-refresh store; the portfolio and
+  ratings endpoints read their CSVs off disk on each call, since those change
+  only when the files are edited. History
   endpoints only serve symbols in the current leaderboard universe — this is
   a leaderboard companion, not an open proxy for arbitrary FMP queries.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
@@ -98,9 +103,11 @@ Then open http://localhost:3000.
   in the snapshot bundle), unrelated to the ranking date range. The arrow in
   its top-left grows the same sheet to a full-screen scrolling page: same
   chart, same pills, same swipe, plus a stack of data cards built from
-  `DETAIL_BLOCKS`. That list is deliberately a scratch space for per-company
-  data and experiments — add an entry to try something, delete it to take it
-  away.
+  `DETAIL_BLOCKS` — analyst rating, 52-week range, return by window, standing
+  on the board, company facts. That list is deliberately a scratch space for
+  per-company data and experiments: add an entry to try something, delete it
+  to take it away, and a block with nothing to say for a given company drops
+  its own card.
 
 ## The daily archive
 

@@ -7,6 +7,7 @@ const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
 const { correlationsAgainst } = require('./src/correlation');
 const { getPortfolio } = require('./src/portfolio');
+const { getRatings } = require('./src/ratings');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -204,6 +205,17 @@ const server = http.createServer((req, res) => {
       return;
     }
     sendJSON(res, 200, portfolio);
+    return;
+  }
+  // Recorded analyst ratings, read off disk like the portfolio above — they
+  // arrive by hand, not from FMP.
+  if (req.url.startsWith('/api/ratings')) {
+    const ratings = getRatings();
+    if (!ratings) {
+      sendJSON(res, 404, { error: 'No ratings recorded.' });
+      return;
+    }
+    sendJSON(res, 200, ratings);
     return;
   }
   if (req.url.startsWith('/api/meta')) {

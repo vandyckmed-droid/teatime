@@ -283,6 +283,14 @@ Concretely:
   as one very volatile day. Its holiday set is 2026-only — extend it when
   the series runs into 2027. New rows are appended and everything downstream
   picks them up on the next request.
+- Analyst ratings live in `data/ratings/ratings.csv`, append-only by (date,
+  symbol) and read by `src/ratings.js` behind `GET /api/ratings` (embedded as
+  `EMBEDDED_RATINGS` in the bundle). The point of the file is the time series,
+  so never overwrite a symbol's earlier row — append a new date. A row with an
+  empty rating and score is a real observation meaning "nothing published that
+  day", not a blank to be cleaned up. New labels go in `RATING_SCALE`
+  (`src/ratings.js`) and `RATING_TONE` (`public/app.js`), which are the same
+  scale duplicated for want of a shared module. These never feed the ranking.
 - Daily board snapshots accrue in `data/snapshots/` via `scripts/snapshot.js`
   and the one workflow in the repo (`.github/workflows/daily-snapshot.yml`).
   Append-only and deliberately stores inputs rather than one ranking — extend

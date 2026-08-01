@@ -1629,6 +1629,7 @@ function renderDetailFacts(company) {
 // spacing and hairlines instead of inventing a layout; a block that needs its
 // own shape can return whatever markup it likes.
 const DETAIL_BLOCKS = [
+  { key: 'rating', title: 'Analyst rating', render: blockRating },
   { key: 'range', title: '52-week range', render: blockRange },
   { key: 'returns', title: 'Return by window', render: blockReturns },
   { key: 'standing', title: 'Standing on the board', render: blockStanding },
@@ -1642,6 +1643,78 @@ function statRow(label, value, cls = '') {
 function signClass(v) {
   if (!(typeof v === 'number') || v === 0) return '';
   return v > 0 ? 'gain' : 'loss';
+}
+
+// ── analyst ratings, as recorded ─────────────────────────────────────
+// Loaded once from /api/ratings (or embedded in the snapshot bundle) and held
+// here. Every reading ever recorded for a symbol is kept, so this block shows
+// the latest one and what came before it rather than just a current value.
+let ratingsData = null;
+
+async function loadRatings() {
+  if (typeof EMBEDDED_RATINGS !== 'undefined') return EMBEDDED_RATINGS;
+  const res = await fetch('/api/ratings');
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json();
+}
+
+// Mirrors RATING_SCALE in src/ratings.js — duplicated because there's no
+// shared module system here (same reason the ranking math is duplicated).
+const RATING_TONE = {
+  'very bearish': 'loss',
+  bearish: 'loss',
+  neutral: '',
+  bullish: 'gain',
+  'very bullish': 'gain',
+};
+const RATING_SCORE_MAX = 10;
+
+function ratingTone(label) {
+  return RATING_TONE[String(label || '').toLowerCase()] ?? '';
+}
+
+function blockRating(company) {
+  if (!ratingsData || !ratingsData.bySymbol) return null;
+  const history = ratingsData.bySymbol[company.symbol];
+  // No card at all for a company that has never been rated — an empty
+  // "Analyst rating" panel on 280 of 300 companies would be noise.
+  if (!history || history.length === 0) return null;
+
+  const [date, rating, score] = history[history.length - 1];
+  const tone = ratingTone(rating);
+
+  if (!rating && score === null) {
+    return `${statRow('Rating', 'None published', 'muted')}
+      ${statRow('Checked', fmtChartDate(date))}`;
+  }
+
+  const pct = score === null ? null : Math.max(0, Math.min(100, (score / RATING_SCORE_MAX) * 100));
+  const meter = pct === null ? '' : `
+    <div class="rating-meter">
+      <span class="rating-meter-fill ${tone}" style="width: ${pct.toFixed(1)}%"></span>
+    </div>`;
+
+  const rows = [
+    statRow('Rating', rating || 'Unlabelled', tone),
+    score === null ? '' : statRow('Score', `${score.toFixed(1)} of ${RATING_SCORE_MAX}`, tone),
+    statRow('Recorded', fmtChartDate(date)),
+  ];
+
+  // Only once there's something to compare against — the point of keeping
+  // every reading is being able to say "it moved", and one reading can't.
+  if (history.length > 1) {
+    const [prevDate, prevRating, prevScore] = history[history.length - 2];
+    rows.push(statRow('Previously',
+      `${prevRating || 'None'}${prevScore === null ? '' : ` (${prevScore.toFixed(1)})`} on ${fmtChartDate(prevDate)}`));
+    if (score !== null && prevScore !== null) {
+      const delta = score - prevScore;
+      rows.push(statRow('Change',
+        `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`, signClass(delta)));
+    }
+  }
+  rows.push(`<p class="detail-block-note">Recorded by hand from published analyst sentiment; ${history.length} reading${history.length === 1 ? '' : 's'} on file. Nothing here feeds the board's ranking.</p>`);
+
+  return meter + rows.filter(Boolean).join('');
 }
 
 // Where today's close sits between the year's extremes. This was an 88px
@@ -2367,6 +2440,12 @@ async function init() {
   loadPortfolio()
     .then((data) => { portfolioSummary = data; renderPortfolioCard(); })
     .catch(() => { /* nothing recorded yet — the card stays hidden */ });
+
+  // Same: off disk, not FMP. Nothing waits on it — the rating block simply
+  // isn't drawn until it lands, and drops itself if it never does.
+  loadRatings()
+    .then((data) => { ratingsData = data; })
+    .catch(() => { /* no ratings recorded — the block stays out */ });
 
   try {
     const data = await loadLeaderboard();
