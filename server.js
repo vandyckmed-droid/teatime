@@ -4,7 +4,7 @@ const path = require('path');
 
 const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
-const { correlationsAgainst, correlationMatrix } = require('./src/correlation');
+const { correlationsAgainst } = require('./src/correlation');
 const { getPortfolio } = require('./src/portfolio');
 const { getRatings } = require('./src/ratings');
 
@@ -145,26 +145,6 @@ function handleCorrelations(req, res, { symbols, startDaysAgo, endDaysAgo }) {
   });
 }
 
-// Every pair among the caller's own saved names, rather than the universe
-// against them. Same window, same math, different question — see the comment
-// on correlationMatrix in src/correlation.js.
-function handleCorrelationMatrix(req, res, { symbols, startDaysAgo, endDaysAgo }) {
-  const historyBySymbol = dataStore.getHistoryBySymbol();
-  if (!historyBySymbol) {
-    sendJSON(res, 503, { error: 'Data not ready yet, try again shortly.' });
-    return;
-  }
-  if (!Number.isFinite(startDaysAgo) || !Number.isFinite(endDaysAgo)) {
-    sendJSON(res, 400, { error: 'startDaysAgo and endDaysAgo must be numbers.' });
-    return;
-  }
-  sendJSON(res, 200, {
-    startDaysAgo,
-    endDaysAgo,
-    ...correlationMatrix(historyBySymbol, symbols, startDaysAgo, endDaysAgo),
-  });
-}
-
 function serveStatic(req, res) {
   const reqPath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.normalize(path.join(PUBLIC_DIR, reqPath));
@@ -200,20 +180,6 @@ const server = http.createServer((req, res) => {
   if (req.url.startsWith('/api/history')) {
     const symbol = new URL(req.url, 'http://localhost').searchParams.get('symbol') || '';
     handleHistory(req, res, symbol.toUpperCase());
-    return;
-  }
-  // Before the plain /api/correlations check below — startsWith would swallow
-  // this path otherwise, the same trap /api/history/batch has to dodge.
-  if (req.url.startsWith('/api/correlations/matrix')) {
-    const params = new URL(req.url, 'http://localhost').searchParams;
-    handleCorrelationMatrix(req, res, {
-      symbols: (params.get('symbols') || '')
-        .split(',')
-        .map((s) => s.trim().toUpperCase())
-        .filter(Boolean),
-      startDaysAgo: numParam(params, 'startDaysAgo'),
-      endDaysAgo: numParam(params, 'endDaysAgo'),
-    });
     return;
   }
   if (req.url.startsWith('/api/correlations')) {

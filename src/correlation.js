@@ -97,35 +97,4 @@ function correlationsAgainst(historyBySymbol, heldSymbols, startDaysAgo, endDays
   return out;
 }
 
-// Every pair among one set of symbols, as a square symmetric matrix — the
-// "how do my own saved names move against each other" view, as opposed to
-// correlationsAgainst() above, which asks the one-directional question "would
-// adding this name duplicate what I already hold".
-//
-// Each pair is computed once and mirrored: correlation is symmetric, and for
-// 20 names that halves 400 calculations to 190. Symbols with no history in the
-// store are dropped rather than filling a row with nulls, so `symbols` in the
-// response is what the matrix is actually indexed by and can be shorter than
-// what was asked for. A pair with too little overlapping history comes back
-// null — the same "not enough to say" the rest of this file uses, not a zero.
-function correlationMatrix(historyBySymbol, symbols, startDaysAgo, endDaysAgo) {
-  const present = symbols.filter((s) => historyBySymbol.has(s));
-  const matrix = present.map(() => new Array(present.length).fill(null));
-
-  for (let i = 0; i < present.length; i++) {
-    matrix[i][i] = 1;
-    for (let j = i + 1; j < present.length; j++) {
-      const r = correlation(
-        historyBySymbol.get(present[i]).series,
-        historyBySymbol.get(present[j]).series,
-        startDaysAgo,
-        endDaysAgo,
-      );
-      matrix[i][j] = r;
-      matrix[j][i] = r;
-    }
-  }
-  return { symbols: present, matrix };
-}
-
-module.exports = { correlationsAgainst, correlationMatrix };
+module.exports = { correlationsAgainst };

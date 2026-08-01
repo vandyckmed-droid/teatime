@@ -68,10 +68,10 @@
     </section>
 
     <!-- ─────────────────────── Investing ─────────────────────── -->
-    <!-- One tab, three views. The portfolio card is tall enough that it pushed
+    <!-- One tab, two views. The portfolio card is tall enough that it pushed
          the saved names off the bottom of the screen when they shared a
          scroll; the segmented control splits them without spending a third
-         slot in the tab bar. "Investing" is the name that covers all of them. -->
+         slot in the tab bar. "Investing" is the name that covers both. -->
     <section class="panel" id="panel-investing" data-panel="investing" hidden>
       <div class="wrap">
         <div class="nav-title">Investing</div>
@@ -81,7 +81,6 @@
           <span class="segmented-thumb" aria-hidden="true"></span>
           <button type="button" data-view="portfolio" aria-pressed="true">Portfolio</button>
           <button type="button" data-view="watchlist" aria-pressed="false">Watchlist</button>
-          <button type="button" data-view="overlap" aria-pressed="false">Overlap</button>
         </div>
 
         <!-- The owner's own account, from data/portfolio/balances.csv via
@@ -118,13 +117,6 @@
             <button type="button" class="action-btn" id="add-next">Add next ranked</button>
             <button type="button" class="danger-btn" id="clear-watchlist">Clear watchlist</button>
           </div>
-        </div>
-
-        <!-- Every pair among the saved names. Built by renderOverlap() in
-             app.js, which sizes its own cells to the card, so this is left
-             empty here. -->
-        <div class="subview" data-subview="overlap" hidden>
-          <div class="overlap-card" id="overlap-card"></div>
         </div>
       </div>
     </section>
