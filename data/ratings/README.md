@@ -1,3 +1,10 @@
+> **Retired as the app's live source, 2026-08-01.** The rating card now
+> shows analyst grade counts fetched daily from FMP (they ride the board's
+> own data, and the daily archive in `data/snapshots/` files them, which is
+> where the time series accrues). This file stays as the hand-kept record it
+> always was — append-only, never overwritten — but nothing reads it at
+> runtime any more.
+
 # Analyst ratings
 
 `ratings.csv` — published analyst sentiment per ticker, recorded by hand on

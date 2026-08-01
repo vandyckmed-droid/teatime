@@ -38,8 +38,8 @@ module.exports = {
   // changes with no other code to touch up to a few hundred companies; past
   // that, the fetch-everything-on-load architecture itself needs to change
   // (see CLAUDE.md's Extensibility patterns section).
-  universeSize: 400,
-  screenerCandidatePool: 750,
+  universeSize: 500,
+  screenerCandidatePool: 1000,
   // NOTE when resizing: screenerMinMarketCap below is the real ceiling on how
   // big the universe can get, and it binds long before screenerCandidatePool
   // does. It only bounds the *candidate pool* — universeSize still takes the
@@ -50,9 +50,11 @@ module.exports = {
   //
   // Measured on the move to 300 (2026-07-31): $30B returns 339 candidates,
   // $22B returns 441, $15B returns 559. Re-measured on the move to 400
-  // (2026-08-01): $22B had drifted to 437 — not enough — so the floor dropped
-  // to $15B, which returned 560 (~545 after the junk filter): comfortable
-  // headroom for 400, and the next resize should re-measure again.
+  // (2026-08-01): $22B had drifted to 437, so the floor dropped to $15B (560
+  // candidates). Re-measured again on the move to 500 (2026-08-01): $12B
+  // returns 663, 625 after the junk filter and dedupe — and the candidate
+  // pool rose to 1000 so the screener's own limit stays well clear of the
+  // count it returns. The next resize should re-measure again.
   // Caps how many FMP requests this server has in flight at once (leaderboard
   // per-company calls, and batch history fetches). Keeps growth in
   // universeSize from turning into a burst of N simultaneous outbound
@@ -69,11 +71,14 @@ module.exports = {
   // safety net — this just stops provoking it.
   fmpConcurrency: 6,
 
-  // $15B leaves ~560 candidates before dedupe — real headroom above
-  // universeSize: 400, with room for market caps to drift down without the
-  // board silently coming up short. ($22B supplied only 437 when 400 was set,
-  // a margin a moderate selloff could eat.)
-  screenerMinMarketCap: 15e9,
+  // $12B leaves ~660 candidates before dedupe — real headroom above
+  // universeSize: 500, with room for market caps to drift down without the
+  // board silently coming up short. The $4M dollar-volume floor was
+  // re-measured at this cap floor (see src/leaderboard.js): junk still tops
+  // out at $2.3M, and the one real casualty is Pershing Square's thin-float
+  // listing at $3.1M/day — accepted under the "board of what you could
+  // actually buy" rule, same as Formula One's class A before it.
+  screenerMinMarketCap: 12e9,
   country: 'US',
   exchanges: 'NYSE,NASDAQ',
   metrics: METRICS,

@@ -35,6 +35,8 @@ isn't limited by what seemed interesting on the day it was captured.
       "industry": "Computer Hardware",  // FMP's finer tag — added 2026-08, older files lack it
       "price": 1016.0, "marketCap": 1.4e11, "beta": 2.17,
       "annVolPct": 115.52,           // trailing-1Y realized vol, annualized — added 2026-08, older files lack it
+      "grades": { "strongBuy": 0, "buy": 57, "hold": 11, "sell": 2,
+                  "strongSell": 0, "consensus": "Buy" },  // analyst counts, added 2026-08 — the ratings time series lives here
       "ipoDate": "…", "low52": 40.1, "high52": 2354.0,
       "returns": { "1D": …, "5D": …, "1M": …, "3M": …, "6M": …,
                    "ytd": …, "1Y": …, "3Y": …, "5Y": … },

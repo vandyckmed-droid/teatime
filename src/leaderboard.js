@@ -118,9 +118,12 @@ async function getLeaderboard() {
     .slice(0, config.universeSize);
 
   const companies = await mapWithConcurrency(universe, config.fmpConcurrency, async (c) => {
-    const [priceChange, profile] = await Promise.all([
+    const [priceChange, profile, grades] = await Promise.all([
       fmp.getPriceChange(c.symbol).catch(() => null),
       fmp.getProfile(c.symbol).catch(() => null),
+      // Analyst consensus rides the same per-company fetch — a third call in
+      // the same concurrency-capped pass, refreshed once daily with the rest.
+      fmp.getGradesConsensus(c.symbol).catch(() => null),
     ]);
     const ipoDate = profile ? profile.ipoDate : null;
     // The logo and the 52-week range ride along on the profile call we already
@@ -143,6 +146,18 @@ async function getLeaderboard() {
       low52: range ? range.low52 : null,
       high52: range ? range.high52 : null,
       ipoDate,
+      // Analyst grade counts and FMP's consensus label. On the payload rather
+      // than behind an endpoint of their own, so the static snapshot (which
+      // embeds this response and can fetch nothing) shows them too, and the
+      // daily archive files them — that filing is the time series.
+      grades: grades ? {
+        strongBuy: grades.strongBuy ?? 0,
+        buy: grades.buy ?? 0,
+        hold: grades.hold ?? 0,
+        sell: grades.sell ?? 0,
+        strongSell: grades.strongSell ?? 0,
+        consensus: grades.consensus || null,
+      } : null,
       returns: extractReturns(priceChange),
       availability: metricAvailability(ipoDate, asOf),
     };

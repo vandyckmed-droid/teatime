@@ -1930,76 +1930,55 @@ function signClass(v) {
   return v > 0 ? 'gain' : 'loss';
 }
 
-// ── analyst ratings, as recorded ─────────────────────────────────────
-// Loaded once from /api/ratings (or embedded in the snapshot bundle) and held
-// here. Every reading ever recorded for a symbol is kept, so this block shows
-// the latest one and what came before it rather than just a current value.
-let ratingsData = null;
-
-async function loadRatings() {
-  if (typeof EMBEDDED_RATINGS !== 'undefined') return EMBEDDED_RATINGS;
-  const res = await fetch('/api/ratings');
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-  return res.json();
-}
-
-// Mirrors RATING_SCALE in src/ratings.js — duplicated because there's no
-// shared module system here (same reason the ranking math is duplicated).
-const RATING_TONE = {
-  'very bearish': 'loss',
-  bearish: 'loss',
-  neutral: '',
-  bullish: 'gain',
-  'very bullish': 'gain',
+// ── analyst consensus ────────────────────────────────────────────────
+// Grade counts and FMP's consensus label ride the company object itself
+// (`grades` on the leaderboard payload, fetched once daily server-side with
+// everything else) — which is what lets the static snapshot show this card
+// with no backend and no endpoint of its own. The time series accrues in the
+// daily archive (data/snapshots/), which files each day's counts; the card
+// only ever shows today's. The owner's earlier hand-kept readings remain in
+// data/ratings/ratings.csv as a record, no longer displayed.
+const CONSENSUS_TONE = {
+  'strong buy': 'gain',
+  buy: 'gain',
+  hold: '',
+  sell: 'loss',
+  'strong sell': 'loss',
 };
-const RATING_SCORE_MAX = 10;
-
-function ratingTone(label) {
-  return RATING_TONE[String(label || '').toLowerCase()] ?? '';
-}
 
 function blockRating(company) {
-  if (!ratingsData || !ratingsData.bySymbol) return null;
-  const history = ratingsData.bySymbol[company.symbol];
-  // No card at all for a company that has never been rated — an empty
-  // "Analyst rating" panel on 280 of 300 companies would be noise.
-  if (!history || history.length === 0) return null;
+  const g = company.grades;
+  if (!g || typeof g !== 'object') return null;
+  const counts = [g.strongBuy, g.buy, g.hold, g.sell, g.strongSell]
+    .map((v) => (typeof v === 'number' && v > 0 ? v : 0));
+  const total = counts.reduce((a, b) => a + b, 0);
+  // No card for a company nobody covers — an empty "Analyst rating" panel
+  // would be noise, same reasoning as the hand-kept version before it.
+  if (total === 0) return null;
 
-  const [date, rating, score] = history[history.length - 1];
-  const tone = ratingTone(rating);
-
-  if (!rating && score === null) {
-    return `${statRow('Rating', 'None published', 'muted')}
-      ${statRow('Checked', fmtChartDate(date))}`;
-  }
-
-  const pct = score === null ? null : Math.max(0, Math.min(100, (score / RATING_SCORE_MAX) * 100));
-  const meter = pct === null ? '' : `
+  const positive = counts[0] + counts[1];
+  const pct = (positive / total) * 100;
+  const tone = CONSENSUS_TONE[String(g.consensus || '').toLowerCase()] ?? '';
+  const meter = `
     <div class="rating-meter">
       <span class="rating-meter-fill ${tone}" style="width: ${pct.toFixed(1)}%"></span>
     </div>`;
 
+  const parts = [];
+  if (counts[0]) parts.push(`${counts[0]} strong buy`);
+  if (counts[1]) parts.push(`${counts[1]} buy`);
+  if (counts[2]) parts.push(`${counts[2]} hold`);
+  if (counts[3]) parts.push(`${counts[3]} sell`);
+  if (counts[4]) parts.push(`${counts[4]} strong sell`);
+
   const rows = [
-    statRow('Rating', rating || 'Unlabelled', tone),
-    score === null ? '' : statRow('Score', `${score.toFixed(1)} of ${RATING_SCORE_MAX}`, tone),
-    statRow('Recorded', fmtChartDate(date)),
+    statRow('Consensus', g.consensus || 'Mixed', tone),
+    statRow('Analysts', `${total}`),
+    statRow('Leaning', `${pct.toFixed(0)}% positive`, tone),
   ];
+  rows.push(`<p class="detail-block-note">${parts.join(' &middot; ')}. Analyst grade counts, refreshed daily. Nothing here feeds the board's ranking.</p>`);
 
-  // Only once there's something to compare against — the point of keeping
-  // every reading is being able to say "it moved", and one reading can't.
-  if (history.length > 1) {
-    const [prevDate, prevRating, prevScore] = history[history.length - 2];
-    rows.push(statRow('Previously',
-      `${prevRating || 'None'}${prevScore === null ? '' : ` (${prevScore.toFixed(1)})`} on ${fmtChartDate(prevDate)}`));
-    if (score !== null && prevScore !== null) {
-      const delta = score - prevScore;
-      rows.push(statRow('Change',
-        `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`, signClass(delta)));
-    }
-  }
-  rows.push(`<p class="detail-block-note">Recorded by hand from published analyst sentiment; ${history.length} reading${history.length === 1 ? '' : 's'} on file. Nothing here feeds the board's ranking.</p>`);
-
-  return meter + rows.filter(Boolean).join('');
+  return meter + rows.join('');
 }
 
 // High and low over a window, from the symbol's own daily closes. Every
@@ -2861,9 +2840,6 @@ async function init() {
 
   // Same: off disk, not FMP. Nothing waits on it — the rating block simply
   // isn't drawn until it lands, and drops itself if it never does.
-  loadRatings()
-    .then((data) => { ratingsData = data; })
-    .catch(() => { /* no ratings recorded — the block stays out */ });
 
   try {
     const data = await loadLeaderboard();

@@ -81,19 +81,23 @@ Then open http://localhost:3000.
   the time the bundle is assembled. Daily returns are total returns — the
   dividend is added back on its ex-date, because FMP's "dividend-adjusted"
   price endpoint returns closes identical to the plain ones.
-- `src/ratings.js` — published analyst sentiment per ticker, recorded by hand
-  in `data/ratings/ratings.csv` and append-only by (date, symbol), so a
-  company rated again later keeps every earlier reading. Nothing here feeds
-  the ranking; the boards score price return and only that.
+- Analyst ratings — FMP's grade counts and consensus label per company,
+  fetched in the same daily per-company pass as price and profile and carried
+  as `grades` on the leaderboard payload, so the static snapshot shows them
+  with no backend and the daily archive files them (that filing is the time
+  series). Nothing here feeds the ranking; the boards score price return and
+  only that. An earlier hand-kept version lives on, retired, in
+  `data/ratings/`.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
   `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
-  `GET /api/correlations?symbols=&startDaysAgo=&endDaysAgo=`,
-  `GET /api/portfolio` and `GET /api/ratings`. The first five read from
-  `src/dataStore.js`'s scheduled-refresh store; the portfolio and ratings
-  endpoints read their CSVs off disk on each call, since those change only
-  when the files are edited. Every one of them is called by the frontend —
-  an endpoint nothing consumes is dead weight, and one (`/api/meta`) was.
+  `GET /api/correlations?symbols=&startDaysAgo=&endDaysAgo=` and
+  `GET /api/portfolio`. The first five read from
+  `src/dataStore.js`'s scheduled-refresh store; the portfolio endpoint reads
+  its CSV off disk on each call, since it changes only when the file is
+  edited. Every one of them is called by the frontend — an endpoint nothing
+  consumes is dead weight, and two (`/api/meta`, then `/api/ratings` when
+  the hand-kept ratings gave way to FMP's) have been removed on that rule.
   History endpoints only serve symbols in the current leaderboard universe —
   this is a leaderboard companion, not an open proxy for arbitrary FMP
   queries.

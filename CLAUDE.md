@@ -407,14 +407,16 @@ Concretely:
   as one very volatile day. Its holiday set is 2026-only — extend it when
   the series runs into 2027. New rows are appended and everything downstream
   picks them up on the next request.
-- Analyst ratings live in `data/ratings/ratings.csv`, append-only by (date,
-  symbol) and read by `src/ratings.js` behind `GET /api/ratings` (embedded as
-  `EMBEDDED_RATINGS` in the bundle). The point of the file is the time series,
-  so never overwrite a symbol's earlier row — append a new date. A row with an
-  empty rating and score is a real observation meaning "nothing published that
-  day", not a blank to be cleaned up. New labels go in `RATING_SCALE`
-  (`src/ratings.js`) and `RATING_TONE` (`public/app.js`), which are the same
-  scale duplicated for want of a shared module. These never feed the ranking.
+- Analyst ratings are FMP's grade counts (strong buy / buy / hold / sell /
+  strong sell plus a consensus label), fetched per company in the same
+  concurrency-capped daily pass as price and profile and carried as `grades`
+  on the leaderboard payload — no endpoint of their own, which is what lets
+  the static snapshot show the card with no backend. The time series accrues
+  in the daily archive (`data/snapshots/` files each day's counts); the card
+  (`blockRating` in `public/app.js`) only ever shows today's. These never
+  feed the ranking. The owner's earlier hand-kept readings remain in
+  `data/ratings/ratings.csv` as an append-only record with its README noting
+  the retirement — nothing reads it at runtime any more.
 - `data/market/spy.csv` is the one data file here that is *not* append-only,
   and the distinction is the rule to keep: the portfolio and ratings files are
   hand-kept observations that refetching would destroy, while this one is a

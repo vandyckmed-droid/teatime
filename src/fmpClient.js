@@ -89,6 +89,13 @@ function getHistoricalPrices(symbol, from, to) {
   return fmpGet('historical-price-eod/full', { symbol, from, to });
 }
 
+// Analyst grade counts (strong buy / buy / hold / sell / strong sell) plus
+// FMP's consensus label. One row per symbol.
+async function getGradesConsensus(symbol) {
+  const rows = await fmpGet('grades-consensus', { symbol });
+  return rows[0];
+}
+
 // Cash dividends by ex-date, newest first. The endpoint ignores from/to and
 // returns the whole history (SPY's is 135 rows back to 1993), so callers ask
 // for all of it and filter by date themselves. Needed because FMP's
@@ -105,4 +112,5 @@ module.exports = {
   getProfile,
   getHistoricalPrices,
   getDividends,
+  getGradesConsensus,
 };

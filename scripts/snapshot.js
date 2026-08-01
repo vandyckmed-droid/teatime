@@ -86,6 +86,10 @@ function buildSnapshot() {
     // filed so a later question about volatility regimes doesn't need the raw
     // history re-fetched. New field 2026-08; older files simply lack it.
     annVolPct: round(c.annVolPct, 2),
+    // Analyst grade counts + FMP's consensus label, filed daily — this is
+    // where the ratings time series accrues. Added 2026-08; older files and
+    // uncovered companies simply carry null.
+    grades: c.grades ?? null,
     ipoDate: c.ipoDate || null,
     low52: round(c.low52, 4),
     high52: round(c.high52, 4),
