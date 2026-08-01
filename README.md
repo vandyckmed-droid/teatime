@@ -82,14 +82,17 @@ Then open http://localhost:3000.
   the per-ticker price chart and the portfolio balance chart: same geometry,
   same axis landmarks, same scrub crosshair, differing only in three
   callbacks for what the labels say.
-- `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
+- `public/` — static frontend, three tabs (Ranks, Investing, Settings) plus a
   bottom sheet that opens a price chart when you tap a company. Board rows
   carry rank, logo, name, sector and return only — the 52-week range bar that
   used to be an 88px column moved into the full-screen ticker view, where it
-  has the width to be read. The Watchlist
-  tab leads with a card showing the owner's own portfolio (see
-  `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M. It stays
-  hidden if no balances are recorded. The tab also
+  has the width to be read. The Investing tab holds two views behind a
+  segmented control — Portfolio, a card of the owner's own account (see
+  `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M, hidden
+  entirely if no balances are recorded; and Watchlist, the saved names. They
+  were one scroll until the portfolio card grew tall enough to push the names
+  off the bottom of the screen. Which view you were last on is remembered.
+  The Watchlist view
   carries an "add next ranked" control — the plus in the empty state, a button
   beside Clear watchlist once there are names — that saves the highest-ranked
   company not already held and not blocked by the diversification filter. The

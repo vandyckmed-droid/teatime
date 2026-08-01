@@ -781,6 +781,14 @@ button { font: inherit; color: inherit; }
 .segmented button[aria-pressed="true"]:active { color: var(--accent-ink); }
 .segmented button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* Full-width variant used to switch views inside a tab, rather than to pick a
+   window under a chart. Same control, more room to breathe above the content
+   it swaps. */
+.segmented-views {
+  margin: 0 0 var(--s5);
+}
+.segmented-views button { padding: 9px 2px; min-height: 36px; font-size: var(--fs-sub); }
+
 /* ── tab bar ──────────────────────────────────────────────────────────── */
 .tabbar {
   position: fixed; left: 50%; bottom: 0; transform: translateX(-50%);

@@ -62,42 +62,56 @@
       </div>
     </section>
 
-    <!-- ─────────────────────── Watchlist ─────────────────────── -->
-    <section class="panel" id="panel-watchlist" data-panel="watchlist" hidden>
+    <!-- ─────────────────────── Investing ─────────────────────── -->
+    <!-- One tab, two views. The portfolio card is tall enough that it pushed
+         the saved names off the bottom of the screen when they shared a
+         scroll; the segmented control splits them without spending a third
+         slot in the tab bar. "Investing" is the name that covers both. -->
+    <section class="panel" id="panel-investing" data-panel="investing" hidden>
       <div class="wrap">
-        <div class="nav-title">Watchlist</div>
-        <p class="sub">Tap a green check to remove one.</p>
+        <div class="nav-title">Investing</div>
+        <p class="sub" id="investing-sub">Your account, and the names you're keeping an eye on.</p>
+
+        <div class="segmented segmented-views" role="group" aria-label="View" data-segmented="investing">
+          <span class="segmented-thumb" aria-hidden="true"></span>
+          <button type="button" data-view="portfolio" aria-pressed="true">Portfolio</button>
+          <button type="button" data-view="watchlist" aria-pressed="false">Watchlist</button>
+        </div>
 
         <!-- The owner's own account, from data/portfolio/balances.csv via
-             /api/portfolio. Hidden until that call succeeds, so the tab is
-             unchanged when there's nothing recorded. -->
-        <div class="portfolio-card" id="portfolio-card" hidden></div>
-
-        <div class="section-label" id="watchlist-score-label" hidden>
-          <span class="section-label-key">Saved</span>
+             /api/portfolio. Hidden until that call succeeds, so the view is
+             empty rather than broken when there's nothing recorded. -->
+        <div class="subview" data-subview="portfolio">
+          <div class="portfolio-card" id="portfolio-card" hidden></div>
         </div>
 
-        <div class="board-head" id="watchlist-board-head" aria-hidden="true" hidden>
-          <span class="board-head-score">Return</span>
-        </div>
+        <div class="subview" data-subview="watchlist" hidden>
+          <div class="section-label" id="watchlist-score-label" hidden>
+            <span class="section-label-key">Saved</span>
+          </div>
 
-        <div class="board">
-          <div id="watchlist-rows">
-            <div class="empty-state">
-              <button type="button" class="empty-state-glyph" id="add-next-empty" aria-label="Add the top-ranked company">
-                <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg>
-              </button>
-              <p>Your watchlist is empty. Tap the plus to add the top-ranked company, or pick your own from Ranks.</p>
+          <div class="board-head" id="watchlist-board-head" aria-hidden="true" hidden>
+            <span class="board-head-score">Return</span>
+          </div>
+
+          <div class="board">
+            <div id="watchlist-rows">
+              <div class="empty-state">
+                <button type="button" class="empty-state-glyph" id="add-next-empty" aria-label="Add the top-ranked company">
+                  <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg>
+                </button>
+                <p>Your watchlist is empty. Tap the plus to add the top-ranked company, or pick your own from Ranks.</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Add-next first, then the destructive action, which sits last (iOS
-             puts these last) and takes two taps — see the confirm step in
-             app.js. -->
-        <div class="board-actions" id="watchlist-actions" hidden>
-          <button type="button" class="action-btn" id="add-next">Add next ranked</button>
-          <button type="button" class="danger-btn" id="clear-watchlist">Clear watchlist</button>
+          <!-- Add-next first, then the destructive action, which sits last (iOS
+               puts these last) and takes two taps — see the confirm step in
+               app.js. -->
+          <div class="board-actions" id="watchlist-actions" hidden>
+            <button type="button" class="action-btn" id="add-next">Add next ranked</button>
+            <button type="button" class="danger-btn" id="clear-watchlist">Clear watchlist</button>
+          </div>
         </div>
       </div>
     </section>
@@ -131,12 +145,12 @@
       </button>
       <!-- Bookmark, not a star: the row control is a plus/check now, and a
            bookmark reads as "saved list" without implying a rating. -->
-      <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
+      <button class="tab-btn" data-tab="investing" role="tab" aria-selected="false">
         <span class="tab-icon">
           <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6.5 3.6h11a1 1 0 011 1v15.3l-6.5-4.4-6.5 4.4V4.6a1 1 0 011-1z"/></svg>
           <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6.5 3.6h11a1 1 0 011 1v15.3l-6.5-4.4-6.5 4.4V4.6a1 1 0 011-1z"/></svg>
         </span>
-        <span class="tab-label">Watchlist</span>
+        <span class="tab-label">Investing</span>
         <span class="tab-badge" id="watchlist-badge" hidden>0</span>
       </button>
       <!-- Sliders, not a gear: this page is entirely parameter tuning, and a

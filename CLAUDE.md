@@ -233,6 +233,18 @@ Concretely:
   date range (Settings-driven); the per-ticker chart sheet has its own
   window toggle. No standing rule on how connected these two should be —
   judge it fresh each time a feature touches both.
+- The tab bar is Ranks / Investing / Settings, and Investing holds two views
+  (`INVESTING_VIEWS` in `public/app.js`): the portfolio card and the saved
+  names. It was called Watchlist until the portfolio card grew tall enough to
+  push the names off the bottom of a shared scroll. `#watchlist` still routes
+  there (`TAB_ALIASES`) so old links keep working. A view that contains a
+  chart has to draw it *after* being shown — a hidden wrapper measures zero,
+  and these charts size themselves in real pixels.
+- Anything the `state` object or the `detail` object reads while being built
+  must be declared above it. Both have now caused the same
+  temporal-dead-zone bug: the error surfaces as a blank board or a silently
+  wrong default (`loadInvestingView`'s try/catch swallowed the ReferenceError
+  and returned the fallback), not as an obvious crash.
 - The watchlist is a stored set of symbols and nothing else, deliberately.
   Settings decide what "add next ranked" (`addNextRanked` / the empty-state
   plus) picks at the moment of the tap; they never retroactively change what's

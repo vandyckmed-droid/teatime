@@ -94,6 +94,25 @@ const SECTOR_SHORT = {
 
 const STORAGE_KEYS = { watchlist: 'teatime.watchlist', settings: 'teatime.settings' };
 
+// ── the Investing tab's two views ────────────────────────────────────
+// Remembered rather than reset each visit: which one you want is a standing
+// preference, not a per-visit decision.
+const INVESTING_VIEWS = [
+  { key: 'portfolio', sub: 'Your account balance, from the record you keep by hand.' },
+  { key: 'watchlist', sub: 'Tap a green check to remove one.' },
+];
+const INVESTING_VIEW_KEY = 'teatime.investingView';
+
+function loadInvestingView() {
+  try {
+    const stored = localStorage.getItem(INVESTING_VIEW_KEY);
+    return INVESTING_VIEWS.some((v) => v.key === stored) ? stored : 'portfolio';
+  } catch {
+    return 'portfolio';
+  }
+}
+
+
 // Chart ranges are a subset of METRICS — 1D/5D are dropped because a chart
 // built from daily closes has nothing meaningful to show for them.
 const CHART_RANGES = [
@@ -130,6 +149,8 @@ const PORTFOLIO_WINDOWS = [
 const state = {
   leaderboard: null,
   activeTab: 'ranks',
+  // Which of the Investing tab's two views is showing (see INVESTING_VIEWS).
+  investingView: loadInvestingView(),
   watchlist: loadWatchlist(),
   settings: loadSettings(),
   rankingsLoaded: false,
@@ -624,6 +645,16 @@ async function refreshRankings() {
 }
 
 // ── tab routing ──────────────────────────────────────────────────────
+const TABS = ['ranks', 'investing', 'settings'];
+// The Investing tab was called Watchlist until the portfolio moved in beside
+// it. Old links (and anything bookmarked to #watchlist) still land correctly.
+const TAB_ALIASES = { watchlist: 'investing' };
+
+function resolveTab(name) {
+  const tab = TAB_ALIASES[name] || name;
+  return TABS.includes(tab) ? tab : null;
+}
+
 function goToTab(tab) {
   state.activeTab = tab;
   document.querySelectorAll('.panel').forEach((el) => {
@@ -633,6 +664,9 @@ function goToTab(tab) {
     btn.setAttribute('aria-selected', String(btn.dataset.tab === tab));
   });
   if (location.hash.slice(1) !== tab) history.replaceState(null, '', `#${tab}`);
+  // The segmented thumb needs real layout numbers, which don't exist while
+  // the panel is display:none.
+  if (tab === 'investing') requestAnimationFrame(() => positionSegmentedThumb('investing', true));
 }
 
 function initTabBar() {
@@ -640,11 +674,39 @@ function initTabBar() {
     btn.addEventListener('click', () => goToTab(btn.dataset.tab));
   });
   window.addEventListener('hashchange', () => {
-    const tab = location.hash.slice(1);
-    if (['ranks', 'watchlist', 'settings'].includes(tab)) goToTab(tab);
+    const tab = resolveTab(location.hash.slice(1));
+    if (tab) goToTab(tab);
   });
-  const initial = location.hash.slice(1);
-  goToTab(['ranks', 'watchlist', 'settings'].includes(initial) ? initial : 'ranks');
+  goToTab(resolveTab(location.hash.slice(1)) || 'ranks');
+}
+
+function setInvestingView(view, { persist = true } = {}) {
+  const chosen = INVESTING_VIEWS.find((v) => v.key === view) || INVESTING_VIEWS[0];
+  state.investingView = chosen.key;
+  if (persist) {
+    try { localStorage.setItem(INVESTING_VIEW_KEY, chosen.key); } catch { /* private mode */ }
+  }
+  document.querySelectorAll('[data-subview]').forEach((el) => {
+    el.hidden = el.dataset.subview !== chosen.key;
+  });
+  document.querySelectorAll('[data-segmented="investing"] button').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.view === chosen.key));
+  });
+  const sub = document.getElementById('investing-sub');
+  if (sub) sub.textContent = chosen.sub;
+  positionSegmentedThumb('investing');
+  // The chart measures its wrapper in pixels, which reads 0 while the view is
+  // hidden — so it has to be drawn after the view is shown, not before.
+  if (chosen.key === 'portfolio') renderPortfolioChart();
+}
+
+function initInvestingViews() {
+  const el = document.querySelector('[data-segmented="investing"]');
+  if (!el) return;
+  el.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => setInvestingView(btn.dataset.view));
+  });
+  setInvestingView(state.investingView, { persist: false });
 }
 
 function rankDateRangeLabel() {
@@ -1286,7 +1348,7 @@ function openDetail(symbol, sequence) {
     // The segmented thumb needs real layout numbers, which don't exist until
     // the sheet stops being display:none — and it should be in place before
     // the sheet slides in, not slide sideways afterwards.
-    positionSegmentedThumb(true);
+    positionSegmentedThumb('detail', true);
   });
 }
 
@@ -1308,7 +1370,7 @@ function showDetailAt(index) {
     console.error('Failed to render detail for', company.symbol, err);
     return false;
   }
-  positionSegmentedThumb(true);
+  positionSegmentedThumb('detail', true);
   const scroll = document.querySelector('.sheet-scroll');
   if (scroll) scroll.scrollTop = 0;
   return true;
@@ -2015,7 +2077,7 @@ function setDetailExpanded(next) {
   // changed height, so it needs a redraw rather than a rescale.
   requestAnimationFrame(() => {
     if (detail.symbol && historyCache.has(detail.symbol)) renderChart();
-    positionSegmentedThumb(true);
+    positionSegmentedThumb('detail', true);
   });
 }
 
@@ -2052,13 +2114,13 @@ function syncSegmented() {
   el.querySelectorAll('button').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.range === detail.range));
   });
-  positionSegmentedThumb();
+  positionSegmentedThumb('detail');
 }
 
 // `instant` skips the slide — used when the sheet is (re)opening, where the
 // thumb should simply already be under the right label.
-function positionSegmentedThumb(instant = false) {
-  const el = document.querySelector('[data-segmented="detail"]');
+function positionSegmentedThumb(group = 'detail', instant = false) {
+  const el = document.querySelector(`[data-segmented="${group}"]`);
   if (!el) return;
   const thumb = el.querySelector('.segmented-thumb');
   const active = el.querySelector('button[aria-pressed="true"]');
@@ -2407,7 +2469,7 @@ function initDetailSheet() {
       const sheet = document.getElementById('detail-sheet');
       if (!sheet || sheet.hidden || !detail.symbol) return;
       if (historyCache.has(detail.symbol)) renderChart();
-      positionSegmentedThumb(true);
+      positionSegmentedThumb('detail', true);
     });
   });
 }
@@ -2578,6 +2640,7 @@ async function loadLeaderboard() {
 
 async function init() {
   initTabBar();
+  initInvestingViews();
   initDetailSheet();
   renderSettings();
   // Before the board arrives, so the window controls are there to read (and
@@ -2590,7 +2653,13 @@ async function init() {
   // Independent of the market data: it comes off disk, not from FMP, so it
   // neither waits for the board nor fails with it.
   loadPortfolio()
-    .then((data) => { portfolioSummary = data; renderPortfolioCard(); })
+    .then((data) => {
+      portfolioSummary = data;
+      renderPortfolioCard();
+      // Redraw once visible: the card may have been built inside a hidden
+      // view, where the chart wrapper measures zero.
+      if (state.investingView === 'portfolio') renderPortfolioChart();
+    })
     .catch(() => { /* nothing recorded yet — the card stays hidden */ });
 
   // Same: off disk, not FMP. Nothing waits on it — the rating block simply
