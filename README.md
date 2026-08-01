@@ -181,16 +181,20 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   further — repeated FMP fetches per visitor, and shipping the full universe's
   history JSON to the browser just to rank it.
 - New row flag: add an entry to `ROW_FLAGS` in `public/app.js` — a `key`, a
-  short `label` for the accessible name, a `title` and `description` for its
-  Settings row, a `test(company)`, and optionally a `note(count)` for the board
-  callout — plus one CSS rule setting `--flag-orb` on
-  `.row[data-flags~="yourkey"]` and one for `.flag-sample-orb[data-flag-sample=...]`
-  so the Settings row previews it. That entry yields the board mark, the
-  Settings switch and the callout line; there is nothing else to wire. A flag
-  draws as a coloured bloom around the logo disc — a different kind of object
-  from the saved-row ring on the card's edge, so the two never read as versions
-  of each other and a row that is both wears both. Currently one entry: mega
-  caps at $200B and up, in the amber `--flag-mega`.
+  short `label`, a `title` and `description` for its Settings row, a
+  `test(company)`, optionally a `note(count)` for the board callout, and an
+  `effect`. Two effects exist. `'orb'` (the default) draws a coloured bloom
+  around the logo disc — one CSS rule setting `--flag-orb` on
+  `.row[data-flags~="yourkey"]` plus a `.flag-sample-orb` rule for the
+  Settings preview; a different kind of object from the saved-row ring on the
+  card's edge, so a row that is both wears both. `'dim'` reuses the
+  diversification filter's treatment — the row fades, its add control is
+  disabled with the reason on the label, and "add next ranked" skips it — with
+  no CSS beyond the shared `.dimmed` rule, and held names always exempt.
+  Either way the one entry yields the board mark, the Settings switch, the
+  live count and the callout line. Current entries: mega caps at $200B and up
+  (amber orb), and biotechnology dimmed via FMP's `industry` tag, which the
+  leaderboard payload carries from the screener row at zero API cost.
 - New per-company data panel: add an entry to `DETAIL_BLOCKS` in
   `public/app.js` — a title and a `render(company)` returning HTML (use
   `statRow()` for anything list-shaped). It appears as a card in the

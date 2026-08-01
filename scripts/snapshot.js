@@ -78,6 +78,7 @@ function buildSnapshot() {
     symbol: c.symbol,
     name: c.name,
     sector: c.sector || null,
+    industry: c.industry || null, // FMP's finer classification — added 2026-08 with annVolPct
     price: round(c.price, 4),
     marketCap: c.marketCap ?? null,
     beta: round(c.beta, 4),

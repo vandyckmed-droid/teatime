@@ -13,7 +13,7 @@ const store = {
   leaderboard: null,
   historyBySymbol: null, // Map(symbol -> { symbol, asOf, series })
   historyAsOf: null,
-  slowFactsBySymbol: new Map(), // symbol -> { sector, beta, ipoDate }
+  slowFactsBySymbol: new Map(), // symbol -> { sector, industry, beta, ipoDate }
   slowFactsAsOf: null,
 };
 
@@ -28,19 +28,20 @@ async function refreshAll() {
     const previous = store.slowFactsBySymbol.get(fresh.symbol);
     const useRetained = previous && !shouldCommitSlowFacts;
     const sector = useRetained ? previous.sector : fresh.sector;
+    const industry = useRetained ? previous.industry : fresh.industry;
     const beta = useRetained ? previous.beta : fresh.beta;
     const ipoDate = useRetained ? previous.ipoDate : fresh.ipoDate;
-    return { ...fresh, sector, beta, ipoDate, availability: metricAvailability(ipoDate, asOf) };
+    return { ...fresh, sector, industry, beta, ipoDate, availability: metricAvailability(ipoDate, asOf) };
   });
 
   const symbols = mergedCompanies.map((c) => c.symbol);
   const historyResults = await getHistoryBatch(symbols);
 
   // Realized trailing-1Y volatility rides on each company, computed here from
-  // the history this refresh just fetched anyway — zero extra API calls. Its
-  // consumer is the high-volatility row flag, and putting the number on the
-  // leaderboard payload is what lets the static snapshot (which embeds this
-  // response and can fetch nothing at page load) evaluate the flag too.
+  // the history this refresh just fetched anyway — zero extra API calls. It
+  // once fed a high-volatility row flag (since replaced by the biotech dimmer);
+  // it stays because the daily archive files it, and a later question about
+  // volatility regimes shouldn't need the raw history re-fetched.
   const companiesWithVol = mergedCompanies.map((c, i) => ({
     ...c,
     annVolPct: trailingAnnualizedVolPct(historyResults[i] && historyResults[i].series),
@@ -50,7 +51,7 @@ async function refreshAll() {
   if (shouldCommitSlowFacts) store.slowFactsAsOf = Date.now();
   const newSlowFactsBySymbol = new Map();
   for (const c of companiesWithVol) {
-    newSlowFactsBySymbol.set(c.symbol, { sector: c.sector, beta: c.beta, ipoDate: c.ipoDate });
+    newSlowFactsBySymbol.set(c.symbol, { sector: c.sector, industry: c.industry, beta: c.beta, ipoDate: c.ipoDate });
   }
   store.slowFactsBySymbol = newSlowFactsBySymbol;
 

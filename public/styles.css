@@ -91,13 +91,6 @@
      the app, so the two read as different kinds of object rather than as two
      entries in one palette. */
   --flag-mega: #FFBC48;
-  /* High-volatility flag: violet, oklch ≈ 0.68 0.19 295. Same reasoning as the
-     amber — clear of both protected bands, and read as temperature rather than
-     verdict. Violet sits near the real-estate/comm sector hues, but those are
-     flat 8px dots and this is a bloom around the logo disc; the object shape
-     is the differentiator, per the mega flag's precedent. Chroma runs higher
-     than any sector dot so the glow doesn't read as smudged periwinkle. */
-  --flag-vol: #9D7BFF;
 
   --tabbar-bg: rgba(0, 0, 0, 0.72);
   --sheet-scrim: rgba(0, 0, 0, 0.38);
@@ -342,8 +335,12 @@ button { font: inherit; color: inherit; }
    correlationBlock in app.js). Faded rather than hidden — it's still a real
    company you may want to open the chart for, it just can't be added. The row
    itself stays tappable; only its add control is disabled. */
-.row.correlated { opacity: 0.4; }
-.row.correlated .add-btn { cursor: not-allowed; }
+/* .correlated is the diversification filter; .dimmed is a dim-effect flag
+   (ROW_FLAGS in app.js). One treatment on purpose — both mean "not addable
+   right now, by your own settings" — but two classes, so a test can tell
+   which mechanism faded a row. */
+.row.correlated, .row.dimmed { opacity: 0.4; }
+.row.correlated .add-btn, .row.dimmed .add-btn { cursor: not-allowed; }
 .row:active { background-color: var(--surface-2); transition: none; }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
@@ -401,22 +398,7 @@ button { font: inherit; color: inherit; }
     0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
     0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
 }
-/* Violet runs slightly hotter than the amber (46% vs 42%) because at equal
-   alpha it reads a step quieter against charcoal — matched by eye, not math. */
-.row[data-flags~="vol"] {
-  --flag-orb:
-    0 0 9px 2px color-mix(in oklab, var(--flag-vol) 46%, transparent),
-    0 0 20px 5px color-mix(in oklab, var(--flag-vol) 18%, transparent);
-}
-/* Both at once: one two-tone orb, not two orbs. The tight layer keeps the
-   mega gold, the wide bloom goes violet — size stays the claim nearest the
-   disc, temperament radiates further. Must come after the single-flag rules;
-   it's the same custom property and order is what resolves it. */
-.row[data-flags~="mega"][data-flags~="vol"] {
-  --flag-orb:
-    0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
-    0 0 20px 6px color-mix(in oklab, var(--flag-vol) 26%, transparent);
-}
+  --flag-mega: #FFBC48;
 
 /* The Settings row previews its own flag, so the switch is labelled by the
    thing it turns on rather than by a description of it. Same disc size and
@@ -434,11 +416,9 @@ button { font: inherit; color: inherit; }
     0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
     0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
 }
-.flag-sample-orb[data-flag-sample="vol"] {
-  box-shadow:
-    0 0 9px 2px color-mix(in oklab, var(--flag-vol) 46%, transparent),
-    0 0 20px 5px color-mix(in oklab, var(--flag-vol) 18%, transparent);
-}
+/* A dim-effect flag previews as exactly what it does: the disc at the same
+   opacity a dimmed row runs. */
+.flag-sample-orb[data-flag-sample="biotech"] { opacity: 0.4; }
 .flag-sample-count {
   font-size: var(--fs-nano); color: var(--text-3);
   font-variant-numeric: tabular-nums;

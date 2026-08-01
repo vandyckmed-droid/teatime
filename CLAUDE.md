@@ -299,20 +299,26 @@ Concretely:
   brighter than its neighbours with nothing explaining why is just a rendering
   bug as far as the reader can tell. The mega-cap cutoff is an absolute $200B
   rather than "top 50" so it doesn't silently change meaning every time
-  `universeSize` moves; it happened to catch 53 of 300 when set. The same
-  reasoning fixed the high-volatility flag at an absolute 60% trailing-1Y
-  annualized (double the board's ~30% median, 29 of 300 when set) rather than a
-  percentile, and pinned its window to a fixed trailing year rather than the
-  ranking window — a flag is a fact about the company, and shouldn't quietly
-  change meaning when the ranking window moves. Its input travels as
-  `annVolPct` on the leaderboard payload (computed in `src/dataStore.js` at
-  refresh, `trailingAnnualizedVolPct` in `src/ranking.js`), because a flag
-  `test` runs client-side against the company object and the static snapshot
-  can fetch nothing — server-computed, payload-carried is the pattern for any
-  future flag that needs history. When one company carries two flags, the CSS
-  composes them into a single two-tone orb via a combined selector
-  (`[data-flags~="mega"][data-flags~="vol"]`) that must come after the
-  single-flag rules — same custom property, source order resolves it.
+  `universeSize` moves; it happened to catch 53 of 300 when set. Flags now
+  have two effects: `'orb'` (the default — a glow behind the logo) and
+  `'dim'`, which reuses the diversification filter's exact treatment — row
+  faded to 0.4, add control disabled with the reason on its label, skipped by
+  "add next ranked" — driven by a flag `test` instead of a correlation. Dim
+  flags keep their own `.dimmed` class beside `.correlated` so a test can tell
+  the mechanisms apart, never touch `data-flags` (orbs only), and never apply
+  to a held name — a dim blocks *adding*, it doesn't judge what you hold, and
+  the callout counts only rows actually dimmed. First dim flag: biotechnology,
+  by FMP's `industry` tag ("Biotechnology", which reads narrowly — Amgen and
+  Gilead are "Drug Manufacturers - General"), carried on the leaderboard
+  payload from the screener row at zero API cost and retained through the
+  slow-facts cadence like sector. A high-volatility orb (60%+ trailing-1Y
+  annualized) lived here briefly and was replaced by the dimmer at the owner's
+  request; its input `annVolPct` (computed in `src/dataStore.js` at refresh,
+  `trailingAnnualizedVolPct` in `src/ranking.js`) stays on the payload because
+  the daily archive files it — and it remains the worked example of the
+  pattern any history-needing flag requires: a flag `test` runs client-side
+  against the company object and the static snapshot can fetch nothing, so
+  inputs must be server-computed and payload-carried.
 - `src/correlation.js` answers one question — `correlationsAgainst`, the
   universe against the held set, which is what fades a board row. Signed,
   never `|r|`: a strong negative is diversification, and taking the absolute

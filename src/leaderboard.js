@@ -123,6 +123,10 @@ async function getLeaderboard() {
       symbol: c.symbol,
       name: c.companyName,
       sector: c.sector,
+      // FMP's finer classification under sector ("Biotechnology", "Drug
+      // Manufacturers - General", ...). Already on the screener row, so it
+      // costs nothing; consumed by the biotech dimmer in public/app.js.
+      industry: c.industry || null,
       price: c.price,
       marketCap: c.marketCap,
       beta: typeof c.beta === 'number' ? c.beta : null,
