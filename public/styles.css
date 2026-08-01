@@ -395,6 +395,27 @@ button { font: inherit; color: inherit; }
     0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
 }
 
+/* The Settings row previews its own flag, so the switch is labelled by the
+   thing it turns on rather than by a description of it. Same disc size and
+   the same --flag-orb value the board uses, keyed off the flag's own name. */
+.flag-sample {
+  display: flex; align-items: center; gap: var(--s3);
+  margin-top: var(--s2);
+}
+.flag-sample-orb {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #fff; flex-shrink: 0;
+}
+.flag-sample-orb[data-flag-sample="mega"] {
+  box-shadow:
+    0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
+    0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
+}
+.flag-sample-count {
+  font-size: var(--fs-nano); color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Left-aligned so the number sits at the card's leading edge rather than
    floating mid-gutter, and big enough to be the row's index at a glance.
    Fixed width still holds the chip column steady from rank 1 to 150. */

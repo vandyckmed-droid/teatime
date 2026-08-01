@@ -180,14 +180,17 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   `src/ranking.js` above) already remove the two biggest costs of scaling
   further — repeated FMP fetches per visitor, and shipping the full universe's
   history JSON to the browser just to rank it.
-- New row highlight: add an entry to `ROW_FLAGS` in `public/app.js` (a `key`,
-  a `label` for the accessible name, a `test(company)`, and optionally a
-  `note(count)` for the board callout) plus one CSS rule setting `--flag-orb`
-  on `.row[data-flags~="yourkey"]`. A flag draws as a coloured bloom around the
-  logo disc — a different kind of object from the saved-row ring on the card's
-  edge, so the two never read as versions of each other and a row that is both
-  wears both. Currently one entry: mega caps at $200B and up, in the amber
-  `--flag-mega`.
+- New row flag: add an entry to `ROW_FLAGS` in `public/app.js` — a `key`, a
+  short `label` for the accessible name, a `title` and `description` for its
+  Settings row, a `test(company)`, and optionally a `note(count)` for the board
+  callout — plus one CSS rule setting `--flag-orb` on
+  `.row[data-flags~="yourkey"]` and one for `.flag-sample-orb[data-flag-sample=...]`
+  so the Settings row previews it. That entry yields the board mark, the
+  Settings switch and the callout line; there is nothing else to wire. A flag
+  draws as a coloured bloom around the logo disc — a different kind of object
+  from the saved-row ring on the card's edge, so the two never read as versions
+  of each other and a row that is both wears both. Currently one entry: mega
+  caps at $200B and up, in the amber `--flag-mega`.
 - New per-company data panel: add an entry to `DETAIL_BLOCKS` in
   `public/app.js` — a title and a `render(company)` returning HTML (use
   `statRow()` for anything list-shaped). It appears as a card in the
@@ -195,7 +198,9 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
 - New preset ranking window: add an entry to `RANK_WINDOW_PRESETS` in
   `public/app.js` (key, label, `startDaysAgo`, `endDaysAgo`) and it appears
   as a pill above the Ranks board.
-- New setting: add an entry to `SETTINGS` in `public/app.js`.
+- New setting: add an entry to `SETTINGS` in `public/app.js`. Flags are their
+  own Settings section, rendered from `ROW_FLAGS` rather than `SETTINGS`,
+  because a flag marks a company rather than changing how anything is ranked.
   `renderSettings()` dispatches on `type` (`'toggle'`, `'threshold'`,
   `'daterange'`); a new `type` needs one more branch there. `SETTINGS` is
   also what `loadSettings()` validates stored values against — a key that

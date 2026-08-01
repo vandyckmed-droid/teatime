@@ -135,6 +135,13 @@
 
         <div class="section-label"><span class="section-label-key">Scoring</span></div>
         <div class="settings-list" id="settings-list"></div>
+
+        <!-- One row per entry in ROW_FLAGS (app.js), built by
+             renderFlagSettings(). Deliberately its own section rather than a
+             row inside Scoring: a flag marks a company, it doesn't change how
+             anything is ranked. -->
+        <div class="section-label"><span class="section-label-key">Flags</span></div>
+        <div class="settings-list" id="flag-settings"></div>
       </div>
     </section>
 

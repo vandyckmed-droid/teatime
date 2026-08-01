@@ -273,7 +273,18 @@ Concretely:
   config-array shape as `SETTINGS` and `DETAIL_BLOCKS`, and built as a skeleton
   before it had a second user. An entry is `{ key, label, test, note? }`;
   matching rows get the key in `data-flags`, and one CSS rule per key sets
-  `--flag-orb`. Four things there are deliberate. A flag draws as a bloom
+  `--flag-orb`. It has its own Settings section (`#flag-settings`, rendered by
+  `renderFlagSettings()`) rather than rows inside Scoring, because a flag marks
+  a company and never touches the ranking — one registry entry yields the board
+  mark, the switch, the live match count and the callout line together. Flag
+  state lives under `settings.flags` as a *sparse* map of overrides: absent
+  means on, so a flag added later lights up with no migration, and
+  `loadSettings` drops any stored key no longer in `ROW_FLAGS`. Which is
+  exactly why `ROW_FLAGS` has to be declared above `state` — `loadSettings()`
+  runs while `state` is being built, and its try/catch (there for private-mode
+  localStorage) swallows the ReferenceError and silently discards every saved
+  override. Fourth time that trap has bitten in this file. Four more things are
+  deliberate. A flag draws as a bloom
   around the *logo disc*, while a saved row draws as a green ring on the
   *card's edge* — different kind of object, not just different colour, which
   is what keeps a flag from reading as a selection; a row that is both wears

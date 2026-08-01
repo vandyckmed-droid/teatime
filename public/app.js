@@ -18,6 +18,18 @@ const SETTINGS = [
     default: 0.7,
   },
   {
+    // Rendered by renderFlagSettings() into its own section, not by the generic
+    // loop — like 'daterange' below. The stored value is a sparse map of
+    // per-flag overrides ({} means "every flag at its own default"), so a flag
+    // added to ROW_FLAGS later needs no migration and a flag removed from it
+    // has its saved value dropped by loadSettings.
+    key: 'flags',
+    type: 'flags',
+    label: 'Flags',
+    description: 'Marks on the board that call out a company for something other than its return.',
+    default: {},
+  },
+  {
     key: 'rankDateRange',
     type: 'daterange',
     label: 'Ranking date range',
@@ -148,6 +160,85 @@ const PORTFOLIO_WINDOWS = [
   { key: '1M', label: '1M', days: 31 },
 ];
 
+// NOTE ON PLACEMENT: this block sits above `state` because loadSettings()
+// validates stored flag overrides against ROW_FLAGS, and loadSettings() runs
+// while `state` is being built. Declared below, the ReferenceError is swallowed
+// by loadSettings()'s own try/catch (it exists for private-mode localStorage)
+// and every saved flag override is silently discarded on load — the same
+// temporal-dead-zone trap that has bitten INVESTING_VIEWS and RANGE_WINDOWS
+// here before. See CLAUDE.md.
+// ── row flags ────────────────────────────────────────────────────────
+// A registry for "mark this row as special" — the same shape as SETTINGS and
+// DETAIL_BLOCKS. One entry is one flag; matching rows get `data-flags` carrying
+// its key, and one CSS rule per key sets --flag-orb on that selector (see
+// .row[data-flags~=...] in styles.css). The orb machinery itself is written
+// once, so a second flag is an entry here plus a single line of CSS, not a new
+// rendering path.
+//
+// Contract for an entry:
+//   key    stable identifier; becomes the data-flags token and the CSS hook
+//   label  spoken in the row's accessible name, so the glow isn't purely visual
+//   test   (company) => boolean, run on every row of both boards
+//   note   optional (count) => string, added to the board callout so a
+//          highlighted row is never unexplained
+//
+// Flags are additive: a row can carry several, and the glow composes with the
+// saved-row ring rather than replacing it.
+//
+// $200B is the mega-cap line. Chosen against the live board — it takes in 53 of
+// the 300 companies, so it lands on "roughly the top 50" while still being an
+// absolute threshold rather than a rank. That matters: a rank would silently
+// change meaning every time universeSize moves, whereas "above $200B" means the
+// same thing at 250 companies as at 500.
+const MEGA_CAP_MIN = 200e9;
+
+const ROW_FLAGS = [
+  {
+    key: 'mega',
+    label: 'mega cap',
+    title: 'Mega caps',
+    description: 'Put a gold orb behind the logo of any company worth $200B or more. '
+      + 'A size marker, not a judgement — it says nothing about return.',
+    test: (c) => typeof c.marketCap === 'number' && c.marketCap >= MEGA_CAP_MIN,
+    note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a gold orb &mdash; `
+      + `mega caps, worth <b>$200B</b> or more.`,
+  },
+];
+
+// Absent from the stored overrides means "on": a flag added to the registry
+// later lights up for everyone without a migration, and switching one off is
+// the thing that gets recorded.
+function flagEnabled(key) {
+  const overrides = (state.settings && state.settings.flags) || {};
+  return overrides[key] !== false;
+}
+
+function rowFlags(c) {
+  return ROW_FLAGS.filter((f) => {
+    if (!flagEnabled(f.key)) return false;
+    try {
+      return f.test(c);
+    } catch {
+      return false; // a broken flag drops itself rather than taking the board down
+    }
+  });
+}
+
+// How many companies a flag would mark, ignoring whether it is switched on —
+// the Settings row shows this so the toggle says what it will do before you
+// touch it.
+function flagMatchCount(flag) {
+  if (!state.leaderboard) return null;
+  let n = 0;
+  for (const c of state.leaderboard.companies) {
+    try {
+      if (flag.test(c)) n += 1;
+    } catch { /* a broken flag counts nothing */ }
+  }
+  return n;
+}
+
+
 const state = {
   leaderboard: null,
   activeTab: 'ranks',
@@ -234,10 +325,20 @@ function loadSettings() {
       range.endDaysAgo = Math.min(range.endDaysAgo, range.startDaysAgo - DATE_RANGE_MIN_GAP);
     }
 
+    // Same posture one level down, for the per-flag overrides: a key that is
+    // no longer in ROW_FLAGS is dropped rather than kept forever, and anything
+    // that isn't a boolean is ignored rather than trusted.
+    const flags = settings.flags;
+    settings.flags = flags && typeof flags === 'object' && !Array.isArray(flags)
+      ? Object.fromEntries(Object.entries(flags)
+        .filter(([key, on]) => typeof on === 'boolean' && ROW_FLAGS.some((f) => f.key === key)))
+      : {};
+
     // Write the cleaned-up version back right away rather than waiting for the
     // next setting change, so a retired key doesn't sit in storage indefinitely
     // on a device where nobody touches Settings again.
-    if (Object.keys(stored).some((key) => !(key in defaults))) {
+    if (Object.keys(stored).some((key) => !(key in defaults))
+      || JSON.stringify(settings.flags) !== JSON.stringify(stored.flags ?? {})) {
       localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
     }
     return settings;
@@ -796,51 +897,6 @@ function updateScoreLabels() {
   });
 }
 
-// ── row flags ────────────────────────────────────────────────────────
-// A registry for "mark this row as special" — the same shape as SETTINGS and
-// DETAIL_BLOCKS. One entry is one flag; matching rows get `data-flags` carrying
-// its key, and one CSS rule per key sets --flag-orb on that selector (see
-// .row[data-flags~=...] in styles.css). The orb machinery itself is written
-// once, so a second flag is an entry here plus a single line of CSS, not a new
-// rendering path.
-//
-// Contract for an entry:
-//   key    stable identifier; becomes the data-flags token and the CSS hook
-//   label  spoken in the row's accessible name, so the glow isn't purely visual
-//   test   (company) => boolean, run on every row of both boards
-//   note   optional (count) => string, added to the board callout so a
-//          highlighted row is never unexplained
-//
-// Flags are additive: a row can carry several, and the glow composes with the
-// saved-row ring rather than replacing it.
-//
-// $200B is the mega-cap line. Chosen against the live board — it takes in 53 of
-// the 300 companies, so it lands on "roughly the top 50" while still being an
-// absolute threshold rather than a rank. That matters: a rank would silently
-// change meaning every time universeSize moves, whereas "above $200B" means the
-// same thing at 250 companies as at 500.
-const MEGA_CAP_MIN = 200e9;
-
-const ROW_FLAGS = [
-  {
-    key: 'mega',
-    label: 'mega cap',
-    test: (c) => typeof c.marketCap === 'number' && c.marketCap >= MEGA_CAP_MIN,
-    note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a gold orb &mdash; `
-      + `mega caps, worth <b>$200B</b> or more.`,
-  },
-];
-
-function rowFlags(c) {
-  return ROW_FLAGS.filter((f) => {
-    try {
-      return f.test(c);
-    } catch {
-      return false; // a broken flag drops itself rather than taking the board down
-    }
-  });
-}
-
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
 // Brand logo in a circular avatar. The <img> sits over ticker initials; a
 // failed load is dropped by pruneBrokenLogos below, revealing the sector-tinted
@@ -1315,6 +1371,10 @@ function renderAll() {
   updateScoreLabels();
   renderRanksBoard();
   renderWatchlistBoard();
+  // The Flags section shows a live match count, which reads "counting…" until
+  // the board exists — renderSettings() runs well before that, so refresh it
+  // here rather than leaving it stale on the one screen that explains flags.
+  renderFlagSettings();
 }
 
 // ── detail sheet (tap a row to see its chart) ────────────────────────
@@ -2625,10 +2685,67 @@ function renderSettings() {
     note.id = 'settings-note';
     note.className = 'settings-note';
     note.innerHTML = 'More settings land here as the board grows — each one is a config entry in <code>public/app.js</code> (<code>SETTINGS</code>) with no other wiring required.';
-    list.parentElement.appendChild(note);
+    // Directly after its own list, not appended to the panel: with a second
+    // section below it, a note parked at the bottom reads as belonging to
+    // whatever it happens to follow.
+    list.insertAdjacentElement('afterend', note);
   }
 
   renderDateRangeSetting();
+  renderFlagSettings();
+}
+
+// The Flags section, built entirely from ROW_FLAGS — one entry there yields a
+// board mark and a switch here, with nothing to wire up in between. That is the
+// point of the section existing before there is more than one flag in it.
+function renderFlagSettings() {
+  const container = document.getElementById('flag-settings');
+  if (!container) return;
+  container.innerHTML = '';
+
+  ROW_FLAGS.forEach((flag) => {
+    const on = flagEnabled(flag.key);
+    const count = flagMatchCount(flag);
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    row.innerHTML = `
+      <div class="settings-row-text">
+        <div class="settings-row-label">${flag.title || flag.label}</div>
+        <div class="settings-row-desc">${flag.description || ''}</div>
+        <div class="flag-sample" aria-hidden="true">
+          <span class="flag-sample-orb" data-flag-sample="${flag.key}"></span>
+          <span class="flag-sample-count">${count === null ? 'counting…'
+            : `${count} of ${state.leaderboard.companies.length} on the board`}</span>
+        </div>
+      </div>
+      <button type="button" class="ios-switch" role="switch" aria-checked="${on}"
+        data-flag="${flag.key}" aria-label="${flag.title || flag.label}">
+        <span class="knob"></span>
+      </button>`;
+    container.appendChild(row);
+
+    row.querySelector('.ios-switch').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const next = btn.getAttribute('aria-checked') !== 'true';
+      btn.setAttribute('aria-checked', String(next));
+      // Only the deviation from the default is stored, so the map stays sparse
+      // and a flag's own default keeps meaning something.
+      if (next) delete state.settings.flags[flag.key];
+      else state.settings.flags[flag.key] = false;
+      saveSettings();
+      if (state.leaderboard) renderAll();
+    });
+  });
+
+  if (!document.getElementById('flags-note')) {
+    const note = document.createElement('p');
+    note.id = 'flags-note';
+    note.className = 'settings-note';
+    note.innerHTML = 'A flag marks a company for something other than its return, and never '
+      + 'affects the ranking. More land here as they are built &mdash; each is a config entry '
+      + 'in <code>public/app.js</code> (<code>ROW_FLAGS</code>) plus one CSS rule for its colour.';
+    container.insertAdjacentElement('afterend', note);
+  }
 }
 
 function renderDateRangeSetting() {
