@@ -239,10 +239,19 @@ Concretely:
   held. A saved name leaves only by its own check or Clear watchlist — keep
   it that way, and don't add anything that prunes the set when the window or
   the correlation threshold moves.
-- `RANGE_WINDOWS` in `public/app.js` is the same shape again, for the price
-  range card's own toggle. Its high/low come from the symbol's daily closes
-  over the window, deliberately *not* from FMP's 52-week figures for the 12M
-  case: those are intraday extremes, and mixing the two would make one pill
+- `drawLineChart` in `public/app.js` draws every line chart in the app — the
+  per-ticker price line and the portfolio balance line. A third chart should
+  be a fourth call, not a second renderer. Two things it has to keep doing:
+  the element ids the detail chart carries (`#chart-line-path` and friends)
+  are emitted for that chart only, since ids must be unique and both charts
+  can be on screen at once, and every internal lookup is scoped to the
+  wrapper and keyed on classes. The same applies to tests — a bare
+  `.chart-axis-y` or `.chart-tick` selector now matches both charts.
+- `PORTFOLIO_WINDOWS` / `RANGE_WINDOWS` in `public/app.js` are the same
+  shape again, for the portfolio chart's and the price range card's own
+  toggles. The range card's high/low come from the symbol's daily closes over
+  the window, deliberately *not* from FMP's 52-week figures for the 12M case:
+  those are intraday extremes, and mixing the two would make one pill
   disagree with the rest for no visible reason. Both constants must stay
   declared above the `detail` object, which reads their defaults — a `const`
   below it throws a temporal-dead-zone error at load and leaves the board

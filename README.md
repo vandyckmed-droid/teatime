@@ -78,13 +78,18 @@ Then open http://localhost:3000.
   only when the files are edited. History
   endpoints only serve symbols in the current leaderboard universe — this is
   a leaderboard companion, not an open proxy for arbitrary FMP queries.
+- `public/app.js`'s `drawLineChart` is the one line-chart renderer, shared by
+  the per-ticker price chart and the portfolio balance chart: same geometry,
+  same axis landmarks, same scrub crosshair, differing only in three
+  callbacks for what the labels say.
 - `public/` — static frontend, three tabs (Ranks, Watchlist, Settings) plus a
   bottom sheet that opens a price chart when you tap a company. Board rows
   carry rank, logo, name, sector and return only — the 52-week range bar that
   used to be an 88px column moved into the full-screen ticker view, where it
   has the width to be read. The Watchlist
   tab leads with a card showing the owner's own portfolio (see
-  `src/portfolio.js`), which stays hidden if no balances are recorded, and
+  `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M. It stays
+  hidden if no balances are recorded. The tab also
   carries an "add next ranked" control — the plus in the empty state, a button
   beside Clear watchlist once there are names — that saves the highest-ranked
   company not already held and not blocked by the diversification filter. The

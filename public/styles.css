@@ -940,6 +940,16 @@ button { font: inherit; color: inherit; }
 .portfolio-change .gain { color: var(--gain); }
 .portfolio-change .loss { color: var(--loss); }
 .portfolio-change .since { font-weight: 500; color: var(--text-3); }
+.portfolio-windows { display: flex; gap: var(--s2); margin: 0 0 var(--s2); }
+/* No card border of its own: it's already inside one, and a box in a box at
+   this width reads as clutter. The hairline below separates it from the
+   stat rows instead. */
+.portfolio-chart {
+  margin: 0 0 var(--s2);
+  padding-bottom: var(--s2);
+}
+.portfolio-chart .chart-wrap { height: 156px; }
+.portfolio-chart .chart-axis-x { margin-top: 8px; }
 .portfolio-note {
   font-size: var(--fs-nano); color: var(--text-3); line-height: 1.45;
   margin: var(--s2) 0 var(--s2);

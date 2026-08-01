@@ -117,6 +117,16 @@ const RANGE_WINDOWS = [
 ];
 const DEFAULT_RANGE_WINDOW = '12M';
 
+// Windows the portfolio balance chart can be read over. "All" first because
+// the record only starts in January — a 12M pill would show the same line and
+// imply there's a year of it.
+const PORTFOLIO_WINDOWS = [
+  { key: 'ALL', label: 'All', days: null },
+  { key: '6M', label: '6M', days: 186 },
+  { key: '3M', label: '3M', days: 93 },
+  { key: '1M', label: '1M', days: 31 },
+];
+
 const state = {
   leaderboard: null,
   activeTab: 'ranks',
@@ -946,6 +956,47 @@ function fmtLongDate(dateStr) {
     .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+let portfolioWindow = 'ALL';
+
+// The balance series over the selected window, as the shared chart's
+// [{date, value}] shape. Gaps in the record are simply absent points — the
+// line joins across them rather than pretending there was no movement.
+function portfolioPoints() {
+  if (!portfolioSummary || !Array.isArray(portfolioSummary.series)) return [];
+  const win = PORTFOLIO_WINDOWS.find((w) => w.key === portfolioWindow) || PORTFOLIO_WINDOWS[0];
+  const rows = portfolioSummary.series;
+  const cutoff = win.days === null ? null : daysAgoToDateStr(win.days);
+  const out = [];
+  for (const [date, balance] of rows) {
+    if (cutoff && date < cutoff) continue;
+    out.push({ date, value: balance });
+  }
+  return out;
+}
+
+function renderPortfolioChart() {
+  const wrap = document.getElementById('portfolio-chart-wrap');
+  if (!wrap) return;
+  const points = portfolioPoints();
+  if (points.length < 2) {
+    wrap.innerHTML = '<div class="chart-error">Not enough recorded balances for this window.</div>';
+    const axis = document.getElementById('portfolio-chart-axis');
+    if (axis) axis.innerHTML = '';
+    return;
+  }
+  drawLineChart({
+    wrap,
+    axisEl: document.getElementById('portfolio-chart-axis'),
+    points,
+    gradId: 'portfolio-grad',
+    label: `Portfolio balance, ${portfolioWindow}`,
+    fmtAxis: (v) => `$${Math.round(v).toLocaleString('en-US')}`,
+    // The balance itself, not a percentage: this is the one chart in the app
+    // about actual dollars, and the axis already carries the round numbers.
+    tooltipFor: (c) => ({ text: fmtMoney(c.value), cls: '' }),
+  });
+}
+
 function renderPortfolioCard() {
   const card = document.getElementById('portfolio-card');
   if (!card) return;
@@ -973,6 +1024,10 @@ function renderPortfolioCard() {
     ? ` ${p.skippedSteps} step${p.skippedSteps === 1 ? '' : 's'} spanning a gap in the record ${p.skippedSteps === 1 ? 'is' : 'are'} left out of the volatility figure.`
     : '';
 
+  const pills = PORTFOLIO_WINDOWS.map((w) => `
+    <button type="button" class="window-pill" data-portfolio-window="${w.key}"
+      aria-pressed="${w.key === portfolioWindow}">${w.label}</button>`).join('');
+
   card.innerHTML = `
     <div class="portfolio-label">Your portfolio</div>
     <div class="portfolio-balance">${fmtMoney(p.endBalance)}</div>
@@ -981,9 +1036,24 @@ function renderPortfolioCard() {
       <span class="delta">${fmtMoneySigned(p.changeDollars)}</span>
       <span class="since">since ${fmtLongDate(p.start)}</span>
     </div>
+    <div class="portfolio-windows" role="group" aria-label="Chart window">${pills}</div>
+    <div class="portfolio-chart">
+      <div class="chart-wrap" id="portfolio-chart-wrap"></div>
+      <div class="chart-axis-x" id="portfolio-chart-axis"></div>
+    </div>
     ${rows.join('')}
     <p class="portfolio-note">Computed from ${p.sessions} recorded daily balances through ${fmtLongDate(p.end)}, not from the broker's own figure.${skipped}</p>`;
   card.hidden = false;
+
+  card.querySelectorAll('[data-portfolio-window]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (portfolioWindow === btn.dataset.portfolioWindow) return;
+      portfolioWindow = btn.dataset.portfolioWindow;
+      renderPortfolioCard();
+    });
+  });
+  // After the card is in the DOM: the chart measures its wrapper in pixels.
+  renderPortfolioChart();
 }
 
 // ── add the next ranked name ─────────────────────────────────────────
@@ -2068,8 +2138,7 @@ const CHART_PAD_Y = 26;
 const CHART_FALLBACK_W = 344;
 const CHART_FALLBACK_H = 184;
 
-function chartSize() {
-  const wrap = document.getElementById('chart-wrap');
+function chartSize(wrap) {
   return {
     w: Math.max(Math.round(wrap?.clientWidth || 0) || CHART_FALLBACK_W, 160),
     h: Math.max(Math.round(wrap?.clientHeight || 0) || CHART_FALLBACK_H, 100),
@@ -2090,6 +2159,92 @@ function chartSkeletonHTML() {
     </div>`;
 }
 
+// ── the shared line chart ────────────────────────────────────────────
+// One renderer, two callers: the per-ticker price chart in the detail sheet
+// and the portfolio balance chart on the Watchlist tab. They draw the same
+// thing — a filled line with three axis landmarks each way and a scrub
+// crosshair — and differ only in what the labels say, so the difference is
+// three callbacks rather than a second copy of the geometry.
+//
+// `points` is [{date, value}], oldest first.
+// `ids` emits the element ids the detail chart has always carried. Only one
+// chart may claim them (ids must be unique in a document) and both charts can
+// be on screen at once, so the portfolio chart goes without; every lookup
+// below is scoped to `wrap` and uses classes, so nothing depends on them.
+function drawLineChart({ wrap, axisEl, points, gradId, label, fmtAxis, tooltipFor, ids = false }) {
+  const { w: W, h: H } = chartSize(wrap);
+  const values = points.map((p) => p.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const innerH = H - CHART_PAD_Y * 2;
+  const innerW = W - CHART_PAD_X * 2;
+
+  const coords = points.map((p, i) => ({
+    x: points.length === 1 ? CHART_PAD_X : CHART_PAD_X + (i / (points.length - 1)) * innerW,
+    y: CHART_PAD_Y + innerH - ((p.value - min) / span) * innerH,
+    date: p.date,
+    value: p.value,
+  }));
+
+  const dir = values[values.length - 1] >= values[0] ? 'gain' : 'loss';
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  // Closed against the line's own first/last x, not 0/W — anchoring it to the
+  // container's edges put a stray diagonal wedge under the first point.
+  const areaPath = `${linePath} L${last.x.toFixed(2)},${H} L${first.x.toFixed(2)},${H} Z`;
+  const baselineY = first.y.toFixed(2);
+
+  // Axis landmarks: three levels and three dates, marked with 5px ticks rather
+  // than gridlines. Discrete and generously spaced on purpose — a full grid
+  // over a 344px sparkline reads as noise, but with the tooltip showing
+  // something other than the raw level, the levels have to come from somewhere.
+  // Only the mid tick: the min/max labels sit outside the data band (see
+  // CHART_PAD_Y), so ticks level with them would float free of their labels.
+  const midIdx = Math.floor((points.length - 1) / 2);
+  const ticks = [
+    `<line class="chart-tick" x1="1" y1="${(CHART_PAD_Y + innerH / 2).toFixed(2)}" x2="6" y2="${(CHART_PAD_Y + innerH / 2).toFixed(2)}" />`,
+    ...[first.x, coords[midIdx].x, last.x].map((x) => `<line class="chart-tick" x1="${x.toFixed(2)}" y1="${H - 7}" x2="${x.toFixed(2)}" y2="${H - 2}" />`),
+  ].join('');
+
+  const id = (name) => (ids ? ` id="${name}"` : '');
+  wrap.innerHTML = `
+    <div class="chart-axis-y max">${fmtAxis(max)}</div>
+    <div class="chart-axis-y mid">${fmtAxis((min + max) / 2)}</div>
+    <div class="chart-axis-y min">${fmtAxis(min)}</div>
+    <svg class="chart-svg ${dir}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}">
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.34" />
+          <stop offset="72%" stop-color="currentColor" stop-opacity="0.07" />
+          <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      ${ticks}
+      <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${W}" y2="${baselineY}" />
+      <path class="chart-area"${id('chart-area-path')} fill="url(#${gradId})" d="${areaPath}" />
+      <path class="chart-line"${id('chart-line-path')} d="${linePath}" />
+      <circle class="chart-startpoint"${id('chart-startpoint-dot')} cx="${first.x.toFixed(2)}" cy="${first.y.toFixed(2)}" r="3.5" />
+      <circle class="chart-endpoint"${id('chart-endpoint-dot')} cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
+      <line class="chart-crosshair-line"${id('crosshair-line')} x1="0" y1="0" x2="0" y2="${H}" />
+      <circle class="chart-crosshair-dot"${id('crosshair-dot')} r="4.5" />
+      <rect class="chart-hit"${id('chart-hit')} x="0" y="0" width="${W}" height="${H}" fill="transparent" />
+    </svg>
+    <div class="chart-tooltip"${id('chart-tooltip')}></div>
+  `;
+
+  if (axisEl) {
+    axisEl.innerHTML =
+      `<span>${fmtChartDate(points[0].date)}</span>` +
+      `<span>${fmtChartDate(points[midIdx].date)}</span>` +
+      `<span>${fmtChartDate(points[points.length - 1].date)}</span>`;
+  }
+
+  animateChartIn(wrap);
+  attachChartScrub(wrap, coords, W, tooltipFor);
+}
+
 function renderChart() {
   const wrap = document.getElementById('chart-wrap');
   if (!wrap) return;
@@ -2106,84 +2261,23 @@ function renderChart() {
   }
   detail.slice = slice;
 
-  const { w: W, h: H } = chartSize();
-  const closes = slice.map((p) => p.close);
-  const min = Math.min(...closes);
-  const max = Math.max(...closes);
-  const span = max - min || 1;
-  const innerH = H - CHART_PAD_Y * 2;
-  const innerW = W - CHART_PAD_X * 2;
-
-  const coords = slice.map((p, i) => ({
-    x: slice.length === 1 ? CHART_PAD_X : CHART_PAD_X + (i / (slice.length - 1)) * innerW,
-    y: CHART_PAD_Y + innerH - ((p.close - min) / span) * innerH,
-    date: p.date,
-    close: p.close,
-  }));
-
-  const isGain = closes[closes.length - 1] >= closes[0];
-  const dir = isGain ? 'gain' : 'loss';
-
-  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
-  const first = coords[0];
-  const last = coords[coords.length - 1];
-  // Closed against the line's own first/last x, not 0/W — anchoring it to the
-  // container's edges put a stray diagonal wedge under the first point.
-  const areaPath = `${linePath} L${last.x.toFixed(2)},${H} L${first.x.toFixed(2)},${H} Z`;
-  const baselineY = first.y.toFixed(2);
-
-  // Axis landmarks: three price levels and three dates, marked with 5px ticks
-  // rather than gridlines. Discrete and generously spaced on purpose — a full
-  // grid over a 344px sparkline reads as noise, but with the tooltip now showing
-  // cumulative return instead of price, the price levels have to come from
-  // somewhere.
-  const midPrice = (min + max) / 2;
-  // Only the mid level: the min/max labels sit outside the data band on purpose
-  // (see CHART_PAD_Y), so ticks level with them float free of their own labels.
-  // The mid label is centred on the band, so its tick lands exactly on it.
-  const yTicks = [CHART_PAD_Y + innerH / 2];
-  const midIdx = Math.floor((slice.length - 1) / 2);
-  const xTicks = [first.x, coords[midIdx].x, last.x];
-  const ticks = [
-    ...yTicks.map((y) => `<line class="chart-tick" x1="1" y1="${y.toFixed(2)}" x2="6" y2="${y.toFixed(2)}" />`),
-    ...xTicks.map((x) => `<line class="chart-tick" x1="${x.toFixed(2)}" y1="${H - 7}" x2="${x.toFixed(2)}" y2="${H - 2}" />`),
-  ].join('');
-
-  wrap.innerHTML = `
-    <div class="chart-axis-y max">${fmtRangePrice(max)}</div>
-    <div class="chart-axis-y mid">${fmtRangePrice(midPrice)}</div>
-    <div class="chart-axis-y min">${fmtRangePrice(min)}</div>
-    <svg class="chart-svg ${dir}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${detail.symbol} price chart, ${detail.range}">
-      <defs>
-        <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="currentColor" stop-opacity="0.34" />
-          <stop offset="72%" stop-color="currentColor" stop-opacity="0.07" />
-          <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      ${ticks}
-      <line class="chart-baseline" x1="0" y1="${baselineY}" x2="${W}" y2="${baselineY}" />
-      <path class="chart-area" id="chart-area-path" fill="url(#chart-grad)" d="${areaPath}" />
-      <path class="chart-line" id="chart-line-path" d="${linePath}" />
-      <circle class="chart-startpoint" id="chart-startpoint-dot" cx="${first.x.toFixed(2)}" cy="${first.y.toFixed(2)}" r="3.5" />
-      <circle class="chart-endpoint" id="chart-endpoint-dot" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="4.5" />
-      <line class="chart-crosshair-line" id="crosshair-line" x1="0" y1="0" x2="0" y2="${H}" />
-      <circle class="chart-crosshair-dot" id="crosshair-dot" r="4.5" />
-      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="chart-hit" />
-    </svg>
-    <div class="chart-tooltip" id="chart-tooltip"></div>
-  `;
-
-  const axisXEl = document.getElementById('chart-axis-x');
-  if (axisXEl) {
-    axisXEl.innerHTML =
-      `<span>${fmtChartDate(slice[0].date)}</span>` +
-      `<span>${fmtChartDate(slice[midIdx].date)}</span>` +
-      `<span>${fmtChartDate(slice[slice.length - 1].date)}</span>`;
-  }
-
-  animateChartIn(wrap);
-  attachChartScrub(wrap, coords, W);
+  drawLineChart({
+    wrap,
+    axisEl: document.getElementById('chart-axis-x'),
+    points: slice.map((p) => ({ date: p.date, value: p.close })),
+    gradId: 'chart-grad',
+    label: `${detail.symbol} price chart, ${detail.range}`,
+    fmtAxis: fmtRangePrice,
+    // Cumulative return from the range's opening close, not the raw price: the
+    // price is already readable off the y-axis landmarks, and "how far up from
+    // where this range started" is what the chart is actually about.
+    tooltipFor: (c, all) => {
+      const base = all[0].value;
+      const cum = base > 0 ? ((c.value - base) / base) * 100 : null;
+      return { text: cum === null ? 'N/A' : fmtPct(cum), cls: cum === null ? '' : signClass(cum) };
+    },
+    ids: true,
+  });
 }
 
 // Line "draws in" left-to-right via the classic stroke-dasharray/dashoffset
@@ -2195,19 +2289,20 @@ function renderChart() {
 // same technique the app already uses for .panel. prefers-reduced-motion
 // turns the animation off in CSS, so this just renders fully drawn instantly.
 function animateChartIn(wrap) {
-  const linePath = wrap.querySelector('#chart-line-path');
+  const linePath = wrap.querySelector('.chart-line');
   if (!linePath) return;
   const length = linePath.getTotalLength();
   linePath.style.strokeDasharray = String(length);
   linePath.style.setProperty('--dash-length', String(length));
 }
 
-function attachChartScrub(wrap, coords, chartW) {
+function attachChartScrub(wrap, coords, chartW, tooltipFor) {
   const svg = wrap.querySelector('svg');
-  const hit = wrap.querySelector('#chart-hit');
-  const crosshairLine = wrap.querySelector('#crosshair-line');
-  const crosshairDot = wrap.querySelector('#crosshair-dot');
-  const tooltip = wrap.querySelector('#chart-tooltip');
+  const hit = wrap.querySelector('.chart-hit');
+  const crosshairLine = wrap.querySelector('.chart-crosshair-line');
+  const crosshairDot = wrap.querySelector('.chart-crosshair-dot');
+  const tooltip = wrap.querySelector('.chart-tooltip');
+  if (!svg || !hit) return;
 
   function nearestIndex(clientX) {
     const rect = svg.getBoundingClientRect();
@@ -2228,22 +2323,17 @@ function attachChartScrub(wrap, coords, chartW) {
 
     const rect = svg.getBoundingClientRect();
     const pxRatio = rect.width / chartW;
-    const leftPx = Math.min(Math.max(c.x * pxRatio, 62), rect.width - 62);
-    tooltip.style.left = `${leftPx}px`;
+    tooltip.style.left = `${Math.min(Math.max(c.x * pxRatio, 62), rect.width - 62)}px`;
     tooltip.style.opacity = '1';
-    // Cumulative return from the range's opening close, not the raw price: the
-    // price is already readable off the y-axis landmarks, and "how far up from
-    // where this range started" is the thing the chart is actually about.
-    const base = coords[0].close;
-    const cum = base > 0 ? ((c.close - base) / base) * 100 : null;
+    const { text, cls } = tooltipFor(c, coords);
     tooltip.innerHTML = '';
     const dateEl = document.createElement('span');
-    dateEl.textContent = fmtChartDate(c.date) + ' — ';
-    const cumEl = document.createElement('b');
-    cumEl.textContent = cum === null ? 'N/A' : fmtPct(cum);
-    if (cum !== null) cumEl.className = cum >= 0 ? 'gain' : 'loss';
+    dateEl.textContent = `${fmtChartDate(c.date)} — `;
+    const valueEl = document.createElement('b');
+    valueEl.textContent = text;
+    if (cls) valueEl.className = cls;
     tooltip.appendChild(dateEl);
-    tooltip.appendChild(cumEl);
+    tooltip.appendChild(valueEl);
   }
 
   function hide() {
@@ -2262,15 +2352,14 @@ function attachChartScrub(wrap, coords, chartW) {
     dragging = true;
     try { hit.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
     showAt(e.clientX);
-    e.preventDefault(); // don't let the drag turn into a sheet scroll
+    e.preventDefault(); // don't let the drag turn into a scroll
   });
   hit.addEventListener('pointermove', (e) => {
     if (dragging || e.pointerType === 'mouse') showAt(e.clientX);
   });
   // Releasing leaves the reading on screen rather than clearing it: a quick tap
   // is a legitimate "what was it here?" and hiding on pointerup would make that
-  // gesture flash and vanish. It clears on the next render — a range switch or
-  // reopening the sheet.
+  // gesture flash and vanish. It clears on the next render.
   hit.addEventListener('pointerup', () => { dragging = false; });
   hit.addEventListener('pointercancel', () => { dragging = false; hide(); });
   hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !dragging) hide(); });
@@ -2309,11 +2398,14 @@ function initDetailSheet() {
   // matters while the sheet is actually open.
   let resizeRaf = null;
   window.addEventListener('resize', () => {
-    const sheet = document.getElementById('detail-sheet');
-    if (!sheet || sheet.hidden || !detail.symbol) return;
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(() => {
       resizeRaf = null;
+      // Both charts measure their wrapper in real pixels, so a size change is
+      // a re-render rather than a rescale.
+      renderPortfolioChart();
+      const sheet = document.getElementById('detail-sheet');
+      if (!sheet || sheet.hidden || !detail.symbol) return;
       if (historyCache.has(detail.symbol)) renderChart();
       positionSegmentedThumb(true);
     });
