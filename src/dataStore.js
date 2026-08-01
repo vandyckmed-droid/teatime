@@ -7,6 +7,7 @@
 const config = require('./config');
 const { getLeaderboard, metricAvailability } = require('./leaderboard');
 const { getHistoryBatch } = require('./history');
+const { trailingAnnualizedVolPct } = require('./ranking');
 
 const store = {
   leaderboard: null,
@@ -35,15 +36,25 @@ async function refreshAll() {
   const symbols = mergedCompanies.map((c) => c.symbol);
   const historyResults = await getHistoryBatch(symbols);
 
+  // Realized trailing-1Y volatility rides on each company, computed here from
+  // the history this refresh just fetched anyway — zero extra API calls. Its
+  // consumer is the high-volatility row flag, and putting the number on the
+  // leaderboard payload is what lets the static snapshot (which embeds this
+  // response and can fetch nothing at page load) evaluate the flag too.
+  const companiesWithVol = mergedCompanies.map((c, i) => ({
+    ...c,
+    annVolPct: trailingAnnualizedVolPct(historyResults[i] && historyResults[i].series),
+  }));
+
   // Everything needed has succeeded — commit atomically.
   if (shouldCommitSlowFacts) store.slowFactsAsOf = Date.now();
   const newSlowFactsBySymbol = new Map();
-  for (const c of mergedCompanies) {
+  for (const c of companiesWithVol) {
     newSlowFactsBySymbol.set(c.symbol, { sector: c.sector, beta: c.beta, ipoDate: c.ipoDate });
   }
   store.slowFactsBySymbol = newSlowFactsBySymbol;
 
-  store.leaderboard = { ...data, companies: mergedCompanies, asOf: asOf.toISOString() };
+  store.leaderboard = { ...data, companies: companiesWithVol, asOf: asOf.toISOString() };
 
   const newHistoryBySymbol = new Map();
   historyResults.forEach((h, i) => newHistoryBySymbol.set(symbols[i], h));

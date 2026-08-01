@@ -81,6 +81,10 @@ function buildSnapshot() {
     price: round(c.price, 4),
     marketCap: c.marketCap ?? null,
     beta: round(c.beta, 4),
+    // Trailing-1Y realized vol (see trailingAnnualizedVolPct in src/ranking.js),
+    // filed so a later question about volatility regimes doesn't need the raw
+    // history re-fetched. New field 2026-08; older files simply lack it.
+    annVolPct: round(c.annVolPct, 2),
     ipoDate: c.ipoDate || null,
     low52: round(c.low52, 4),
     high52: round(c.high52, 4),

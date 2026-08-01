@@ -299,7 +299,20 @@ Concretely:
   brighter than its neighbours with nothing explaining why is just a rendering
   bug as far as the reader can tell. The mega-cap cutoff is an absolute $200B
   rather than "top 50" so it doesn't silently change meaning every time
-  `universeSize` moves; it happened to catch 53 of 300 when set.
+  `universeSize` moves; it happened to catch 53 of 300 when set. The same
+  reasoning fixed the high-volatility flag at an absolute 60% trailing-1Y
+  annualized (double the board's ~30% median, 29 of 300 when set) rather than a
+  percentile, and pinned its window to a fixed trailing year rather than the
+  ranking window — a flag is a fact about the company, and shouldn't quietly
+  change meaning when the ranking window moves. Its input travels as
+  `annVolPct` on the leaderboard payload (computed in `src/dataStore.js` at
+  refresh, `trailingAnnualizedVolPct` in `src/ranking.js`), because a flag
+  `test` runs client-side against the company object and the static snapshot
+  can fetch nothing — server-computed, payload-carried is the pattern for any
+  future flag that needs history. When one company carries two flags, the CSS
+  composes them into a single two-tone orb via a combined selector
+  (`[data-flags~="mega"][data-flags~="vol"]`) that must come after the
+  single-flag rules — same custom property, source order resolves it.
 - `src/correlation.js` answers one question — `correlationsAgainst`, the
   universe against the held set, which is what fades a board row. Signed,
   never `|r|`: a strong negative is diversification, and taking the absolute

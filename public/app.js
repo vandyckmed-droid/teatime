@@ -192,6 +192,16 @@ const PORTFOLIO_WINDOWS = [
 // same thing at 250 companies as at 500.
 const MEGA_CAP_MIN = 200e9;
 
+// 60% annualized is roughly double the board's typical name: measured against
+// the live universe, the median trailing-1Y vol was ~30% and this line caught
+// 29 of 300. An absolute threshold for the same reason as the $200B one — a
+// percentile would quietly re-decide what "volatile" means every time the
+// universe or the market regime changed. The number itself comes from the
+// leaderboard payload (annVolPct, computed once daily in src/dataStore.js from
+// the same history fetch the rankings use), so the static snapshot can
+// evaluate this flag with no backend.
+const HIGH_VOL_MIN_PCT = 60;
+
 const ROW_FLAGS = [
   {
     key: 'mega',
@@ -202,6 +212,17 @@ const ROW_FLAGS = [
     test: (c) => typeof c.marketCap === 'number' && c.marketCap >= MEGA_CAP_MIN,
     note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a gold orb &mdash; `
       + `mega caps, worth <b>$200B</b> or more.`,
+  },
+  {
+    key: 'vol',
+    label: 'high volatility',
+    title: 'High volatility',
+    description: 'Put a violet orb behind the logo of any company whose daily swings over the '
+      + 'past year annualize to 60% or more — about double the typical name on this board. '
+      + 'A temperament marker, not a warning: it says how hard the ride is, not which way it goes.',
+    test: (c) => typeof c.annVolPct === 'number' && c.annVolPct >= HIGH_VOL_MIN_PCT,
+    note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a violet orb &mdash; `
+      + `daily swings annualizing to <b>60%</b> or more over the past year.`,
   },
 ];
 

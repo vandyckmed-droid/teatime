@@ -91,6 +91,13 @@
      the app, so the two read as different kinds of object rather than as two
      entries in one palette. */
   --flag-mega: #FFBC48;
+  /* High-volatility flag: violet, oklch ≈ 0.68 0.19 295. Same reasoning as the
+     amber — clear of both protected bands, and read as temperature rather than
+     verdict. Violet sits near the real-estate/comm sector hues, but those are
+     flat 8px dots and this is a bloom around the logo disc; the object shape
+     is the differentiator, per the mega flag's precedent. Chroma runs higher
+     than any sector dot so the glow doesn't read as smudged periwinkle. */
+  --flag-vol: #9D7BFF;
 
   --tabbar-bg: rgba(0, 0, 0, 0.72);
   --sheet-scrim: rgba(0, 0, 0, 0.38);
@@ -394,6 +401,22 @@ button { font: inherit; color: inherit; }
     0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
     0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
 }
+/* Violet runs slightly hotter than the amber (46% vs 42%) because at equal
+   alpha it reads a step quieter against charcoal — matched by eye, not math. */
+.row[data-flags~="vol"] {
+  --flag-orb:
+    0 0 9px 2px color-mix(in oklab, var(--flag-vol) 46%, transparent),
+    0 0 20px 5px color-mix(in oklab, var(--flag-vol) 18%, transparent);
+}
+/* Both at once: one two-tone orb, not two orbs. The tight layer keeps the
+   mega gold, the wide bloom goes violet — size stays the claim nearest the
+   disc, temperament radiates further. Must come after the single-flag rules;
+   it's the same custom property and order is what resolves it. */
+.row[data-flags~="mega"][data-flags~="vol"] {
+  --flag-orb:
+    0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
+    0 0 20px 6px color-mix(in oklab, var(--flag-vol) 26%, transparent);
+}
 
 /* The Settings row previews its own flag, so the switch is labelled by the
    thing it turns on rather than by a description of it. Same disc size and
@@ -410,6 +433,11 @@ button { font: inherit; color: inherit; }
   box-shadow:
     0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
     0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
+}
+.flag-sample-orb[data-flag-sample="vol"] {
+  box-shadow:
+    0 0 9px 2px color-mix(in oklab, var(--flag-vol) 46%, transparent),
+    0 0 20px 5px color-mix(in oklab, var(--flag-vol) 18%, transparent);
 }
 .flag-sample-count {
   font-size: var(--fs-nano); color: var(--text-3);

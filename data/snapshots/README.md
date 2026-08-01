@@ -33,6 +33,7 @@ isn't limited by what seemed interesting on the day it was captured.
     {
       "symbol": "SNDK", "name": "…", "sector": "Technology",
       "price": 1016.0, "marketCap": 1.4e11, "beta": 2.17,
+      "annVolPct": 115.52,           // trailing-1Y realized vol, annualized — added 2026-08, older files lack it
       "ipoDate": "…", "low52": 40.1, "high52": 2354.0,
       "returns": { "1D": …, "5D": …, "1M": …, "3M": …, "6M": …,
                    "ytd": …, "1Y": …, "3Y": …, "5Y": … },

@@ -113,6 +113,31 @@ function volAdjustedBetween(prepared, startStr, endStr) {
   return (mean / stdev) * Math.sqrt(TRADING_DAYS_PER_YEAR);
 }
 
+// Realized annualized volatility over the trailing ~12 months of closes, in
+// percent. Feeds the leaderboard's per-company annVolPct (see dataStore), whose
+// one consumer is the high-volatility row flag — which is why the window is a
+// fixed trailing year rather than the ranking window: a flag is a fact about
+// the company, and shouldn't quietly change meaning when the ranking window
+// moves. Sample stdev of simple daily returns, same convention as
+// volAdjustedBetween above and src/portfolio.js.
+const TRAILING_VOL_SESSIONS = 250;
+const TRAILING_VOL_MIN_RETURNS = 60; // under ~3 months of history is noise, not a fact
+
+function trailingAnnualizedVolPct(series) {
+  const pts = (series || []).slice(-(TRAILING_VOL_SESSIONS + 1));
+  if (pts.length < TRAILING_VOL_MIN_RETURNS + 1) return null;
+  const returns = [];
+  for (let i = 1; i < pts.length; i++) {
+    const prev = pts[i - 1].close;
+    if (!(prev > 0) || !(pts[i].close > 0)) continue;
+    returns.push(pts[i].close / prev - 1);
+  }
+  if (returns.length < TRAILING_VOL_MIN_RETURNS) return null;
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((a, r) => a + (r - mean) ** 2, 0) / (returns.length - 1);
+  return Math.sqrt(variance) * Math.sqrt(TRADING_DAYS_PER_YEAR) * 100;
+}
+
 function customRangeReturn(series, startDaysAgo, endDaysAgo) {
   if (!series || series.length === 0) return null;
   return returnBetween(prepareSeries(series), daysAgoToDateStr(startDaysAgo), daysAgoToDateStr(endDaysAgo));
@@ -129,5 +154,6 @@ module.exports = {
   prepareSeries,
   returnBetween,
   volAdjustedBetween,
+  trailingAnnualizedVolPct,
   daysAgoToDateStr,
 };
