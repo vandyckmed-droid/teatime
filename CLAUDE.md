@@ -18,6 +18,11 @@ process."
 - **Be short.** Two to four sentences unless they ask for detail.
 - **No jargon.** No git internals, no file paths, no library or function
   names, no code-speak — unless they directly ask how something works.
+  This includes engineering-adjacent phrases that feel harmless: "move the
+  test suite into the project" earned a correction from the owner, where
+  "store the app's safety checks with the app so they can't get lost" would
+  not have. If a phrase names an artifact of the workflow rather than
+  something the owner can see or feel, translate it.
 - **Frame changes as outcomes, not mechanics.** "This makes your rankings
   update faster," not "this refactors the caching layer."
 - **End with one clear recommendation.** The single best next step, not a
@@ -203,10 +208,15 @@ no branch, no PR). Note what you improved at the top of the commit message.
 
 - `node --check` the touched `.js` files.
 - Boot the server (`PORT=<free-port> nohup node server.js > /tmp/x.log 2>&1 &`)
-  and drive it with Playwright — this repo has no committed test suite, so a
-  scripted Playwright pass *is* the test suite for each change. Use the
-  global install: `/opt/node22/lib/node_modules/playwright`, Chromium at
-  `/opt/pw-browsers/chromium`. Test at a phone-sized viewport
+  and run the committed suites in `tests/` against it (see `tests/README.md`
+  for the conventions — argv target, live vs `file://` bundle mode, the
+  localStorage seeding trap). A scripted Playwright pass *is* the testing
+  bar for each change: run every suite a change could plausibly touch, and
+  when a change alters behaviour a suite asserts, update the suite in the
+  same commit. New coverage goes in `tests/` too — that directory only stays
+  the safety net if it grows with the app. Playwright comes from the global
+  install (`/opt/node22/lib/node_modules/playwright`, Chromium at
+  `/opt/pw-browsers/chromium`); test at a phone-sized viewport
   (`devices['iPhone 14 Pro']` is a convenient preset — no requirement that
   the design itself be iOS-specific, just that it fits a real phone screen).
 - The app is dark-only (see "Phone-sized layout" below) — no need to test

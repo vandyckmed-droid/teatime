@@ -145,6 +145,13 @@ Then open http://localhost:3000.
   to take it away, and a block with nothing to say for a given company drops
   its own card.
 
+## The tests
+
+`tests/` holds the Playwright regression suites — the only tests here, and
+the bar every change has to clear before it ships. `tests/README.md` covers
+how to point them at a live server or at the published bundle, and the
+conventions they share.
+
 ## The daily archive
 
 `scripts/snapshot.js` writes one file per day to `data/snapshots/`, run by
