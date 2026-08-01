@@ -180,6 +180,13 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   `src/ranking.js` above) already remove the two biggest costs of scaling
   further — repeated FMP fetches per visitor, and shipping the full universe's
   history JSON to the browser just to rank it.
+- New row highlight: add an entry to `ROW_FLAGS` in `public/app.js` (a `key`,
+  a `label` for the accessible name, a `test(company)`, and optionally a
+  `note(count)` for the board callout) plus one CSS rule setting `--flag-glow`
+  and `--flag-tint` on `.row[data-flags~="yourkey"]`. The glow layer itself is
+  written once and composed into every box-shadow a row can carry, so a flag
+  sits on top of the saved-row ring instead of fighting it. Currently one
+  entry: mega caps at $200B and up.
 - New per-company data panel: add an entry to `DETAIL_BLOCKS` in
   `public/app.js` — a title and a `render(company)` returning HTML (use
   `statRow()` for anything list-shaped). It appears as a card in the

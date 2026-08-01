@@ -313,10 +313,17 @@ button { font: inherit; color: inherit; }
   padding: 12px var(--s3);
   min-height: 62px;
   cursor: pointer;
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: var(--flag-tint);
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
-  box-shadow: var(--shadow-card);
+  /* --flag-glow is the row-flag layer (see ROW_FLAGS in app.js). It is
+     composed into every box-shadow a row can have rather than being its own
+     rule, so a flag never fights the saved-row treatment for the property —
+     a saved mega cap wears both. Transparent by default costs nothing. */
+  --flag-glow: 0 0 0 0 transparent;
+  --flag-tint: none;
+  box-shadow: var(--shadow-card), var(--flag-glow);
   transition: background 180ms ease;
 }
 .row.unavailable { opacity: 0.45; }
@@ -326,7 +333,7 @@ button { font: inherit; color: inherit; }
    itself stays tappable; only its add control is disabled. */
 .row.correlated { opacity: 0.4; }
 .row.correlated .add-btn { cursor: not-allowed; }
-.row:active { background: var(--surface-2); transition: none; }
+.row:active { background-color: var(--surface-2); transition: none; }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* ── saved rows: a partial outline glow ───────────────────────────────
@@ -337,12 +344,13 @@ button { font: inherit; color: inherit; }
    drawn just outside the border by masking a gradient-filled box down to
    its own padding edge (the standard gradient-border technique). */
 .row.is-selected {
-  background: color-mix(in oklab, var(--accent) 4%, var(--surface));
+  background-color: color-mix(in oklab, var(--accent) 4%, var(--surface));
   box-shadow:
     var(--shadow-card),
-    0 2px 18px -8px color-mix(in oklab, var(--accent) 22%, transparent);
+    0 2px 18px -8px color-mix(in oklab, var(--accent) 22%, transparent),
+    var(--flag-glow);
 }
-.row.is-selected:active { background: color-mix(in oklab, var(--accent) 9%, var(--surface-2)); }
+.row.is-selected:active { background-color: color-mix(in oklab, var(--accent) 9%, var(--surface-2)); }
 .row.is-selected::before {
   content: '';
   position: absolute; inset: -1px;
@@ -358,6 +366,24 @@ button { font: inherit; color: inherit; }
   -webkit-mask-composite: xor;
           mask-composite: exclude;
   pointer-events: none;
+}
+
+/* ── row flags: a quiet halo ──────────────────────────────────────────
+   Driven by ROW_FLAGS in app.js, which writes matching keys into data-flags.
+   Everything below is per-flag: one selector setting --flag-glow is the whole
+   cost of adding another.
+
+   Achromatic on purpose. Green and red are spoken for here — gain, loss, and
+   "yours / act here" — and a flag is a neutral fact about a company, not a
+   verdict on it. A white halo says "notable" without claiming good or bad, and
+   it cannot be misread as either. Two soft outer blooms rather than a border:
+   a ring would compete with the saved-row outline directly above, and this has
+   to be able to sit underneath one. */
+.row[data-flags~="mega"] {
+  --flag-glow:
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 0 18px -5px rgba(255, 255, 255, 0.22);
+  --flag-tint: linear-gradient(rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
 }
 
 /* Left-aligned so the number sits at the card's leading edge rather than

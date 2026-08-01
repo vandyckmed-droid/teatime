@@ -796,6 +796,51 @@ function updateScoreLabels() {
   });
 }
 
+// ── row flags ────────────────────────────────────────────────────────
+// A registry for "mark this row as special" — the same shape as SETTINGS and
+// DETAIL_BLOCKS. One entry is one flag; matching rows get `data-flags` carrying
+// its key, and one CSS rule per key sets --flag-glow on that selector (see
+// .row[data-flags~=...] in styles.css). The glow machinery itself is written
+// once, so a second flag is an entry here plus a single line of CSS, not a new
+// rendering path.
+//
+// Contract for an entry:
+//   key    stable identifier; becomes the data-flags token and the CSS hook
+//   label  spoken in the row's accessible name, so the glow isn't purely visual
+//   test   (company) => boolean, run on every row of both boards
+//   note   optional (count) => string, added to the board callout so a
+//          highlighted row is never unexplained
+//
+// Flags are additive: a row can carry several, and the glow composes with the
+// saved-row ring rather than replacing it.
+//
+// $200B is the mega-cap line. Chosen against the live board — it takes in 53 of
+// the 300 companies, so it lands on "roughly the top 50" while still being an
+// absolute threshold rather than a rank. That matters: a rank would silently
+// change meaning every time universeSize moves, whereas "above $200B" means the
+// same thing at 250 companies as at 500.
+const MEGA_CAP_MIN = 200e9;
+
+const ROW_FLAGS = [
+  {
+    key: 'mega',
+    label: 'mega cap',
+    test: (c) => typeof c.marketCap === 'number' && c.marketCap >= MEGA_CAP_MIN,
+    note: (n) => `<b>${n}</b> ${n === 1 ? 'company is' : 'companies are'} lit with a soft halo &mdash; `
+      + `mega caps, worth <b>$200B</b> or more.`,
+  },
+];
+
+function rowFlags(c) {
+  return ROW_FLAGS.filter((f) => {
+    try {
+      return f.test(c);
+    } catch {
+      return false; // a broken flag drops itself rather than taking the board down
+    }
+  });
+}
+
 // ── row rendering (shared by Ranks and Watchlist) ───────────────────
 // Brand logo in a circular avatar. The <img> sits over ticker initials; a
 // failed load is dropped by pruneBrokenLogos below, revealing the sector-tinted
@@ -870,7 +915,12 @@ function baseRow(c, extraClass) {
   row.dataset.symbol = c.symbol;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
-  row.setAttribute('aria-label', `${c.name}: view chart`);
+  // The flags are a visual signal, so they also go in the accessible name —
+  // a glow nobody can hear is a glow half the point of.
+  const flags = rowFlags(c);
+  if (flags.length) row.dataset.flags = flags.map((f) => f.key).join(' ');
+  const suffix = flags.length ? ` (${flags.map((f) => f.label).join(', ')})` : '';
+  row.setAttribute('aria-label', `${c.name}${suffix}: view chart`);
   return row;
 }
 
@@ -997,6 +1047,14 @@ function renderRanksCallout(unavailable) {
   const faded = state.leaderboard.companies.filter((c) => correlationBlock(c)).length;
   if (faded > 0) {
     notes.push(`<b>${faded}</b> ${faded === 1 ? 'name is' : 'names are'} faded and can't be added &mdash; daily-return correlation of <b>${state.settings.correlationThreshold.toFixed(2)}</b> or more with something already on your watchlist. Adjust or switch this off in Settings.`);
+  }
+
+  // One line per flag that has something to say, so a highlighted row is never
+  // just a mysteriously brighter row.
+  for (const flag of ROW_FLAGS) {
+    if (!flag.note) continue;
+    const n = state.leaderboard.companies.filter((c) => rowFlags(c).includes(flag)).length;
+    if (n > 0) notes.push(flag.note(n));
   }
 
   if (notes.length === 0) {
