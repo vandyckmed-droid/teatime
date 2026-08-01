@@ -1,4 +1,5 @@
-# Archives one file per day into data/snapshots/ (see scripts/snapshot.js).
+# Archives one file per day into data/snapshots/ and refreshes the SPY
+# benchmark series in data/market/ (see scripts/snapshot.js).
 #
 # This is the only automation in the repo — deploying the GitHub Pages bundle is
 # still a plain commit, not a workflow. It exists because the archive has to
@@ -43,7 +44,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Capture today's board
+      - name: Capture today's board and refresh the benchmark
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         # A manual run always recaptures. Skipping when the day already has a
@@ -62,9 +63,9 @@ jobs:
           # that — so this step reported "nothing to commit" on every run that
           # captured a new day, and the file died with the runner. Silently:
           # the job still exited 0 and the run showed green.
-          git add data/snapshots
-          if git diff --cached --quiet -- data/snapshots; then
-            echo "No new snapshot to commit."
+          git add data/snapshots data/market
+          if git diff --cached --quiet -- data/snapshots data/market; then
+            echo "Nothing new to commit."
             exit 0
           fi
           git commit -m "Daily snapshot: $(date -u +%Y-%m-%d)"

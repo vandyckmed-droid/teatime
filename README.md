@@ -64,7 +64,22 @@ Then open http://localhost:3000.
   missing day in the record can't masquerade as one very volatile day. Figures
   come from those dates and dollar amounts alone — deliberately not
   reconciled against the broker's own headline rate of return, which uses a
-  baseline and a method the file doesn't contain.
+  baseline and a method the file doesn't contain. It also computes beta
+  against SPY — cov(rp, rm) / var(rm) over a trailing 126 sessions where
+  *both* a balance move and a market move exist. That join is an inner join
+  and nothing is ever zero-filled or carried forward, because a fabricated
+  "the account didn't move while the market did" day drags beta toward zero;
+  gap-spanning steps already excluded from the volatility figure stay
+  excluded here too, and below 60 paired sessions the figure is reported as
+  null and the card simply omits the row.
+- `src/market.js` — SPY's daily closes and dividends, kept in
+  `data/market/spy.csv` and refreshed by the daily Actions run. It's a file
+  rather than another `dataStore` field because the published snapshot has to
+  be able to compute beta at build time: the static site has no backend and
+  makes no network calls, so anything it shows must already be a number by
+  the time the bundle is assembled. Daily returns are total returns — the
+  dividend is added back on its ex-date, because FMP's "dividend-adjusted"
+  price endpoint returns closes identical to the plain ones.
 - `src/ratings.js` — published analyst sentiment per ticker, recorded by hand
   in `data/ratings/ratings.csv` and append-only by (date, symbol), so a
   company rated again later keeps every earlier reading. Nothing here feeds
@@ -90,8 +105,10 @@ Then open http://localhost:3000.
   used to be an 88px column moved into the full-screen ticker view, where it
   has the width to be read. The Investing tab holds two views behind a
   segmented control — Portfolio, a card of the owner's own account (see
-  `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M, hidden
-  entirely if no balances are recorded; and Watchlist, the saved names. They
+  `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M and rows
+  for return, volatility, beta vs SPY, the 15% vol-target multiple and the
+  best/worst day, hidden entirely if no balances are recorded; and Watchlist,
+  the saved names. They
   were one scroll until the portfolio card grew tall enough to push the names
   off the bottom of the screen. Which view you were last on is remembered.
   The Watchlist view
@@ -125,6 +142,12 @@ Then open http://localhost:3000.
 `scripts/snapshot.js` writes one file per day to `data/snapshots/`, run by
 `.github/workflows/daily-snapshot.yml` at 09:00 UTC. It's the only workflow in
 the repo — publishing the Pages bundle is still a plain commit.
+
+The same run also refreshes `data/market/spy.csv` (see `src/market.js`), and
+does it first, so the benchmark keeps advancing even on a day whose board was
+already filed. The two are committed together but fail apart: a missed archive
+day is gone for good, whereas the SPY file is rewritten in full every run, so a
+failed refresh just logs and the next run picks it up.
 
 The app keeps no history of itself: `src/dataStore.js` holds the current day
 in memory and each refresh overwrites it, so yesterday's board is otherwise

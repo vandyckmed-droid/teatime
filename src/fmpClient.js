@@ -89,4 +89,20 @@ function getHistoricalPrices(symbol, from, to) {
   return fmpGet('historical-price-eod/full', { symbol, from, to });
 }
 
-module.exports = { screenLargestCompanies, getPriceChange, getProfile, getHistoricalPrices };
+// Cash dividends by ex-date, newest first. The endpoint ignores from/to and
+// returns the whole history (SPY's is 135 rows back to 1993), so callers ask
+// for all of it and filter by date themselves. Needed because FMP's
+// "dividend-adjusted" price endpoint returns closes identical to the plain
+// ones — it does not actually reinvest dividends — so a total-return series
+// has to be built from the ex-dates here.
+function getDividends(symbol) {
+  return fmpGet('dividends', { symbol, limit: 500 });
+}
+
+module.exports = {
+  screenLargestCompanies,
+  getPriceChange,
+  getProfile,
+  getHistoricalPrices,
+  getDividends,
+};

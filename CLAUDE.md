@@ -346,11 +346,34 @@ Concretely:
   day", not a blank to be cleaned up. New labels go in `RATING_SCALE`
   (`src/ratings.js`) and `RATING_TONE` (`public/app.js`), which are the same
   scale duplicated for want of a shared module. These never feed the ranking.
+- `data/market/spy.csv` is the one data file here that is *not* append-only,
+  and the distinction is the rule to keep: the portfolio and ratings files are
+  hand-kept observations that refetching would destroy, while this one is a
+  straight mirror of FMP and is rewritten in full on every refresh, which makes
+  it self-correcting and costs almost nothing in the diff (stable dates, only
+  the tail moves). Read by `src/market.js`, consumed only by the portfolio
+  card's beta figure. Its returns are *total* returns — the dividend is added
+  back on its ex-date, because FMP's "dividend-adjusted" price endpoint hands
+  back closes identical to the plain ones and adjusts nothing. If a second
+  benchmark is ever wanted, add a column or a sibling file and keep the same
+  rewrite-in-full posture; don't start appending to this one.
+- Beta (`computeBeta` in `src/portfolio.js`) pairs the portfolio's daily
+  returns with SPY's by date — an inner join, trailing 126 pairs, hidden below
+  60. Three things there are load-bearing and easy to "simplify" wrongly:
+  nothing is ever zero-filled or forward-filled (a fabricated flat day against
+  a real market move pulls beta toward zero); the steps already dropped from
+  the volatility figure for spanning a recording gap are dropped here by
+  construction, because the join walks that same filtered list; and the figure
+  has to be computed server-side, since the published bundle embeds
+  `EMBEDDED_PORTFOLIO` and cannot fetch anything at page load.
 - Daily board snapshots accrue in `data/snapshots/` via `scripts/snapshot.js`
   and the one workflow in the repo (`.github/workflows/daily-snapshot.yml`).
   Append-only and deliberately stores inputs rather than one ranking — extend
   what a file holds rather than adding a second archive, and don't rewrite
-  past files. Outbound FMP calls (per-company in `src/leaderboard.js`,
+  past files. That workflow also refreshes `data/market/spy.csv` first, and
+  its commit step stages both paths — a new data directory that isn't in that
+  `git add` line is written by the runner and then thrown away with it, which
+  is exactly how a month of snapshots was lost once already. Outbound FMP calls (per-company in `src/leaderboard.js`,
   and history in `src/history.js`) go through `mapWithConcurrency`
   (`src/concurrency.js`) capped at `config.fmpConcurrency`, not unbounded
   `Promise.all` — this is what keeps a bigger `universeSize` from turning

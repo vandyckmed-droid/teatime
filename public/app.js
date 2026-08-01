@@ -1072,6 +1072,13 @@ function renderPortfolioCard() {
     statRow('Annualized return', fmtPct(p.annualizedReturnPct), signClass(p.annualizedReturnPct)),
     statRow('Volatility', p.annualizedVolPct === null ? 'N/A' : `${p.annualizedVolPct.toFixed(1)}% annualized`),
   ];
+  // Neutral, unsigned, two decimals: beta is a sensitivity, not a gain or a
+  // loss, so it gets none of the green/red the rows around it use. Absent
+  // whenever the server couldn't pair enough sessions to mean anything — see
+  // computeBeta() in src/portfolio.js.
+  if (typeof p.betaVsSpy === 'number') {
+    rows.push(statRow('Beta vs SPY', p.betaVsSpy.toFixed(2)));
+  }
   if (p.exposureScale) {
     // Straight arithmetic, not a recommendation: target ÷ realized.
     rows.push(statRow(`${p.targetVolPct}% vol target`, `${p.exposureScale.toFixed(2)}× exposure`));

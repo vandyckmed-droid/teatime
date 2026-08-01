@@ -23,6 +23,7 @@ const path = require('path');
 const config = require('../src/config');
 const dataStore = require('../src/dataStore');
 const ranking = require('../src/ranking');
+const market = require('../src/market');
 
 // The window the boards default to (mirrors rankDateRange's default in
 // public/app.js). Stored alongside the scores so a later reader knows exactly
@@ -119,10 +120,27 @@ function buildSnapshot() {
   };
 }
 
+// The benchmark series behind the portfolio card's beta figure. Refreshed on
+// the same schedule but on its own terms: it's rewritten in full every run, so
+// a failure here is not the permanent loss that a missed archive day is — the
+// next run refetches the whole window regardless. It runs before the
+// already-captured check below so the benchmark keeps advancing even on a day
+// whose board was already filed.
+async function refreshBenchmark() {
+  try {
+    const result = await market.refreshSpyCsv();
+    console.log(`Refreshed ${result.path} (${result.rows} rows, ${result.start} -> ${result.end})`);
+  } catch (err) {
+    console.error(`SPY refresh failed (last-known data kept, next run retries): ${err.message}`);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const date = new Date().toISOString().slice(0, 10);
   const outPath = path.join(args.outDir, `${date}.json`);
+
+  await refreshBenchmark();
 
   if (fs.existsSync(outPath) && !args.force) {
     console.log(`${outPath} already exists — nothing to do (pass --force to overwrite).`);

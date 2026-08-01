@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { getSpySeries } = require('./market');
+
 // ── the owner's own account balance ──────────────────────────────────
 // Read from data/portfolio/balances.csv (see the README beside it), which is
 // maintained by hand from brokerage screenshots. Everything here is derived
@@ -63,6 +65,69 @@ function sessionsBetween(fromStr, toStr) {
   return count;
 }
 
+// ── beta against the market ──────────────────────────────────────────
+// cov(rp, rm) / var(rm) over a trailing window of sessions where *both* a
+// portfolio balance move and a SPY move exist. The join is the whole point:
+// a missing balance day is never zero-filled or carried forward, because
+// either one would invent a day of "the account didn't move while the market
+// did" and drag beta toward zero.
+const BETA_WINDOW_SESSIONS = 126; // ~6 months of trading
+// Below this the estimate is mostly noise, so the app hides the figure rather
+// than printing a number it doesn't believe.
+const BETA_MIN_SESSIONS = 60;
+
+// SPY's daily total return, keyed by the date the return landed on. Same
+// consecutive-sessions rule as the portfolio side — SPY's series shouldn't
+// have holes, but the check only ever drops a pair, never invents one. It
+// does drop steps around pre-2026 holidays, which MARKET_HOLIDAYS_2026
+// doesn't know about; that costs nothing here, since the join can only keep
+// dates the balance file also has.
+function marketReturnsByDate(spy) {
+  const out = new Map();
+  for (let i = 1; i < spy.length; i++) {
+    const prev = spy[i - 1];
+    const cur = spy[i];
+    if (sessionsBetween(prev.date, cur.date) > 0) continue;
+    // Dividend added back on its ex-date: this is a total return, matching a
+    // brokerage balance, which collects its dividends whether we model them
+    // or not.
+    out.set(cur.date, (cur.close + cur.dividend) / prev.close - 1);
+  }
+  return out;
+}
+
+function computeBeta(daily, spy) {
+  if (!spy || spy.length < 2) return { beta: null, sessions: 0 };
+
+  const rmByDate = marketReturnsByDate(spy);
+  const paired = [];
+  for (const step of daily) {
+    const rm = rmByDate.get(step.date);
+    if (rm === undefined) continue;
+    paired.push([step.value, rm]);
+  }
+
+  const window = paired.slice(-BETA_WINDOW_SESSIONS);
+  const n = window.length;
+  if (n < BETA_MIN_SESSIONS) return { beta: null, sessions: n };
+
+  const meanP = window.reduce((a, [p]) => a + p, 0) / n;
+  const meanM = window.reduce((a, [, m]) => a + m, 0) / n;
+  let cov = 0;
+  let varM = 0;
+  for (const [p, m] of window) {
+    cov += (p - meanP) * (m - meanM);
+    varM += (m - meanM) ** 2;
+  }
+  // Sample (n-1) on both, for the same reason stdev() uses it. The divisors
+  // cancel in the ratio; they're written out because the formula is the spec.
+  cov /= n - 1;
+  varM /= n - 1;
+  if (!(varM > 0)) return { beta: null, sessions: n };
+
+  return { beta: cov / varM, sessions: n };
+}
+
 function stdev(values) {
   if (values.length < 2) return null;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
@@ -79,15 +144,18 @@ function summarize(series) {
   const last = series[series.length - 1];
 
   // Simple returns across genuinely consecutive sessions only; the skipped
-  // pairs are reported rather than quietly dropped.
+  // pairs are reported rather than quietly dropped. Each return is tagged with
+  // the date it landed on, which is what lets beta pair it with the market's
+  // move on the same session.
   const daily = [];
   let skipped = 0;
   for (let i = 1; i < series.length; i++) {
     if (sessionsBetween(series[i - 1].date, series[i].date) > 0) { skipped += 1; continue; }
-    daily.push(series[i].balance / series[i - 1].balance - 1);
+    daily.push({ date: series[i].date, value: series[i].balance / series[i - 1].balance - 1 });
   }
+  const dailyValues = daily.map((d) => d.value);
 
-  const dailyVol = stdev(daily);
+  const dailyVol = stdev(dailyValues);
   const annualizedVol = dailyVol === null ? null : dailyVol * Math.sqrt(TRADING_DAYS_PER_YEAR);
   const totalReturn = last.balance / first.balance - 1;
 
@@ -95,6 +163,8 @@ function summarize(series) {
   // isn't reported as if it were a full year's result.
   const days = Math.max(1, Math.round((Date.parse(last.date) - Date.parse(first.date)) / 86400000));
   const annualizedReturn = (1 + totalReturn) ** (365 / days) - 1;
+
+  const { beta, sessions: betaSessions } = computeBeta(daily, getSpySeries());
 
   return {
     start: first.date,
@@ -117,8 +187,15 @@ function summarize(series) {
     // volatility, given the volatility this series actually realized. Above 1
     // means the account was quieter than the target.
     exposureScale: annualizedVol > 0 ? (TARGET_VOL_PCT / 100) / annualizedVol : null,
-    best: daily.length ? Math.max(...daily) * 100 : null,
-    worst: daily.length ? Math.min(...daily) * 100 : null,
+    best: dailyValues.length ? Math.max(...dailyValues) * 100 : null,
+    worst: dailyValues.length ? Math.min(...dailyValues) * 100 : null,
+    // Null whenever the paired window is too short to mean anything (or SPY
+    // has never been fetched); the card leaves the row out entirely rather
+    // than showing a placeholder.
+    betaVsSpy: beta,
+    betaSessions,
+    betaWindowSessions: BETA_WINDOW_SESSIONS,
+    betaMinSessions: BETA_MIN_SESSIONS,
   };
 }
 
