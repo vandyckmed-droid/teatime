@@ -259,13 +259,29 @@ Concretely:
   date range (Settings-driven); the per-ticker chart sheet has its own
   window toggle. No standing rule on how connected these two should be —
   judge it fresh each time a feature touches both.
-- The tab bar is Ranks / Investing / Settings, and Investing holds two views
-  (`INVESTING_VIEWS` in `public/app.js`): the portfolio card and the saved
-  names. It was called Watchlist until the portfolio card grew tall enough to
-  push the names off the bottom of a shared scroll. `#watchlist` still routes
-  there (`TAB_ALIASES`) so old links keep working. A view that contains a
-  chart has to draw it *after* being shown — a hidden wrapper measures zero,
-  and these charts size themselves in real pixels.
+- The tab bar is Ranks / Investing / Settings, and Investing holds three views
+  (`INVESTING_VIEWS` in `public/app.js`): the portfolio card, the saved names,
+  and the Overlap grid. It was called Watchlist until the portfolio card grew
+  tall enough to push the names off the bottom of a shared scroll. `#watchlist`
+  still routes there (`TAB_ALIASES`) so old links keep working. A view that
+  contains a chart has to draw it *after* being shown — a hidden wrapper
+  measures zero, and these charts size themselves in real pixels. The same
+  applies to anything else that measures: the Overlap grid picks its cell size
+  from the card's width, so `setInvestingView` renders it on show too.
+- Two correlation questions, one file (`src/correlation.js`), and they are not
+  interchangeable: `correlationsAgainst` is the universe against the held set
+  (what fades a board row), `correlationMatrix` is all-pairs within one set
+  (the Overlap view). Both signed, never `|r|` — a strong negative is
+  diversification, and taking the absolute value would block exactly the names
+  worth adding. Overlap's fills are white/azure on purpose: green and red mean
+  gain and loss everywhere else in this app, and "these two move together" is a
+  warning here, not a win. Don't reach for the semantic palette to encode it.
+- `state.overlap` caches `{ key, symbols, matrix }` where `key` is the saved
+  set plus the ranking window — everything the figures depend on. `renderOverlap`
+  compares that key against the current one and recomputes on a mismatch, which
+  is why no watchlist mutation or window change has to remember to invalidate
+  it. Add a new input to the figures and it goes in the key, not in a new
+  invalidation call site.
 - Anything the `state` object or the `detail` object reads while being built
   must be declared above it. Both have now caused the same
   temporal-dead-zone bug: the error surfaces as a blank board or a silently

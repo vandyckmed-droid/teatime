@@ -4,7 +4,7 @@ const path = require('path');
 
 const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
-const { correlationsAgainst } = require('./src/correlation');
+const { correlationsAgainst, correlationMatrix } = require('./src/correlation');
 const { getPortfolio } = require('./src/portfolio');
 const { getRatings } = require('./src/ratings');
 
@@ -17,6 +17,15 @@ const MIME_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
 };
+
+// Number(null) is 0, so an absent parameter would sail through the
+// Number.isFinite checks in the handlers below as a legitimate window of zero
+// days — a 400 in disguise, answered with an empty result instead. NaN is the
+// honest reading of "not supplied", and that is what those checks reject.
+function numParam(params, name) {
+  const raw = params.get(name);
+  return raw === null || raw.trim() === '' ? NaN : Number(raw);
+}
 
 function sendJSON(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -136,6 +145,26 @@ function handleCorrelations(req, res, { symbols, startDaysAgo, endDaysAgo }) {
   });
 }
 
+// Every pair among the caller's own saved names, rather than the universe
+// against them. Same window, same math, different question — see the comment
+// on correlationMatrix in src/correlation.js.
+function handleCorrelationMatrix(req, res, { symbols, startDaysAgo, endDaysAgo }) {
+  const historyBySymbol = dataStore.getHistoryBySymbol();
+  if (!historyBySymbol) {
+    sendJSON(res, 503, { error: 'Data not ready yet, try again shortly.' });
+    return;
+  }
+  if (!Number.isFinite(startDaysAgo) || !Number.isFinite(endDaysAgo)) {
+    sendJSON(res, 400, { error: 'startDaysAgo and endDaysAgo must be numbers.' });
+    return;
+  }
+  sendJSON(res, 200, {
+    startDaysAgo,
+    endDaysAgo,
+    ...correlationMatrix(historyBySymbol, symbols, startDaysAgo, endDaysAgo),
+  });
+}
+
 function serveStatic(req, res) {
   const reqPath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.normalize(path.join(PUBLIC_DIR, reqPath));
@@ -173,6 +202,20 @@ const server = http.createServer((req, res) => {
     handleHistory(req, res, symbol.toUpperCase());
     return;
   }
+  // Before the plain /api/correlations check below — startsWith would swallow
+  // this path otherwise, the same trap /api/history/batch has to dodge.
+  if (req.url.startsWith('/api/correlations/matrix')) {
+    const params = new URL(req.url, 'http://localhost').searchParams;
+    handleCorrelationMatrix(req, res, {
+      symbols: (params.get('symbols') || '')
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean),
+      startDaysAgo: numParam(params, 'startDaysAgo'),
+      endDaysAgo: numParam(params, 'endDaysAgo'),
+    });
+    return;
+  }
   if (req.url.startsWith('/api/correlations')) {
     const params = new URL(req.url, 'http://localhost').searchParams;
     handleCorrelations(req, res, {
@@ -180,16 +223,16 @@ const server = http.createServer((req, res) => {
         .split(',')
         .map((s) => s.trim().toUpperCase())
         .filter(Boolean),
-      startDaysAgo: Number(params.get('startDaysAgo')),
-      endDaysAgo: Number(params.get('endDaysAgo')),
+      startDaysAgo: numParam(params, 'startDaysAgo'),
+      endDaysAgo: numParam(params, 'endDaysAgo'),
     });
     return;
   }
   if (req.url.startsWith('/api/rank')) {
     const params = new URL(req.url, 'http://localhost').searchParams;
     handleRank(req, res, {
-      startDaysAgo: Number(params.get('startDaysAgo')),
-      endDaysAgo: Number(params.get('endDaysAgo')),
+      startDaysAgo: numParam(params, 'startDaysAgo'),
+      endDaysAgo: numParam(params, 'endDaysAgo'),
       volAdjusted: params.get('volAdjusted') === 'true',
     });
     return;

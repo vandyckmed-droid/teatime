@@ -94,12 +94,13 @@ const SECTOR_SHORT = {
 
 const STORAGE_KEYS = { watchlist: 'teatime.watchlist', settings: 'teatime.settings' };
 
-// ── the Investing tab's two views ────────────────────────────────────
+// ── the Investing tab's views ────────────────────────────────────────
 // Remembered rather than reset each visit: which one you want is a standing
 // preference, not a per-visit decision.
 const INVESTING_VIEWS = [
   { key: 'portfolio', sub: 'Your account balance, from the record you keep by hand.' },
   { key: 'watchlist', sub: 'Tap a green check to remove one.' },
+  { key: 'overlap', sub: 'How your saved names move against each other.' },
 ];
 const INVESTING_VIEW_KEY = 'teatime.investingView';
 
@@ -149,7 +150,7 @@ const PORTFOLIO_WINDOWS = [
 const state = {
   leaderboard: null,
   activeTab: 'ranks',
-  // Which of the Investing tab's two views is showing (see INVESTING_VIEWS).
+  // Which of the Investing tab's views is showing (see INVESTING_VIEWS).
   investingView: loadInvestingView(),
   watchlist: loadWatchlist(),
   settings: loadSettings(),
@@ -161,6 +162,11 @@ const state = {
   // symbol -> { value, against }: strongest positive return correlation with
   // something already on the watchlist. Populated by refreshCorrelations().
   correlations: {},
+  // { key, symbols, matrix } for the Overlap view — every pair among the saved
+  // names. `key` is the saved set plus the ranking window, which is everything
+  // the figures depend on, so renderOverlap() can tell a stale cache from a
+  // current one without every mutation site having to remember to clear it.
+  overlap: null,
 };
 
 // symbol -> { symbol, asOf, series }, oldest first. Shared by the Ranks/Watchlist
@@ -599,6 +605,82 @@ async function refreshCorrelations() {
   }
 }
 
+// ── the Overlap view ─────────────────────────────────────────────────
+// Every pair among the saved names, as a square matrix. Same window and same
+// math as the fading above; the difference is only which question is asked —
+// "would this new name duplicate what I hold" there, "which of the things I
+// already hold are the same bet" here.
+
+// Everything the figures depend on, in one string. If this changes, what's
+// cached is stale — which beats trying to remember to invalidate at each of
+// the several places a name or a window can change.
+function overlapKey(symbols) {
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  return `${symbols.join(',')}|${startDaysAgo}|${endDaysAgo}`;
+}
+
+function computeOverlapClientSide(symbols) {
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const startStr = daysAgoToDateStr(startDaysAgo);
+  const endStr = daysAgoToDateStr(endDaysAgo);
+  const present = symbols.filter((s) => historyCache.has(s));
+  const matrix = present.map(() => new Array(present.length).fill(null));
+  for (let i = 0; i < present.length; i++) {
+    matrix[i][i] = 1;
+    for (let j = i + 1; j < present.length; j++) {
+      // Computed once and mirrored — correlation is symmetric.
+      const r = correlationClientSide(
+        historyCache.get(present[i]).series,
+        historyCache.get(present[j]).series,
+        startStr,
+        endStr,
+      );
+      matrix[i][j] = r;
+      matrix[j][i] = r;
+    }
+  }
+  return { symbols: present, matrix };
+}
+
+// Same dual-path shape as refreshCorrelations: live server first, embedded
+// history second. The snapshot bundle only ever takes the second path.
+let overlapRequestSeq = 0;
+async function refreshOverlap() {
+  const seq = ++overlapRequestSeq;
+  const held = [...state.watchlist];
+  const key = overlapKey(held);
+  if (held.length < 2) {
+    state.overlap = { key, symbols: held, matrix: [] };
+    return;
+  }
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+
+  const clientSide = async () => {
+    await loadAllHistories(held);
+    if (seq !== overlapRequestSeq) return;
+    state.overlap = { key, ...computeOverlapClientSide(held) };
+  };
+
+  if (typeof EMBEDDED_LEADERBOARD !== 'undefined') {
+    await clientSide();
+    return;
+  }
+  try {
+    const params = new URLSearchParams({
+      symbols: held.join(','),
+      startDaysAgo: String(startDaysAgo),
+      endDaysAgo: String(endDaysAgo),
+    });
+    const res = await fetch(`/api/correlations/matrix?${params}`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    const data = await res.json();
+    if (seq !== overlapRequestSeq) return;
+    state.overlap = { key, symbols: data.symbols || [], matrix: data.matrix || [] };
+  } catch {
+    await clientSide();
+  }
+}
+
 function computeRankScoresClientSide() {
   const scores = {};
   for (const c of state.leaderboard.companies) {
@@ -695,9 +777,12 @@ function setInvestingView(view, { persist = true } = {}) {
   const sub = document.getElementById('investing-sub');
   if (sub) sub.textContent = chosen.sub;
   positionSegmentedThumb('investing');
-  // The chart measures its wrapper in pixels, which reads 0 while the view is
-  // hidden — so it has to be drawn after the view is shown, not before.
+  // Both of these measure their container in pixels, which reads 0 while the
+  // view is hidden — so they have to be drawn after the view is shown, not
+  // before. The grid also computes its own work lazily, so this is where a
+  // stale set of names first gets noticed.
   if (chosen.key === 'portfolio') renderPortfolioChart();
+  if (chosen.key === 'overlap') renderOverlap();
 }
 
 function initInvestingViews() {
@@ -1238,10 +1323,160 @@ function updateWatchlistBadge(animate = false) {
   }
 }
 
+// ── the Overlap grid ─────────────────────────────────────────────────
+// Cells are sized to fit the card when they can. Past about eight names they
+// can't, and the grid scrolls sideways inside its own box rather than
+// squeezing to illegibility — a number too small to read is worse than one
+// you have to scroll to.
+const OVERLAP_CELL_MIN = 30;
+const OVERLAP_CELL_MAX = 58;
+const OVERLAP_LABEL_COL = 48;
+const OVERLAP_NUMBER_AT = 36; // below this a cell carries its colour only
+const OVERLAP_FALLBACK_WIDTH = 345; // if the view is measured while hidden
+
+// ".86" / "-.12". The leading zero is dropped because every value here is
+// between -1 and 1 and the column is narrow; the legend says what 1.00 means.
+function fmtCorr(r) {
+  if (r === null || r === undefined) return '·';
+  const s = Math.abs(r).toFixed(2);
+  return `${r < 0 ? '-' : ''}${s.startsWith('0') ? s.slice(1) : s}`;
+}
+
+// Strength as a translucent fill. Positive uses plain white, negative the
+// azure from the sector palette — deliberately neither green nor red, which
+// are spoken for (gain/loss) and would say the wrong thing here: two names
+// moving together is the situation this view exists to warn about, not a win.
+function overlapCellStyle(r) {
+  if (r === null || r === undefined) return '';
+  const alpha = (0.05 + 0.32 * Math.min(1, Math.abs(r))).toFixed(3);
+  const rgb = r < 0 ? '106, 175, 255' : '255, 255, 255';
+  return `background:rgba(${rgb},${alpha})`;
+}
+
+function renderOverlap() {
+  const el = document.getElementById('overlap-card');
+  if (!el) return;
+  const held = [...state.watchlist];
+  const key = overlapKey(held);
+
+  if (held.length < 2) {
+    el.innerHTML = `<div class="overlap-empty">
+      <p>${held.length === 0
+        ? 'Nothing saved yet. Add names on the Watchlist and they will be compared here.'
+        : 'One name saved. Add a second and this shows how the two move together.'}</p>
+    </div>`;
+    return;
+  }
+
+  // The cache carries the set and the window it was computed for, so a stale
+  // one is visible rather than silently shown as current.
+  if (!state.overlap || state.overlap.key !== key) {
+    el.innerHTML = '<div class="overlap-empty"><p>Working it out…</p></div>';
+    refreshOverlap().then(() => {
+      if (state.overlap && state.overlap.key === overlapKey([...state.watchlist])) renderOverlap();
+    }).catch(() => {
+      el.innerHTML = '<div class="overlap-empty"><p>Couldn\'t work these out just now.</p></div>';
+    });
+    return;
+  }
+
+  const { symbols, matrix } = state.overlap;
+  if (symbols.length < 2) {
+    el.innerHTML = '<div class="overlap-empty"><p>Not enough price history for these names yet.</p></div>';
+    return;
+  }
+
+  const width = el.clientWidth || OVERLAP_FALLBACK_WIDTH;
+  const cell = Math.max(
+    OVERLAP_CELL_MIN,
+    Math.min(OVERLAP_CELL_MAX, Math.floor((width - OVERLAP_LABEL_COL) / symbols.length)),
+  );
+  const showNumbers = cell >= OVERLAP_NUMBER_AT;
+  const threshold = state.settings.correlationThreshold;
+  const thresholdOn = threshold < CORRELATION_MAX;
+
+  const head = symbols.map((s) => `<th scope="col">${s}</th>`).join('');
+  const body = symbols.map((rowSym, i) => {
+    const cells = symbols.map((colSym, j) => {
+      if (i === j) return '<td class="overlap-self" aria-label="itself">—</td>';
+      const r = matrix[i][j];
+      const hot = thresholdOn && r !== null && r >= threshold ? ' overlap-hot' : '';
+      const title = r === null
+        ? `${rowSym} and ${colSym}: not enough overlapping history`
+        : `${rowSym} and ${colSym}: ${r.toFixed(2)}`;
+      return `<td class="overlap-cell${hot}" style="${overlapCellStyle(r)}" title="${title}">${
+        showNumbers ? fmtCorr(r) : ''}</td>`;
+    }).join('');
+    return `<tr><th scope="row">${rowSym}</th>${cells}</tr>`;
+  }).join('');
+
+  // The pairs worth naming, so the takeaway doesn't depend on reading the grid.
+  let closest = null;
+  let loosest = null;
+  let hotPairs = 0;
+  for (let i = 0; i < symbols.length; i++) {
+    for (let j = i + 1; j < symbols.length; j++) {
+      const r = matrix[i][j];
+      if (r === null) continue;
+      if (!closest || r > closest.r) closest = { r, a: symbols[i], b: symbols[j] };
+      if (!loosest || Math.abs(r) < Math.abs(loosest.r)) loosest = { r, a: symbols[i], b: symbols[j] };
+      if (thresholdOn && r >= threshold) hotPairs += 1;
+    }
+  }
+
+  const notes = [];
+  if (closest) {
+    notes.push(`<div class="overlap-note"><span class="overlap-note-key">Most alike</span>
+      <span class="overlap-note-val">${closest.a} &middot; ${closest.b}
+      <b>${closest.r.toFixed(2)}</b></span></div>`);
+  }
+  if (loosest && closest && !(loosest.a === closest.a && loosest.b === closest.b)) {
+    notes.push(`<div class="overlap-note"><span class="overlap-note-key">Most independent</span>
+      <span class="overlap-note-val">${loosest.a} &middot; ${loosest.b}
+      <b>${loosest.r.toFixed(2)}</b></span></div>`);
+  }
+
+  const hotLine = thresholdOn
+    ? `<p class="overlap-legend">${hotPairs === 0
+      ? `No pair is at your ${threshold.toFixed(2)} threshold.`
+      : `<b>${hotPairs}</b> pair${hotPairs === 1 ? '' : 's'} at or above your ${threshold.toFixed(2)} threshold ${hotPairs === 1 ? 'is' : 'are'} outlined.`}</p>`
+    : '<p class="overlap-legend">The correlation limit is switched off in Settings, so nothing is flagged.</p>';
+
+  el.innerHTML = `
+    <div class="overlap-head">
+      <span class="overlap-label">Overlap</span>
+      <span class="overlap-window">${rankDateRangeShort()}</span>
+    </div>
+    <div class="overlap-scroll">
+      <table class="overlap-grid" style="--overlap-cell:${cell}px">
+        <thead><tr><th class="overlap-corner"></th>${head}</tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+    ${notes.join('')}
+    ${hotLine}
+    <p class="overlap-legend" id="overlap-scroll-hint" hidden>More names to the right &mdash; drag the grid sideways.</p>
+    <p class="overlap-legend">1.00 means the two moved in lockstep day to day over this window; 0 means they moved independently; below 0 they moved opposite ways. Measured on daily returns, same window as the rankings.</p>`;
+
+  // A grid wider than the card hides columns off the right edge with nothing
+  // to say so. Fade that edge and name it in words — a column you don't know
+  // is there is worse than one you have to reach for.
+  const scroller = el.querySelector('.overlap-scroll');
+  const hint = el.querySelector('#overlap-scroll-hint');
+  const syncScrollHint = () => {
+    const remaining = scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft;
+    scroller.classList.toggle('has-more', remaining > 1);
+    if (hint) hint.hidden = scroller.scrollWidth <= scroller.clientWidth + 1;
+  };
+  scroller.addEventListener('scroll', syncScrollHint, { passive: true });
+  syncScrollHint();
+}
+
 function renderAll() {
   updateScoreLabels();
   renderRanksBoard();
   renderWatchlistBoard();
+  if (state.investingView === 'overlap') renderOverlap();
 }
 
 // ── detail sheet (tap a row to see its chart) ────────────────────────

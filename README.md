@@ -87,14 +87,25 @@ Then open http://localhost:3000.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
   `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
-  `GET /api/portfolio` and `GET /api/ratings`. The first five read from
+  `GET /api/correlations?symbols=&startDaysAgo=&endDaysAgo=`,
+  `GET /api/correlations/matrix?symbols=&startDaysAgo=&endDaysAgo=`,
+  `GET /api/portfolio` and `GET /api/ratings`. The first six read from
   `src/dataStore.js`'s scheduled-refresh store; the portfolio and ratings
   endpoints read their CSVs off disk on each call, since those change only
   when the files are edited. Every one of them is called by the frontend —
   an endpoint nothing consumes is dead weight, and one (`/api/meta`) was.
   History endpoints only serve symbols in the current leaderboard universe —
   this is a leaderboard companion, not an open proxy for arbitrary FMP
-  queries.
+  queries. The `/matrix` route is matched before the plain `/api/correlations`
+  one, since `startsWith` would otherwise swallow it — the same trap
+  `/api/history/batch` has to dodge.
+- `src/correlation.js` — answers two different questions with the same math.
+  `correlationsAgainst` is one-directional: every universe name against the
+  held set, keeping only each name's strongest positive match, which is what
+  fades a row on the board. `correlationMatrix` is all-pairs among one set —
+  the Overlap view's "which of my own saved names are the same bet". Both are
+  signed rather than absolute: a strongly negative correlation is a good
+  diversifier, so taking `|r|` would flag exactly the names worth adding.
 - `public/app.js`'s `drawLineChart` is the one line-chart renderer, shared by
   the per-ticker price chart and the portfolio balance chart: same geometry,
   same axis landmarks, same scrub crosshair, differing only in three
@@ -108,9 +119,19 @@ Then open http://localhost:3000.
   `src/portfolio.js`) with a chart of the balance over All/6M/3M/1M and rows
   for return, volatility, beta vs SPY, the 15% vol-target multiple and the
   best/worst day, hidden entirely if no balances are recorded; and Watchlist,
-  the saved names. They
+  the saved names; and Overlap, every pair among those saved names as a heat
+  grid, so the question "which of these are the same bet" is answerable
+  without reading each row. Portfolio and Watchlist
   were one scroll until the portfolio card grew tall enough to push the names
   off the bottom of the screen. Which view you were last on is remembered.
+  The Overlap grid sizes its own cells to the card, drops the numbers and goes
+  colour-only below 36px, and scrolls sideways inside its own box past about
+  eight names rather than shrinking further — with the hidden columns named in
+  words and the right edge faded while there is more to reach. Cells at or
+  above the Settings correlation threshold — the same limit that fades a board
+  row — are outlined. Fills are white for positive and azure for negative,
+  deliberately not the gain green or the loss red: two names moving together
+  is the thing this view exists to surface, not a win.
   The Watchlist view
   carries an "add next ranked" control — the plus in the empty state, a button
   beside Clear watchlist once there are names — that saves the highest-ranked
