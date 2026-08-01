@@ -137,4 +137,4 @@ function getPortfolio() {
   return { ...summary, series: series.map((p) => [p.date, p.balance]) };
 }
 
-module.exports = { getPortfolio, summarize, parseCsv, sessionsBetween, TARGET_VOL_PCT };
+module.exports = { getPortfolio };

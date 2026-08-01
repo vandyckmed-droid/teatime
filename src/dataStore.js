@@ -8,10 +8,6 @@ const config = require('./config');
 const { getLeaderboard, metricAvailability } = require('./leaderboard');
 const { getHistoryBatch } = require('./history');
 
-function isoDaysAgo(days) {
-  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-}
-
 const store = {
   leaderboard: null,
   historyBySymbol: null, // Map(symbol -> { symbol, asOf, series })
@@ -38,23 +34,6 @@ async function refreshAll() {
 
   const symbols = mergedCompanies.map((c) => c.symbol);
   const historyResults = await getHistoryBatch(symbols);
-
-  // Backfill any 52-week range FMP's profile didn't give us (see
-  // parse52WeekRange in leaderboard.js) from the history we just fetched.
-  // Close-based rather than intraday, so it's slightly narrower — but a
-  // present-and-slightly-narrow range beats a row with no range at all.
-  const cutoff = isoDaysAgo(365);
-  historyResults.forEach((hist, i) => {
-    const company = mergedCompanies[i];
-    if (company.low52 !== null && company.high52 !== null) return;
-    const closes = (hist && hist.series ? hist.series : [])
-      .filter((p) => p.date >= cutoff)
-      .map((p) => p.close)
-      .filter((v) => Number.isFinite(v) && v > 0);
-    if (closes.length === 0) return;
-    company.low52 = Math.min(...closes);
-    company.high52 = Math.max(...closes);
-  });
 
   // Everything needed has succeeded — commit atomically.
   if (shouldCommitSlowFacts) store.slowFactsAsOf = Date.now();
@@ -86,5 +65,4 @@ module.exports = {
   getLeaderboard: () => store.leaderboard,
   getHistoryBySymbol: () => store.historyBySymbol,
   getHistoryAsOf: () => store.historyAsOf,
-  getSlowFactsAsOf: () => store.slowFactsAsOf,
 };

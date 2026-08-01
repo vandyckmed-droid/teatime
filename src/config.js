@@ -75,7 +75,6 @@ module.exports = {
   exchanges: 'NYSE,NASDAQ',
   metrics: METRICS,
   metricMinDays: METRIC_MIN_DAYS,
-  defaultMetric: '1Y',
   // One fetch covers the longest chart range; the frontend slices it client-side
   // per range so switching windows never re-hits the API.
   historyLookbackDays: 1828,

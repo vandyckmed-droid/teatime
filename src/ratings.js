@@ -20,11 +20,6 @@ const RATING_SCALE = [
 ];
 const SCORE_MAX = 10;
 
-function toneFor(label) {
-  const hit = RATING_SCALE.find((r) => r.label.toLowerCase() === String(label || '').toLowerCase());
-  return hit ? hit.tone : 'neutral';
-}
-
 function parseCsv(text) {
   const out = [];
   const lines = text.split('\n');
@@ -85,4 +80,4 @@ function getRatings() {
   };
 }
 
-module.exports = { getRatings, parseCsv, toneFor, RATING_SCALE, SCORE_MAX };
+module.exports = { getRatings };

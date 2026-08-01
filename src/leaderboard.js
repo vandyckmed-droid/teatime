@@ -73,10 +73,14 @@ function metricAvailability(ipoDate, asOf) {
   return availability;
 }
 
-// FMP's profile carries the 52-week range as a "low-high" string. It's the real
-// intraday range, so it beats deriving one from our daily closes — but it comes
-// from a free-text field, so parse defensively and let dataStore fall back to
-// the close-based range when this can't be trusted.
+// FMP's profile carries the 52-week range as a "low-high" string, parsed
+// defensively because it's a free-text field. Nothing on screen reads these
+// any more — the app's price-range card works its own high/low out of daily
+// closes over whichever window is selected — but scripts/snapshot.js files
+// them into the daily archive, which is the only reason they're still
+// collected. A company whose profile omits the range simply records null;
+// dataStore used to recompute it from the full history of every company on
+// every refresh, which was a lot of work for a figure nothing displayed.
 function parse52WeekRange(range) {
   if (typeof range !== 'string') return null;
   const [low, high] = range.split('-').map((part) => Number(part.trim()));
@@ -131,11 +135,12 @@ async function getLeaderboard() {
     };
   });
 
+  // universeSize and defaultMetric used to ride along here and were never
+  // read by anything; scripts/snapshot.js takes universeSize from config
+  // directly, which is the copy that means something.
   return {
     asOf: asOf.toISOString(),
-    universeSize: config.universeSize,
     metrics: config.metrics,
-    defaultMetric: config.defaultMetric,
     companies,
   };
 }

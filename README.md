@@ -72,12 +72,14 @@ Then open http://localhost:3000.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
   `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
-  `GET /api/portfolio`, `GET /api/ratings` and `GET /api/meta`. The first four
-  read from `src/dataStore.js`'s scheduled-refresh store; the portfolio and
-  ratings endpoints read their CSVs off disk on each call, since those change
-  only when the files are edited. History
-  endpoints only serve symbols in the current leaderboard universe — this is
-  a leaderboard companion, not an open proxy for arbitrary FMP queries.
+  `GET /api/portfolio` and `GET /api/ratings`. The first five read from
+  `src/dataStore.js`'s scheduled-refresh store; the portfolio and ratings
+  endpoints read their CSVs off disk on each call, since those change only
+  when the files are edited. Every one of them is called by the frontend —
+  an endpoint nothing consumes is dead weight, and one (`/api/meta`) was.
+  History endpoints only serve symbols in the current leaderboard universe —
+  this is a leaderboard companion, not an open proxy for arbitrary FMP
+  queries.
 - `public/app.js`'s `drawLineChart` is the one line-chart renderer, shared by
   the per-ticker price chart and the portfolio balance chart: same geometry,
   same axis landmarks, same scrub crosshair, differing only in three

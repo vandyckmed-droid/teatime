@@ -97,4 +97,4 @@ function correlationsAgainst(historyBySymbol, heldSymbols, startDaysAgo, endDays
   return out;
 }
 
-module.exports = { correlation, correlationsAgainst };
+module.exports = { correlationsAgainst };

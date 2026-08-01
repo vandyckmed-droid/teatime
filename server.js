@@ -2,7 +2,6 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const config = require('./src/config');
 const dataStore = require('./src/dataStore');
 const ranking = require('./src/ranking');
 const { correlationsAgainst } = require('./src/correlation');
@@ -216,16 +215,6 @@ const server = http.createServer((req, res) => {
       return;
     }
     sendJSON(res, 200, ratings);
-    return;
-  }
-  if (req.url.startsWith('/api/meta')) {
-    sendJSON(res, 200, {
-      universeSize: config.universeSize,
-      metrics: config.metrics,
-      defaultMetric: config.defaultMetric,
-      historyAsOf: dataStore.getHistoryAsOf(),
-      slowFactsAsOf: dataStore.getSlowFactsAsOf(),
-    });
     return;
   }
   serveStatic(req, res);
