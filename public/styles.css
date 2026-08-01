@@ -515,30 +515,36 @@ button { font: inherit; color: inherit; }
   content: ''; flex: 1 1 0; min-width: 0;
 }
 .board-head-score {
-  flex: 0 0 auto; width: 54px; text-align: right;
+  flex: 0 0 auto; width: 56px; text-align: right;
   color: var(--accent);
 }
-/* Reserve the add-control's width so 'Return' sits over the score, not over
-   the button. */
-.board-head::after { content: ''; flex: 0 0 auto; width: 26px; }
+/* Reserves the select column *and* the gutter beside it, so the label lands
+   over the numbers rather than drifting toward the button. Must equal
+   .select-cell's width plus its margin-left below — these two are one column
+   measured in two places. */
+.board-head::after { content: ''; flex: 0 0 auto; width: 32px; }
 
 /* min-width, not width: the right edge is what has to line up down the list,
    and a four-digit return (a 5Y window can produce one) needs to be allowed to
-   take the space it needs out of the name column rather than spill over it. */
+   take the space it needs out of the name column rather than spill over it.
+   It grows leftward, because everything to its right is fixed. */
 .trailing-cell {
-  flex: 0 0 auto; width: 54px;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  flex: 0 0 auto; min-width: 56px;
+  display: flex; flex-direction: column; align-items: flex-end;
 }
+/* Return over price with no gap and tight leading: the two are one figure
+   about one company, and any daylight between them made the pair read as two
+   loose objects sitting next to the control rather than as a single block. */
 .return-val {
   font-weight: 700; font-size: 14px;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1.15;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1.1;
   white-space: nowrap;
 }
 .return-val.gain { color: var(--gain); }
 .return-val.loss { color: var(--loss); }
 .return-val.na { color: var(--text-3); font-size: var(--fs-cap); font-weight: 500; }
 .price-mini {
-  font-size: 10px; color: var(--text-3);
+  font-size: 10px; line-height: 1.25; color: var(--text-3);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
@@ -547,7 +553,15 @@ button { font: inherit; color: inherit; }
    Plus = "add this", check = "added". Unsaved is a hollow outlined key so
    it reads as an affordance; saved is a solid green disc — the same green
    as the card's outline glow, so the row and its control agree. */
-.select-cell { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* Its own fixed-width column, with a gutter to its left that is wider than
+   the row's default gap. At 6px the disc sat closer to the price than to the
+   card edge, so the eye grouped it with the numbers; 12px on the left against
+   13px of row padding on the right makes it read as the column it is.
+   .board-head::after above reserves width + margin — keep them in step. */
+.select-cell {
+  flex: 0 0 auto; width: 26px; margin-left: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
 .add-btn {
   width: 26px; height: 26px; padding: 0; flex-shrink: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
