@@ -799,8 +799,8 @@ function updateScoreLabels() {
 // ── row flags ────────────────────────────────────────────────────────
 // A registry for "mark this row as special" — the same shape as SETTINGS and
 // DETAIL_BLOCKS. One entry is one flag; matching rows get `data-flags` carrying
-// its key, and one CSS rule per key sets --flag-glow on that selector (see
-// .row[data-flags~=...] in styles.css). The glow machinery itself is written
+// its key, and one CSS rule per key sets --flag-orb on that selector (see
+// .row[data-flags~=...] in styles.css). The orb machinery itself is written
 // once, so a second flag is an entry here plus a single line of CSS, not a new
 // rendering path.
 //
@@ -826,7 +826,7 @@ const ROW_FLAGS = [
     key: 'mega',
     label: 'mega cap',
     test: (c) => typeof c.marketCap === 'number' && c.marketCap >= MEGA_CAP_MIN,
-    note: (n) => `<b>${n}</b> ${n === 1 ? 'company is' : 'companies are'} lit with a soft halo &mdash; `
+    note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a gold orb &mdash; `
       + `mega caps, worth <b>$200B</b> or more.`,
   },
 ];

@@ -81,6 +81,17 @@
     0 12px 32px -8px rgba(0, 0, 0, 0.75),
     0 2px 8px rgba(0, 0, 0, 0.40);
 
+  /* ── row-flag colour (see ROW_FLAGS in app.js) ──
+     Amber, oklch ≈ 0.83 0.145 75. A flag has to be legible as *not* a verdict,
+     which rules out the two protected bands: green is gain and action, red is
+     loss. It also has to survive next to the sector dots, and this sits between
+     Energy's orange (52°) and Financial's citron (108°) — close in hue to both,
+     but it is never drawn as a flat 8px dot the way a sector is. It is a soft
+     bloom around the 30px logo disc, and it is the only warm glow anywhere in
+     the app, so the two read as different kinds of object rather than as two
+     entries in one palette. */
+  --flag-mega: #FFBC48;
+
   --tabbar-bg: rgba(0, 0, 0, 0.72);
   --sheet-scrim: rgba(0, 0, 0, 0.38);
 
@@ -314,16 +325,9 @@ button { font: inherit; color: inherit; }
   min-height: 62px;
   cursor: pointer;
   background-color: var(--surface);
-  background-image: var(--flag-tint);
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
-  /* --flag-glow is the row-flag layer (see ROW_FLAGS in app.js). It is
-     composed into every box-shadow a row can have rather than being its own
-     rule, so a flag never fights the saved-row treatment for the property —
-     a saved mega cap wears both. Transparent by default costs nothing. */
-  --flag-glow: 0 0 0 0 transparent;
-  --flag-tint: none;
-  box-shadow: var(--shadow-card), var(--flag-glow);
+  box-shadow: var(--shadow-card);
   transition: background 180ms ease;
 }
 .row.unavailable { opacity: 0.45; }
@@ -347,8 +351,7 @@ button { font: inherit; color: inherit; }
   background-color: color-mix(in oklab, var(--accent) 4%, var(--surface));
   box-shadow:
     var(--shadow-card),
-    0 2px 18px -8px color-mix(in oklab, var(--accent) 22%, transparent),
-    var(--flag-glow);
+    0 2px 18px -8px color-mix(in oklab, var(--accent) 22%, transparent);
 }
 .row.is-selected:active { background-color: color-mix(in oklab, var(--accent) 9%, var(--surface-2)); }
 .row.is-selected::before {
@@ -368,22 +371,28 @@ button { font: inherit; color: inherit; }
   pointer-events: none;
 }
 
-/* ── row flags: a quiet halo ──────────────────────────────────────────
+/* ── row flags: an orb behind the logo ────────────────────────────────
    Driven by ROW_FLAGS in app.js, which writes matching keys into data-flags.
-   Everything below is per-flag: one selector setting --flag-glow is the whole
-   cost of adding another.
+   The machinery is the one --flag-orb line on .logo below; everything after it
+   is per-flag, so adding another costs a single selector.
 
-   Achromatic on purpose. Green and red are spoken for here — gain, loss, and
-   "yours / act here" — and a flag is a neutral fact about a company, not a
-   verdict on it. A white halo says "notable" without claiming good or bad, and
-   it cannot be misread as either. Two soft outer blooms rather than a border:
-   a ring would compete with the saved-row outline directly above, and this has
-   to be able to sit underneath one. */
+   Deliberately a *different kind of object* from the saved-row treatment, not
+   just a different colour of the same one. Saved is a green ring on the card's
+   outer edge; a flag is a warm bloom radiating from the logo disc. Even at a
+   glance, and even on a row that is both, the two never read as versions of
+   each other — which is the whole point of a flag being separate from a
+   selection.
+
+   No hard ring on the orb: an outlined disc reads as a badge or a warning,
+   which is a louder claim than "this company is large". Two blurred blooms,
+   no spread ring, so it stays a glow. */
+.logo { box-shadow: var(--flag-orb, none); }
+.row { --flag-orb: none; }
+
 .row[data-flags~="mega"] {
-  --flag-glow:
-    0 0 0 1px rgba(255, 255, 255, 0.07),
-    0 0 18px -5px rgba(255, 255, 255, 0.22);
-  --flag-tint: linear-gradient(rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+  --flag-orb:
+    0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
+    0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
 }
 
 /* Left-aligned so the number sits at the card's leading edge rather than

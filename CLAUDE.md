@@ -273,18 +273,22 @@ Concretely:
   config-array shape as `SETTINGS` and `DETAIL_BLOCKS`, and built as a skeleton
   before it had a second user. An entry is `{ key, label, test, note? }`;
   matching rows get the key in `data-flags`, and one CSS rule per key sets
-  `--flag-glow` / `--flag-tint`. Three things there are deliberate. The glow is
-  a custom property composed into *every* box-shadow a row can have rather
-  than its own rule, so a flagged-and-saved row wears both instead of one
-  winning on specificity — which is also why `.row`'s background is set as
-  `background-color` plus `background-image`, since the `background` shorthand
-  would wipe the tint. Flag colours are achromatic on purpose: green and red
-  are gain/loss/action here, and a flag is a neutral fact, not a verdict. And
-  each flag can contribute one line to the Ranks callout, because a row that
-  is quietly brighter than its neighbours with nothing explaining why is just
-  a rendering bug as far as the reader can tell. The mega-cap cutoff is an
-  absolute $200B rather than "top 50" so it doesn't silently change meaning
-  every time `universeSize` moves; it happened to catch 53 of 300 when set.
+  `--flag-orb`. Four things there are deliberate. A flag draws as a bloom
+  around the *logo disc*, while a saved row draws as a green ring on the
+  *card's edge* — different kind of object, not just different colour, which
+  is what keeps a flag from reading as a selection; a row that is both wears
+  both, and the first attempt (a white glow on the row itself) failed exactly
+  this test. The orb has blur and almost no spread, because an outlined disc
+  reads as a badge or a warning, a louder claim than "this company is large".
+  Flag colours avoid the two protected bands — green is gain and action, red
+  is loss, and a flag is a fact rather than a verdict — which is why
+  `--flag-mega` is amber; assert on that in oklab (`a` is the green/red axis,
+  `b` the blue/yellow one) rather than by matching hex. And each flag can
+  contribute one line to the Ranks callout, because a row that is quietly
+  brighter than its neighbours with nothing explaining why is just a rendering
+  bug as far as the reader can tell. The mega-cap cutoff is an absolute $200B
+  rather than "top 50" so it doesn't silently change meaning every time
+  `universeSize` moves; it happened to catch 53 of 300 when set.
 - `src/correlation.js` answers one question — `correlationsAgainst`, the
   universe against the held set, which is what fades a board row. Signed,
   never `|r|`: a strong negative is diversification, and taking the absolute
