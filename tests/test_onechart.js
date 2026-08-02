@@ -167,7 +167,8 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
     settings.sections[0] === 'Ranking window' && settings.sections.includes('Scoring'));
   check('the Detail sheet section is gone', !settings.displayList);
   check(`no segmented control left in Settings (${settings.inlineSegmented})`, settings.inlineSegmented === 0);
-  check(`scoring keeps its two rows (${settings.scoringRows})`, settings.scoringRows === 2);
+  // One row since the tightness stepper left with the hardwired echo flag.
+  check(`scoring keeps its one row (${settings.scoringRows})`, settings.scoringRows === 1);
   check(`date range keeps its three (${settings.dateRows})`, settings.dateRows === 3);
   check('the settings note is still appended once', settings.note);
   await page.screenshot({ path: `${S}-settings.png` });

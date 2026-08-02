@@ -81,22 +81,14 @@
     0 12px 32px -8px rgba(0, 0, 0, 0.75),
     0 2px 8px rgba(0, 0, 0, 0.40);
 
-  /* ── correlation-group colours (see ROW_FLAGS / computeCorrGroups in app.js) ──
-     One hue per group, cycled if there are ever more groups than entries
-     (CORR_GROUP_COLORS in app.js must match this count). A flag has to be
-     legible as *not* a verdict, which rules out the two protected bands: green
-     is gain and action, red is loss — so these live in amber, blue, violet,
-     cyan, and two neutrals-with-a-tint. They survive next to the sector dots
-     because a group is never drawn as a flat 8px dot the way a sector is: it
-     is a soft bloom around the 30px logo disc, a different kind of object. */
-  --corr-g0: #FFBC48; /* amber   — oklch ≈ 0.83 0.145 75  */
-  --corr-g1: #58A6FF; /* azure   — oklch ≈ 0.72 0.145 255 */
-  --corr-g2: #B48CFF; /* violet  — oklch ≈ 0.72 0.150 300 */
-  --corr-g3: #55C3F2; /* sky     — cyan pulled toward blue; #35D2E5 measured
-                         oklab a = -0.11, close enough to gain green that the
-                         suite (rightly) rejected it */
-  --corr-g4: #F49AC8; /* orchid  — pink held above the red band's chroma line */
-  --corr-g5: #C9C27A; /* citron  — kept duller than gain green, hue well off it */
+  /* ── row-flag colour (see ROW_FLAGS in app.js) ──
+     One flag, one colour — the owner cut the multi-colour group coding; this
+     marks "tracks a name ranked above it" and nothing else. Amber: legible as
+     *not* a verdict, which rules out the two protected bands (green is gain
+     and action, red is loss), and it is never drawn as a flat 8px dot the way
+     a sector is — it is a ring on the 30px logo disc, a different kind of
+     object. */
+  --flag-echo: #FFBC48; /* amber — oklch ≈ 0.83 0.145 75 */
 
   --tabbar-bg: rgba(0, 0, 0, 0.72);
   --sheet-scrim: rgba(0, 0, 0, 0.38);
@@ -382,28 +374,25 @@ button { font: inherit; color: inherit; }
    even on a row that is both, the two never read as versions of each other —
    which is the whole point of a flag being separate from a selection.
 
-   The crisp 2.5px ring is the legibility fix the owner asked for: the
-   original treatment was two soft blooms with no hard edge (chosen when the
-   flag meant "this company is large" and whispering was right), and the
-   owner reported it too subtle to see or use. A blur is also the worst shape
-   for the groups' real job — matching colours between rows — where a hard
-   edge reads instantly. The bloom stays underneath for warmth, but the ring
+   The crisp ring is the legibility fix the owner asked for (the original
+   blur-only blooms were "too subtle to see or use"), and the surface-coloured
+   gap under it is the follow-up fix: without it the ring hugged white logo
+   discs and washed out. The bloom stays underneath for warmth, but the ring
    carries the signal. */
 .logo { box-shadow: var(--flag-orb, none); }
 .row { --flag-orb: none; }
 
-/* One rule per group colour; the two-bloom recipe is identical, only the hue
-   moves. Tokens come from the corr flag's token() in app.js. */
-.row[data-flags~="corr-g0"] { --flag-color: var(--corr-g0); }
-.row[data-flags~="corr-g1"] { --flag-color: var(--corr-g1); }
-.row[data-flags~="corr-g2"] { --flag-color: var(--corr-g2); }
-.row[data-flags~="corr-g3"] { --flag-color: var(--corr-g3); }
-.row[data-flags~="corr-g4"] { --flag-color: var(--corr-g4); }
-.row[data-flags~="corr-g5"] { --flag-color: var(--corr-g5); }
-.row[data-flags~="corr"] {
+/* The ring floats off the disc on a gap of card-surface colour. This is the
+   owner's wash-out fix: a ring hugging a white logo disc gets its colour
+   crushed by the white it borders (the dark-disc logos looked fantastic, the
+   white-disc majority read as a pale halo). The 2px surface-coloured gap
+   means the colour ring always borders dark on both sides, whatever the disc
+   fill — the "avatar status ring" treatment. */
+.row[data-flags~="echo"] {
   --flag-orb:
-    0 0 0 2.5px color-mix(in oklab, var(--flag-color) 92%, transparent),
-    0 0 12px 4px color-mix(in oklab, var(--flag-color) 38%, transparent);
+    0 0 0 2px var(--surface),
+    0 0 0 4.5px color-mix(in oklab, var(--flag-echo) 92%, transparent),
+    0 0 14px 6px color-mix(in oklab, var(--flag-echo) 30%, transparent);
 }
 
 /* The Settings row previews its own flag, so the switch is labelled by the
@@ -417,11 +406,11 @@ button { font: inherit; color: inherit; }
   width: 30px; height: 30px; border-radius: 50%;
   background: #fff; flex-shrink: 0;
 }
-/* The sample can only wear one hue; the first group colour stands for all. */
-.flag-sample-orb[data-flag-sample="corr"] {
+.flag-sample-orb[data-flag-sample="echo"] {
   box-shadow:
-    0 0 0 2.5px color-mix(in oklab, var(--corr-g0) 92%, transparent),
-    0 0 12px 4px color-mix(in oklab, var(--corr-g0) 38%, transparent);
+    0 0 0 2px var(--surface),
+    0 0 0 4.5px color-mix(in oklab, var(--flag-echo) 92%, transparent),
+    0 0 14px 6px color-mix(in oklab, var(--flag-echo) 30%, transparent);
 }
 
 .flag-sample-count {

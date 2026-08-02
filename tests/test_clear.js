@@ -12,8 +12,8 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-  // Seed a watchlist plus a tightness that actually groups things, so we can
-  // check the group orbs lift once nothing is held.
+  // Seed a watchlist. The correlation flag is watchlist-independent, so the
+  // orb check below is about what clearing must NOT do: the flags stay put.
   // Seed once only: addInitScript re-runs on every navigation, so seeding
   // unconditionally would silently re-fill the watchlist on the reload check.
   await page.addInitScript(() => {
@@ -22,7 +22,6 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
     if (!localStorage.getItem('teatime.test.seeded')) {
       localStorage.setItem('teatime.test.seeded', '1');
       localStorage.setItem('teatime.watchlist', JSON.stringify(['NVDA', 'XOM', 'JNJ']));
-      localStorage.setItem('teatime.settings', JSON.stringify({ correlationThreshold: 0.45 }));
     }
   });
   // The Investing tab remembers which view you were on and defaults to
@@ -34,15 +33,14 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
 
   const btn = page.locator('#clear-watchlist');
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist') || '[]').length);
-  const grouped = () => page.evaluate(() =>
-    document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length);
+  const flaggedCount = () => page.evaluate(() =>
+    document.querySelectorAll('#ranks-rows .row[data-flags~="echo"]').length);
 
   check('button is visible when the watchlist has names', await btn.isVisible());
   check(`label starts unarmed ("${(await btn.textContent()).trim()}")`,
     (await btn.textContent()).trim() === 'Clear watchlist');
   check(`3 names saved (${await stored()})`, (await stored()) === 3);
-  const groupedBefore = await grouped();
-  check(`some rows wear group orbs (${groupedBefore})`, groupedBefore > 0);
+  const flaggedBefore = await flaggedCount();
   await page.screenshot({ path: `${S}-unarmed.png` });
 
   // ── first tap only arms; nothing is lost ──
@@ -73,10 +71,11 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
     await page.locator('#panel-investing').isVisible());
   await page.screenshot({ path: `${S}-cleared.png` });
 
-  // ── the correlation fade lifts, since nothing is held ──
+  // ── the correlation flag is watchlist-independent: clearing changes nothing ──
   await page.click('[data-tab="ranks"]');
   await page.waitForTimeout(700);
-  check(`the orbs lift once nothing is held (${groupedBefore} -> ${await grouped()})`, (await grouped()) === 0);
+  check(`the flags don't move when the list empties (${flaggedBefore} -> ${await flaggedCount()})`,
+    (await flaggedCount()) === flaggedBefore);
 
   // ── it survives a reload, i.e. localStorage really was written ──
   await page.reload({ waitUntil: 'domcontentloaded' });

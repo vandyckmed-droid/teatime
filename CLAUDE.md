@@ -298,47 +298,51 @@ Concretely:
   flag draws as a bloom around the *logo disc*, while a saved row draws as a
   green ring on the *card's edge* — different kind of object, not just
   different colour, which is what keeps a flag from reading as a selection; a
-  row that is both wears both. The orb is a crisp 2.5px ring plus a soft
-  bloom — the ring was added at the owner's direction after the original
-  blur-only treatment proved "too subtle to see or use"; a hard edge is also
-  what makes colour-matching between rows (the groups' whole job) instant.
-  The old no-ring rule ("an outlined disc reads as a badge") applied to the
-  mega-cap era, when the flag whispered a mild fact; it's retired, not
-  violated. Flag colours avoid the two
-  protected bands — green is gain and action, red is loss, and a flag is a
-  fact rather than a verdict; assert on that in oklab (`a` is the green/red
-  axis, `b` the blue/yellow one) rather than by matching hex — the first cyan
-  chosen for a group colour failed exactly that assertion and moved to sky.
-  And each flag can contribute one line to the Ranks callout, because a row
-  that is quietly brighter than its neighbours with nothing explaining why is
-  just a rendering bug as far as the reader can tell. Occupancy history: a
-  mega-cap orb (the prototype), a high-volatility orb, and a biotech dimmer
-  were each built and later cut at the owner's request; all are in history if
-  wanted back. The one flag now is the correlation groups (below). The
-  payload lesson from the rolled-back flags still governs: a flag `test` runs
-  client-side against the company object and the static snapshot can fetch
-  nothing, so any data a flag needs must be server-computed and
-  payload-carried.
-- The correlation guide is **groups as flags**, not a filter. History: the
-  original "diversification filter" faded any row correlating ≥ threshold
-  with a held name and disabled its add button; the owner replaced it in the
-  big simplification pass — a flag informs, a block decides for you.
-  `computeCorrGroups()` in `public/app.js` builds connected components of the
-  *held* names under "pairwise r ≥ threshold" (union-find over
-  client-computed correlations — deliberately simpler than the HRP
-  clustering; it's a guide for the eye), then every board name whose
-  strongest correlation against a held name clears the same bar joins that
-  name's group. Each group ≥2 members gets a colour (`--corr-g0…g5`, count
-  mirrored by `CORR_GROUP_COLORS`); singleton groups stay dark — an orb on a
-  name nothing moves with guides nothing. Groups recompute off the render
-  path (after `refreshCorrelations`, and synchronously on threshold change)
-  and restyle rows in place via `applyRowFlagsInPlace`. The "Group tightness"
-  stepper is the old filter threshold re-purposed; 1.00 still means off.
-  `src/correlation.js` still answers the one server-side question —
-  `correlationsAgainst`, the universe against the held set. Signed, never
-  `|r|`: a strong negative is diversification, and treating it as duplication
-  would mark exactly the names worth adding. An all-pairs matrix and an
-  Overlap heat-grid view were built and removed earlier; shapes in history.
+  row that is both wears both. The orb treatment carries two owner
+  corrections that must not regress: a crisp ring (blur-only blooms were
+  "too subtle to see or use"), and a card-surface-coloured gap between the
+  logo disc and the ring — without it the ring hugged the white discs most
+  logos sit on and washed out ("fantastic when the fill is dark, washed out
+  when light"). The old no-ring rule ("an outlined disc reads as a badge")
+  applied to the mega-cap era, when the flag whispered a mild fact; it's
+  retired, not violated. Flag colours avoid the two protected bands — green
+  is gain and action, red is loss, and a flag is a fact rather than a
+  verdict; assert on that in oklab (`a` is the green/red axis, `b` the
+  blue/yellow one) rather than by matching hex. And each flag can contribute
+  one line to the Ranks callout, because a row that is quietly brighter than
+  its neighbours with nothing explaining why is just a rendering bug as far
+  as the reader can tell. Occupancy history: a mega-cap orb (the prototype),
+  a high-volatility orb, a biotech dimmer, and watchlist-anchored
+  colour-coded correlation groups were each built and later cut at the
+  owner's request; all are in history if wanted back. The one flag now is
+  the echo flag (below). The payload lesson from the rolled-back flags still
+  governs: a flag `test` runs client-side against the company object and the
+  static snapshot can fetch nothing, so any data a flag needs must be
+  server-computed and payload-carried (the echo flag satisfies it by reading
+  the already-shipped histories).
+- The correlation guide is the **echo flag**: one amber ring on any top-50
+  name whose daily moves track at least one name ranked *above* it. Third
+  design in this seat, each replaced at the owner's request — a
+  fade-and-block "diversification filter" (a flag informs, a block decides
+  for you), then watchlist-anchored colour-coded groups ("this candidate is
+  the same colour as something I hold isn't what I want"). What the owner
+  settled on: one flag, one colour, no grouping, board-relative rather than
+  watchlist-relative, and **no Settings knob** — `ECHO_THRESHOLD` (0.72) and
+  `ECHO_TOP_COUNT` (50) are hardwired in `public/app.js`. The threshold was
+  calibrated 2026-08-02 to the owner's "roughly one in four of the top 50":
+  his guess of 0.65 measured at 18-23 of 50 across the two preset windows ×
+  two scoring modes, and 0.72 measured 10-15 (mean 13) — re-run that grid
+  before ever moving it. `computeEchoFlags()` runs inside `refreshRankings`
+  (the flag reads board order and nothing else, so it recomputes exactly
+  when scores do, sequence-guarded); pairwise correlation is signed, never
+  `|r|` — a strong negative is diversification, and flagging it would mark
+  exactly the names worth adding. The watchlist has zero effect on the flag,
+  which is also why saving a name is now the cheapest interaction in the
+  app. There is no server-side correlation code left (`src/correlation.js`
+  and `/api/correlations` were removed with the groups); the flag computes
+  client-side from histories both channels already have. An all-pairs matrix
+  and an Overlap heat-grid view were built and removed earlier; shapes in
+  history.
 - Anything the `state` object or the `detail` object reads while being built
   must be declared above it. Both have now caused the same
   temporal-dead-zone bug: the error surfaces as a blank board or a silently

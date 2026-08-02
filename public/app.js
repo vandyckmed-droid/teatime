@@ -11,13 +11,6 @@ const SETTINGS = [
     default: false,
   },
   {
-    key: 'correlationThreshold',
-    type: 'threshold',
-    label: 'Group tightness',
-    description: 'How tightly two names must move together (daily-return correlation over the ranking date range) to share a correlation group — the coloured orbs on the board. Lower groups more; 1.00 switches grouping off. Strong negative correlation never groups — that is diversification, not duplication.',
-    default: 0.7,
-  },
-  {
     // Rendered by renderFlagSettings() into its own section, not by the generic
     // loop — like 'daterange' below. The stored value is a sparse map of
     // per-flag overrides ({} means "every flag at its own default"), so a flag
@@ -59,13 +52,7 @@ const DATE_RANGE_MIN_GAP = 10;
 
 const TRADING_DAYS_PER_YEAR = 252;
 
-// Group-tightness stepper. 1.00 means "off": a distinct name effectively
-// never reaches r = 1, so nothing groups.
-const CORRELATION_STEP = 0.05;
-const CORRELATION_MIN = 0.3;
-const CORRELATION_MAX = 1;
-// A correlation over a handful of days is noise (mirrors MIN_OBSERVATIONS in
-// src/correlation.js, used by the snapshot-mode fallback below).
+// A correlation over a handful of days is noise, not a signal.
 const CORRELATION_MIN_OBSERVATIONS = 20;
 
 // Sectors actually seen in the top 100 by market cap as of the scale-up to
@@ -173,8 +160,9 @@ const PORTFOLIO_WINDOWS = [
 // its token(s), and one CSS rule per token sets --flag-orb on that selector
 // (see .row[data-flags~=...] in styles.css). The orb machinery itself is
 // written once, so another flag is an entry here plus CSS, not a new rendering
-// path. (A mega-cap flag was the prototype occupant; cut at the owner's
-// request in the big simplification pass — it's in history if wanted back.)
+// path. (Earlier occupants — a mega-cap orb, then watchlist-anchored
+// colour-coded correlation groups — were each cut at the owner's request;
+// both are in history.)
 //
 // Contract for an entry:
 //   key    stable identifier; the settings override key and default data-flags
@@ -182,129 +170,139 @@ const PORTFOLIO_WINDOWS = [
 //   label  spoken in the row's accessible name, so the glow isn't purely visual
 //   test   (company) => boolean, run on every row of both boards
 //   token  optional (company) => string of data-flags tokens, when the flag
-//          needs a per-row variant (the correlation groups colour by group)
+//          needs a per-row variant
 //   note   optional (count) => string, added to the board callout so a
 //          highlighted row is never unexplained
 //
 // Flags are additive: a row can carry several, and the glow composes with the
 // saved-row ring rather than replacing it.
 
-// How many distinct group colours exist in styles.css (--corr-g0 …); groups
-// past that cycle. Hues stay off the two protected bands — green is gain and
-// action, red is loss, and a group is a fact rather than a verdict.
-const CORR_GROUP_COLORS = 6;
+// The echo flag: a top-50 name whose daily moves track at least one name
+// *above it* on the ranked list. One flag, one colour — deliberately not a
+// grouping or colour-coding system (that was built and cut; the owner wants a
+// simple yes/no: "something higher already gives me this movement").
+//
+// Both bounds are hardwired, per the owner ("remove the need for another
+// toggle in Settings"):
+//  - ECHO_TOP_COUNT: only the top 50 are checked, against the top 50 —
+//    names below that will likely never make the cut anyway.
+//  - ECHO_THRESHOLD: pairwise daily-return correlation over the ranking
+//    window. Calibrated 2026-08-02 against the live board to the owner's
+//    target of "roughly one in four of the top 50 flagged". The owner's guess
+//    was 0.65, but measured across both preset windows and both scoring modes
+//    that flags 18-23 of 50 — nearly half. The one-in-four line sits at 0.72:
+//    15 (12M raw), 10 (12M vol-adj), 14 (6M raw), 14 (6M vol-adj) — mean 13.
+//    Re-measure the same grid before ever moving this.
+const ECHO_TOP_COUNT = 50;
+const ECHO_THRESHOLD = 0.72;
 
 const ROW_FLAGS = [
   {
-    key: 'corr',
-    label: 'correlation group',
-    title: 'Correlation groups',
-    description: 'Colour-code names whose daily moves track each other, anchored on your saved names: '
-      + 'each colour is one group, so a candidate glowing the same colour as something you hold '
-      + 'would add more of the same movement. Group tightness above sets the bar.',
-    test: (c) => corrGroupIndex(c.symbol) !== null,
-    token: (c) => `corr corr-g${corrGroupIndex(c.symbol) % CORR_GROUP_COLORS}`,
-    note: (n) => `<b>${n}</b> ${n === 1 ? 'name glows' : 'names glow'} with a colour &mdash; each colour is a `
-      + `group of names whose daily moves track each other (correlation of `
-      + `<b>${state.settings.correlationThreshold.toFixed(2)}</b>+ over the ranking range), anchored on your `
-      + `saved names. Same colour, same movement &mdash; adding it doubles down rather than diversifies.`,
+    key: 'echo',
+    label: 'tracks a higher-ranked name',
+    title: 'Correlation flag',
+    description: 'Mark any top-50 name whose daily price moves track at least one name ranked above it '
+      + `(correlation ${ECHO_THRESHOLD.toFixed(2)}+ over the ranking window). A flagged name adds little `
+      + 'that something higher on the list does not already give you.',
+    test: (c) => echoFlagged.has(c.symbol),
+    note: (n) => `<b>${n}</b> of the top ${ECHO_TOP_COUNT} ${n === 1 ? 'carries' : 'carry'} the amber ring &mdash; `
+      + `each tracks at least one name ranked above it (correlation of <b>${ECHO_THRESHOLD.toFixed(2)}</b>+ `
+      + 'over the ranking window), so the higher name already gives you that movement.',
   },
 ];
 
-// symbol -> group index, and the held anchors of each group. Rebuilt by
-// computeCorrGroups() whenever the watchlist, the threshold, or the ranking
-// window changes — never in a render path.
-let corrGroups = { bySymbol: new Map(), anchors: [] };
+// Symbols currently wearing the echo flag. Rebuilt by computeEchoFlags(),
+// which runs whenever the rankings do (the flag reads board order and nothing
+// else — the watchlist has no effect on it, so saving a name never triggers
+// this).
+let echoFlagged = new Set();
 
-function corrGroupIndex(symbol) {
-  if (!flagEnabled('corr')) return null;
-  const idx = corrGroups.bySymbol.get(symbol);
-  return idx === undefined ? null : idx;
+// Pairwise daily-return correlation between two date-indexed close maps over
+// [startStr, endStr] — the same inner-join-then-correlate the removed
+// server-side version used. Signed, never |r|: a strong negative is
+// diversification, and flagging it would mark exactly the names worth adding.
+function pairCorrelation(datesA, mapA, mapB, startStr, endStr) {
+  const closes = [];
+  for (const d of datesA) {
+    if (d < startStr || d > endStr) continue;
+    const b = mapB.get(d);
+    if (b === undefined) continue;
+    closes.push([mapA.get(d), b]);
+  }
+  const n = closes.length - 1;
+  if (n < CORRELATION_MIN_OBSERVATIONS) return null;
+  const ra = [];
+  const rb = [];
+  for (let i = 1; i < closes.length; i++) {
+    const [a0, b0] = closes[i - 1];
+    const [a1, b1] = closes[i];
+    if (!(a0 > 0) || !(b0 > 0)) return null;
+    ra.push(a1 / a0 - 1);
+    rb.push(b1 / b0 - 1);
+  }
+  const meanA = ra.reduce((x, y) => x + y, 0) / n;
+  const meanB = rb.reduce((x, y) => x + y, 0) / n;
+  let cov = 0;
+  let varA = 0;
+  let varB = 0;
+  for (let i = 0; i < n; i++) {
+    const da = ra[i] - meanA;
+    const db = rb[i] - meanB;
+    cov += da * db;
+    varA += da * da;
+    varB += db * db;
+  }
+  if (!(varA > 0) || !(varB > 0)) return null;
+  return cov / Math.sqrt(varA * varB);
 }
 
-// Groups are connected components of the held names under "correlates at or
-// above the threshold", plus every board name whose strongest correlation
-// against a held name (state.correlations) clears the same bar — it joins the
-// group of the name it tracks. A group with a single member stays dark: an orb
-// on a name nothing else moves with guides nothing. Component-building is
-// deliberately simple (a name bridges two groups, they merge) — this is a
-// guide for the eye, not the HRP clustering, and the honest reading of "these
-// all reached each other at r ≥ the bar" is one group.
-function computeCorrGroups() {
-  const bySymbol = new Map();
-  const threshold = state.settings.correlationThreshold;
-  if (!(threshold < CORRELATION_MAX) || !state.leaderboard) {
-    corrGroups = { bySymbol, anchors: [] };
-    return;
-  }
-  const held = [...state.watchlist];
-  if (held.length === 0) {
-    corrGroups = { bySymbol, anchors: [] };
-    return;
-  }
+// Walk the ranked top 50 downward; a name is flagged on its first correlation
+// ≥ ECHO_THRESHOLD against any name above it. Rank 1 can never be flagged.
+// Histories for the top names come from one batch call (or the embedded data
+// on the snapshot bundle); ~1,200 pair checks run in a few ms off the render
+// path. Returns the set rather than assigning it — the caller holds the
+// request sequence, and a superseded refresh must never overwrite (or clear)
+// flags a newer one just computed.
+async function computeEchoFlags() {
+  if (!state.leaderboard || !state.rankScores) return new Set();
+  const ranked = state.leaderboard.companies
+    .map((c) => ({ symbol: c.symbol, value: scoreFor(c) }))
+    .filter((x) => x.value !== null)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, ECHO_TOP_COUNT)
+    .map((x) => x.symbol);
+  if (ranked.length < 2) return new Set();
 
-  // Pairwise correlation among the held names themselves, over the same window
-  // the board's correlations use. Histories for held names are already in
-  // historyCache in every path that gets here (the insights strip loads them);
-  // a missing one just leaves that name a singleton.
+  await loadAllHistories(ranked);
+
   const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
   const startStr = daysAgoToDateStr(startDaysAgo);
   const endStr = daysAgoToDateStr(endDaysAgo);
-  const parent = new Map(held.map((s) => [s, s]));
-  const find = (s) => {
-    while (parent.get(s) !== s) { parent.set(s, parent.get(parent.get(s))); s = parent.get(s); }
-    return s;
-  };
-  const union = (a, b) => { parent.set(find(a), find(b)); };
-  for (let i = 0; i < held.length; i++) {
-    for (let j = i + 1; j < held.length; j++) {
-      const a = historyCache.get(held[i]);
-      const b = historyCache.get(held[j]);
-      if (!a || !b) continue;
-      const r = correlationClientSide(a.series, b.series, startStr, endStr);
-      if (r !== null && r >= threshold) union(held[i], held[j]);
+  const indexed = ranked.map((sym) => {
+    const cached = historyCache.get(sym);
+    if (!cached || !cached.series) return null;
+    const dates = [];
+    const map = new Map();
+    for (const p of cached.series) {
+      if (!(p.close > 0)) continue;
+      dates.push(p.date);
+      map.set(p.date, p.close);
+    }
+    return { sym, dates, map };
+  });
+
+  const flagged = new Set();
+  for (let k = 1; k < indexed.length; k++) {
+    const me = indexed[k];
+    if (!me) continue;
+    for (let j = 0; j < k; j++) {
+      const above = indexed[j];
+      if (!above) continue;
+      const r = pairCorrelation(me.dates, me.map, above.map, startStr, endStr);
+      if (r !== null && r >= ECHO_THRESHOLD) { flagged.add(me.sym); break; }
     }
   }
-
-  const groupOfRoot = new Map();
-  const members = []; // per group: [heldMembers]
-  for (const s of held) {
-    const root = find(s);
-    if (!groupOfRoot.has(root)) { groupOfRoot.set(root, members.length); members.push([]); }
-    members[groupOfRoot.get(root)].push(s);
-  }
-  const heldGroup = new Map();
-  members.forEach((ms, g) => ms.forEach((s) => heldGroup.set(s, g)));
-
-  // Board names join the group of the held name they track. Counted per group
-  // so singleton groups (one held name, no matches) can stay dark.
-  const outsiders = new Map(); // symbol -> group
-  const outsiderCount = new Array(members.length).fill(0);
-  for (const c of state.leaderboard.companies) {
-    if (state.watchlist.has(c.symbol)) continue;
-    const hit = state.correlations[c.symbol];
-    if (!hit || hit.value < threshold) continue;
-    const g = heldGroup.get(hit.against);
-    if (g === undefined) continue;
-    outsiders.set(c.symbol, g);
-    outsiderCount[g] += 1;
-  }
-
-  // Stable colour order: biggest groups first, ties by first member, so the
-  // same watchlist always wears the same colours.
-  const size = members.map((ms, g) => ms.length + outsiderCount[g]);
-  const order = members.map((_, g) => g)
-    .filter((g) => size[g] >= 2)
-    .sort((a, b) => size[b] - size[a] || (members[a][0] < members[b][0] ? -1 : 1));
-  const colorOf = new Map(order.map((g, i) => [g, i]));
-
-  for (const [s, g] of heldGroup) {
-    if (colorOf.has(g)) bySymbol.set(s, colorOf.get(g));
-  }
-  for (const [s, g] of outsiders) {
-    if (colorOf.has(g)) bySymbol.set(s, colorOf.get(g));
-  }
-  corrGroups = { bySymbol, anchors: order.map((g) => members[g]) };
+  return flagged;
 }
 
 // Absent from the stored overrides means "on": a flag added to the registry
@@ -353,9 +351,6 @@ const state = {
   // client-side fallback below when running as a static snapshot with no
   // backend to call).
   rankScores: null,
-  // symbol -> { value, against }: strongest positive return correlation with
-  // something already on the watchlist. Populated by refreshCorrelations().
-  correlations: {},
 };
 
 // symbol -> { symbol, asOf, series }, oldest first. Shared by the Ranks/Watchlist
@@ -710,114 +705,6 @@ function scoreFor(company) {
   return typeof v === 'number' ? v : null;
 }
 
-// ── correlation guide ────────────────────────────────────────────────
-// The board's correlation signal is the coloured group orbs (see ROW_FLAGS /
-// computeCorrGroups above). An earlier version faded correlated rows and
-// blocked their add button; replaced at the owner's request — a flag informs,
-// a block decides for you.
-
-// Signed, not absolute — see the header comment in src/correlation.js.
-function correlationClientSide(seriesA, seriesB, startStr, endStr) {
-  if (!seriesA || !seriesB) return null;
-  const bByDate = new Map();
-  for (const p of seriesB) bByDate.set(p.date, p.close);
-  const pairs = [];
-  for (const p of seriesA) {
-    if (p.date < startStr || p.date > endStr) continue;
-    const b = bByDate.get(p.date);
-    if (b === undefined || !(p.close > 0) || !(b > 0)) continue;
-    pairs.push([p.close, b]);
-  }
-  const n = pairs.length - 1;
-  if (n < CORRELATION_MIN_OBSERVATIONS) return null;
-  const ra = [];
-  const rb = [];
-  for (let i = 1; i < pairs.length; i++) {
-    ra.push((pairs[i][0] - pairs[i - 1][0]) / pairs[i - 1][0]);
-    rb.push((pairs[i][1] - pairs[i - 1][1]) / pairs[i - 1][1]);
-  }
-  const meanA = ra.reduce((x, y) => x + y, 0) / n;
-  const meanB = rb.reduce((x, y) => x + y, 0) / n;
-  let cov = 0;
-  let varA = 0;
-  let varB = 0;
-  for (let i = 0; i < n; i++) {
-    const da = ra[i] - meanA;
-    const db = rb[i] - meanB;
-    cov += da * db;
-    varA += da * da;
-    varB += db * db;
-  }
-  if (!(varA > 0) || !(varB > 0)) return null;
-  return cov / Math.sqrt(varA * varB);
-}
-
-function computeCorrelationsClientSide(held) {
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const startStr = daysAgoToDateStr(startDaysAgo);
-  const endStr = daysAgoToDateStr(endDaysAgo);
-  const out = {};
-  for (const c of state.leaderboard.companies) {
-    if (held.includes(c.symbol)) continue;
-    const mine = historyCache.get(c.symbol);
-    if (!mine) continue;
-    let best = null;
-    for (const other of held) {
-      const theirs = historyCache.get(other);
-      if (!theirs) continue;
-      const r = correlationClientSide(mine.series, theirs.series, startStr, endStr);
-      if (r === null) continue;
-      if (best === null || r > best.value) best = { value: r, against: other };
-    }
-    if (best) out[c.symbol] = best;
-  }
-  return out;
-}
-
-// Same dual-path shape as refreshRankings: the live server computes this over
-// history the browser never has to download, and the static snapshot (no
-// backend) falls back to computing it from embedded history.
-let corrRequestSeq = 0;
-async function refreshCorrelations() {
-  const seq = ++corrRequestSeq;
-  const held = [...state.watchlist];
-  if (held.length === 0) {
-    state.correlations = {};
-    computeCorrGroups();
-    return;
-  }
-  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
-  const params = new URLSearchParams({
-    symbols: held.join(','),
-    startDaysAgo: String(startDaysAgo),
-    endDaysAgo: String(endDaysAgo),
-  });
-
-  if (typeof EMBEDDED_LEADERBOARD !== 'undefined') {
-    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
-    if (seq !== corrRequestSeq) return;
-    state.correlations = computeCorrelationsClientSide(held);
-    computeCorrGroups();
-    return;
-  }
-  try {
-    const res = await fetch(`/api/correlations?${params}`);
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-    const data = await res.json();
-    if (seq !== corrRequestSeq) return;
-    state.correlations = data.correlations || {};
-  } catch {
-    await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
-    if (seq !== corrRequestSeq) return;
-    state.correlations = computeCorrelationsClientSide(held);
-  }
-  // Grouping the held names needs their own histories (one cheap batch call —
-  // the insights strip wants them anyway) and then no further requests.
-  await loadAllHistories(held);
-  if (seq !== corrRequestSeq) return;
-  computeCorrGroups();
-}
-
 function computeRankScoresClientSide() {
   const scores = {};
   for (const c of state.leaderboard.companies) {
@@ -842,6 +729,8 @@ async function refreshRankings() {
     await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
     if (seq !== rankRequestSeq) return;
     state.rankScores = computeRankScoresClientSide();
+    const bundleFlags = await computeEchoFlags();
+    if (seq === rankRequestSeq) echoFlagged = bundleFlags;
     return;
   }
   const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
@@ -861,6 +750,12 @@ async function refreshRankings() {
     if (seq !== rankRequestSeq) return;
     state.rankScores = computeRankScoresClientSide();
   }
+  // The echo flag reads the board order these scores define, so it recomputes
+  // exactly when they do — one seam, and stale flags can never outlive a
+  // window change. Assigned only if this refresh is still the latest, so a
+  // slow superseded run can't clobber what a newer one computed.
+  const flags = await computeEchoFlags();
+  if (seq === rankRequestSeq) echoFlagged = flags;
 }
 
 // ── tab routing ──────────────────────────────────────────────────────
@@ -988,9 +883,10 @@ async function applyWindowPreset(key) {
   renderWindowPills();
   renderDateRangeSetting();
   if (state.leaderboard && state.rankingsLoaded) {
-    // Both sequence their own requests, so rapid taps each fire but only the
-    // latest response applies — same as the steppers.
-    await Promise.all([refreshRankings(), refreshCorrelations()]);
+    // Sequences its own requests, so rapid taps each fire but only the latest
+    // response applies — same as the steppers. The echo flag recomputes inside
+    // refreshRankings, since it reads the board order and nothing else.
+    await refreshRankings();
     renderAll();
   }
 }
@@ -1144,6 +1040,11 @@ function pruneBrokenLogos(container) {
 // which genuinely did change — recompute in the background and restyle rows in
 // place when they land. The full rebuild path still exists for settings
 // changes, where the ordering itself changes.
+//
+// Note what is deliberately absent here: no flag or correlation work. The
+// echo flag reads the ranked board and a hardwired threshold — saving a name
+// changes nothing about it, which is also why a save is now the cheapest
+// interaction in the app.
 function toggleWatchlist(symbol) {
   if (state.watchlist.has(symbol)) state.watchlist.delete(symbol);
   else state.watchlist.add(symbol);
@@ -1151,11 +1052,6 @@ function toggleWatchlist(symbol) {
   updateWatchlistBadge(true);
   updateRowSelection(symbol);
   renderWatchlistBoard();
-  refreshCorrelations().then(() => {
-    applyRowFlagsInPlace();
-    renderRanksCallout();
-    renderFlagSettings();
-  });
 }
 
 // Restyle the tapped row (both boards may carry it) without rebuilding it.
@@ -1776,7 +1672,7 @@ function renderPlanCard(plan) {
 }
 
 // One request-sequence guard for the whole insights strip, same pattern as
-// refreshCorrelations — a stale async compute must never paint over a newer
+// refreshRankings — a stale async compute must never paint over a newer
 // watchlist.
 let planRequestSeq = 0;
 async function renderWatchlistInsights(companies) {
@@ -2106,8 +2002,6 @@ function initClearWatchlist() {
     state.watchlist.clear();
     saveWatchlist();
     updateWatchlistBadge();
-    // Nothing is held any more, so no group orbs should survive it.
-    await refreshCorrelations();
     renderAll();
     // Stays on this tab rather than bouncing to Ranks — the empty state already
     // says where to go, and navigating for the user is a surprise.
@@ -3128,42 +3022,6 @@ function renderSettings() {
         }
       });
     }
-    // Threshold stepper: 0.30–1.00 in 0.05 steps, 1.00 shown as "Off". Changing
-    // it needs no refetch — the correlations themselves don't depend on the
-    // threshold, only on the watchlist and the date range — but the groups cut
-    // from them do, so they recompute (locally, no requests) before rendering.
-    if (setting.type === 'threshold') {
-      const value = state.settings[setting.key];
-      const off = !(value < CORRELATION_MAX);
-      row.innerHTML = `
-        <div class="settings-row-text">
-          <div class="settings-row-label">${setting.label}</div>
-          <div class="settings-row-desc">${setting.description}</div>
-          <div class="stepper-date${off ? ' is-off' : ''}" id="threshold-value">${off ? 'Off' : value.toFixed(2)}</div>
-        </div>
-        <div class="stepper" role="group" aria-label="${setting.label}">
-          <button type="button" class="stepper-btn" data-key="${setting.key}" data-dir="-1" aria-label="Lower the correlation threshold"${value - CORRELATION_STEP < CORRELATION_MIN - 1e-9 ? ' disabled' : ''}>&minus;</button>
-          <button type="button" class="stepper-btn" data-key="${setting.key}" data-dir="1" aria-label="Raise the correlation threshold"${off ? ' disabled' : ''}>+</button>
-        </div>`;
-      list.appendChild(row);
-      row.querySelectorAll('.stepper-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const dir = Number(btn.dataset.dir);
-          const next = state.settings[setting.key] + dir * CORRELATION_STEP;
-          // Round to the step: repeated float addition drifts (0.7 + 0.05 …).
-          state.settings[setting.key] = Math.min(
-            CORRELATION_MAX,
-            Math.max(CORRELATION_MIN, Math.round(next / CORRELATION_STEP) * CORRELATION_STEP),
-          );
-          saveSettings();
-          renderSettings();
-          if (state.leaderboard && state.rankingsLoaded) {
-            computeCorrGroups();
-            renderAll();
-          }
-        });
-      });
-    }
   });
 
   if (!document.getElementById('settings-note')) {
@@ -3287,9 +3145,10 @@ function renderDateRangeSetting() {
       renderDateRangeSetting();
       renderWindowPills();
       if (state.leaderboard && state.rankingsLoaded) {
-        // Both of these sequence their own requests, so rapid stepper clicks
-        // each fire but only the latest response applies.
-        await Promise.all([refreshRankings(), refreshCorrelations()]);
+        // Sequences its own requests, so rapid stepper clicks each fire but
+        // only the latest response applies. The echo flag recomputes inside
+        // refreshRankings — it depends on the window through the board order.
+        await refreshRankings();
         renderAll();
       }
     });
@@ -3355,7 +3214,6 @@ async function init() {
     document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
     await refreshRankings();
     state.rankingsLoaded = true;
-    await refreshCorrelations();
 
     renderAll();
   } catch (err) {

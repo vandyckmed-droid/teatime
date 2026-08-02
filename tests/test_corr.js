@@ -1,9 +1,9 @@
-// The correlation guide: coloured group orbs, not the old fade-and-block
-// filter. Names whose daily moves track a saved name (r >= the tightness
-// setting) share that name's group colour; nothing is faded and nothing is
-// blocked from being added — the orb informs, the choice stays yours. This
-// suite is also the regression net for the removed filter: a disabled add
-// button or a dimmed row here means it crept back.
+// The echo flag: a top-50 name whose daily moves track at least one name
+// ranked above it (pairwise r >= the hardwired ECHO_THRESHOLD over the
+// ranking window) wears one amber ring. Deliberately not a grouping or
+// colour-coding system, and deliberately independent of the watchlist —
+// both were built and cut at the owner's request. This suite recomputes the
+// flag definition independently and checks the board agrees.
 const { chromium, devices } = require('/opt/node22/lib/node_modules/playwright');
 const S = require('os').tmpdir();
 const BASE = process.argv[2] || 'http://localhost:3425';
@@ -18,104 +18,114 @@ const BASE = process.argv[2] || 'http://localhost:3425';
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-  // Seed NVDA on the watchlist, and a tightness low enough to bite on this
-  // dataset (nothing here reaches 0.70 against NVDA).
-  await page.addInitScript(() => {
-    localStorage.setItem('teatime.watchlist', JSON.stringify(['NVDA']));
-    localStorage.setItem('teatime.settings', JSON.stringify({ correlationThreshold: 0.45 }));
-  });
   await page.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#ranks-rows .row', { timeout: 25000 });
-  // Groups land asynchronously after correlations do.
+  await page.waitForSelector('#ranks-rows .row', { timeout: 30000 });
   await page.waitForFunction(
-    () => document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length > 0,
-    null, { timeout: 30000 },
+    () => document.querySelectorAll('#ranks-rows .row[data-flags~="echo"]').length > 0,
+    null, { timeout: 45000 },
   ).catch(() => null);
 
-  const state = () => page.evaluate(() => {
-    const rows = [...document.querySelectorAll('#ranks-rows .row')];
-    const flagged = rows.filter((r) => (r.dataset.flags || '').includes('corr'));
-    const token = (r) => ((r.dataset.flags || '').match(/corr-g\d/) || [null])[0];
-    const nvda = rows.find((r) => r.dataset.symbol === 'NVDA');
-    const sample = flagged[0];
-    return {
-      total: rows.length,
-      flagged: flagged.length,
-      flaggedSymbols: flagged.slice(0, 6).map((r) => r.dataset.symbol),
-      tokens: [...new Set(flagged.map(token))],
-      nvdaToken: nvda ? token(nvda) : null,
-      sampleOpacity: sample ? getComputedStyle(sample).opacity : null,
-      sampleDisabled: sample ? sample.querySelector('.add-btn').disabled : null,
-      sampleOrb: sample ? getComputedStyle(sample.querySelector('.logo')).boxShadow : '',
-      plainOrb: (() => {
-        const plain = rows.find((r) => !r.dataset.flags);
-        return plain ? getComputedStyle(plain.querySelector('.logo')).boxShadow : '';
-      })(),
-      sampleAria: sample ? sample.getAttribute('aria-label') : '',
-      callout: document.getElementById('ranks-callout').hidden
-        ? '' : document.getElementById('ranks-callout-text').textContent,
+  const board = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#ranks-rows .row[data-symbol]')];
+    return rows.map((r, i) => ({
+      sym: r.dataset.symbol,
+      pos: i + 1,
+      flagged: (r.dataset.flags || '').includes('echo'),
+      aria: r.getAttribute('aria-label'),
+    }));
+  });
+  const flagged = board.filter((r) => r.flagged);
+
+  // ── the shape of the flag ──
+  check(`flags exist (${flagged.length} of top 50)`, flagged.length >= 5);
+  check(`roughly one in four of the top 50 (${flagged.length})`,
+    flagged.length >= 8 && flagged.length <= 20);
+  check('rank 1 can never be flagged — nothing is above it', !board[0].flagged);
+  check(`nothing below the top 50 is flagged (${board.filter((r) => r.pos > 50 && r.flagged).length})`,
+    board.filter((r) => r.pos > 50 && r.flagged).length === 0);
+  check('every flagged row speaks the reason',
+    flagged.every((r) => /tracks a higher-ranked name/.test(r.aria)));
+  const callout = await page.$eval('#ranks-callout-text', (e) => e.textContent).catch(() => '');
+  check('the callout explains the ring and the bar',
+    new RegExp(`${flagged.length} of the top 50`).test(callout) && /0\.72/.test(callout));
+
+  // ── independent recomputation of the definition itself ──
+  // Recompute best-correlation-above for the first few flagged and unflagged
+  // rows from the app's own history cache, entirely outside its flag code.
+  const audit = await page.evaluate(() => {
+    const T = 0.72;
+    const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+    const dstr = (n) => { const d = new Date(); d.setUTCHours(0, 0, 0, 0); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+    const startStr = dstr(startDaysAgo);
+    const endStr = dstr(endDaysAgo);
+    const rows = [...document.querySelectorAll('#ranks-rows .row[data-symbol]')].slice(0, 50)
+      .map((r) => ({ sym: r.dataset.symbol, flagged: (r.dataset.flags || '').includes('echo') }));
+    const corr = (a, b) => {
+      const mb = new Map(b.map((p) => [p.date, p.close]));
+      const pairs = [];
+      for (const p of a) {
+        if (p.date < startStr || p.date > endStr) continue;
+        const v = mb.get(p.date);
+        if (v !== undefined && p.close > 0 && v > 0) pairs.push([p.close, v]);
+      }
+      const n = pairs.length - 1;
+      if (n < 20) return null;
+      const ra = []; const rb = [];
+      for (let i = 1; i < pairs.length; i++) { ra.push(pairs[i][0] / pairs[i - 1][0] - 1); rb.push(pairs[i][1] / pairs[i - 1][1] - 1); }
+      const ma = ra.reduce((x, y) => x + y, 0) / n; const mbn = rb.reduce((x, y) => x + y, 0) / n;
+      let cov = 0; let va = 0; let vb = 0;
+      for (let i = 0; i < n; i++) { const da = ra[i] - ma; const db = rb[i] - mbn; cov += da * db; va += da * da; vb += db * db; }
+      return (va > 0 && vb > 0) ? cov / Math.sqrt(va * vb) : null;
     };
+    const out = [];
+    for (let k = 0; k < rows.length; k++) {
+      const mine = (historyCache.get(rows[k].sym) || {}).series;
+      if (!mine) continue;
+      let best = -2;
+      for (let j = 0; j < k; j++) {
+        const theirs = (historyCache.get(rows[j].sym) || {}).series;
+        if (!theirs) continue;
+        const r = corr(mine, theirs);
+        if (r !== null && r > best) best = r;
+      }
+      out.push({ sym: rows[k].sym, flagged: rows[k].flagged, best });
+      if (out.length >= 50) break;
+    }
+    return { checked: out, threshold: T };
   });
+  // Rows right at the threshold can disagree by float noise; leave a margin.
+  const wrong = audit.checked.filter((r) =>
+    (r.best >= audit.threshold + 0.01 && !r.flagged) || (r.best < audit.threshold - 0.01 && r.flagged && r.best > -2));
+  check(`the flag matches an independent recomputation (${wrong.length} disagree${wrong.length ? `: ${wrong.slice(0, 3).map((w) => `${w.sym}@${w.best.toFixed(2)}`).join(', ')}` : ''})`,
+    wrong.length === 0);
 
-  const s1 = await state();
-  check(`names group with NVDA at r >= 0.45 (${s1.flagged}/${s1.total}: ${s1.flaggedSymbols.join(', ')})`,
-    s1.flagged >= 2);
-  check(`the held anchor wears the same colour as its group (${s1.nvdaToken})`,
-    s1.nvdaToken !== null && s1.tokens.includes(s1.nvdaToken));
-  check('grouped rows draw an orb where plain rows draw none',
-    s1.sampleOrb !== 'none' && s1.sampleOrb !== '' && s1.plainOrb === 'none');
-  check(`grouped rows are not faded (opacity ${s1.sampleOpacity})`,
-    parseFloat(s1.sampleOpacity) === 1);
-  check('a grouped row\'s add control stays enabled', s1.sampleDisabled === false);
-  check('the accessible name speaks the group', /correlation group/.test(s1.sampleAria));
-  check(`the callout explains the colours ("${s1.callout.slice(-90)}")`,
-    /glow/.test(s1.callout) && /0\.45/.test(s1.callout));
-
-  await page.screenshot({ path: `${S}-groups.png` });
-
-  // ── the orb is a guide, not a gate: a grouped name can be added ──
-  const target = s1.flaggedSymbols.find((sym) => sym !== 'NVDA');
-  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist')).length);
+  // ── the flag is watchlist-independent: saving a name changes nothing ──
+  const target = flagged[0].sym;
+  const before = await page.evaluate(() => [...document.querySelectorAll('#ranks-rows .row[data-flags~="echo"]')].map((r) => r.dataset.symbol).join(','));
   await page.locator(`#ranks-rows .row[data-symbol="${target}"] .add-btn`).click();
-  await page.waitForTimeout(1500);
-  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist')));
-  check(`adding a grouped name works (${before} -> ${after.length}, added ${target})`,
-    after.length === before + 1 && after.includes(target));
-
-  // Both saved names now anchor the group; the row keeps its colour and gains
-  // the saved ring — the two treatments compose rather than replace.
-  const addedRow = await page.evaluate((sym) => {
+  await page.waitForTimeout(1200);
+  const afterSave = await page.evaluate(() => [...document.querySelectorAll('#ranks-rows .row[data-flags~="echo"]')].map((r) => r.dataset.symbol).join(','));
+  check('saving a flagged name neither adds nor removes any flag', afterSave === before);
+  const savedRow = await page.evaluate((sym) => {
     const r = document.querySelector(`#ranks-rows .row[data-symbol="${sym}"]`);
-    return { flags: r.dataset.flags || '', selected: r.classList.contains('is-selected') };
+    return { flagged: (r.dataset.flags || '').includes('echo'), selected: r.classList.contains('is-selected') };
   }, target);
-  check('the added name keeps its group colour and gains the saved ring',
-    addedRow.flags.includes('corr') && addedRow.selected);
-
-  // Undo, so the stored list is back to the seed for the checks below.
+  check('a saved flagged row wears ring and saved treatment together',
+    savedRow.flagged && savedRow.selected);
   await page.locator(`#ranks-rows .row[data-symbol="${target}"] .add-btn`).click();
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(800);
 
-  // ── tightness at 1.00 switches grouping off ──
-  const ctx2 = await browser.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
-  const p2 = await ctx2.newPage();
-  p2.on('pageerror', (e) => errors.push(String(e)));
-  await p2.addInitScript(() => {
-    localStorage.setItem('teatime.watchlist', JSON.stringify(['NVDA']));
-    localStorage.setItem('teatime.settings', JSON.stringify({ correlationThreshold: 1 }));
-  });
-  await p2.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
-  await p2.waitForSelector('#ranks-rows .row', { timeout: 25000 });
-  await p2.waitForTimeout(3500);
-  const offState = await p2.evaluate(() => ({
-    flagged: document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length,
-    thresholdShown: (() => {
-      const el = document.getElementById('threshold-value');
-      return el ? el.textContent.trim() : '(no settings open)';
-    })(),
+  // ── no threshold control exists any more — the bar is hardwired ──
+  await page.click('[data-tab="settings"]');
+  await page.waitForTimeout(600);
+  const settingsProbe = await page.evaluate(() => ({
+    thresholdEl: !!document.getElementById('threshold-value'),
+    steppersInList: document.querySelectorAll('#settings-list .stepper-btn').length,
   }));
-  check(`at 1.00 no group orbs draw (${offState.flagged})`, offState.flagged === 0);
-  await ctx2.close();
+  check('no tightness stepper survives in Settings',
+    !settingsProbe.thresholdEl && settingsProbe.steppersInList === 0);
 
+  await page.screenshot({ path: `${S}-echo.png` });
   check(`no page errors (${errors.length})`, errors.length === 0);
   if (errors.length) console.log('ERRORS:', JSON.stringify(errors.slice(0, 4)));
 

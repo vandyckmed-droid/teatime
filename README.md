@@ -84,22 +84,17 @@ Then open http://localhost:3000.
   price endpoint returns closes identical to the plain ones.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
-  `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
-  `GET /api/correlations?symbols=&startDaysAgo=&endDaysAgo=` and
-  `GET /api/portfolio`. The first five read from
+  `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=` and
+  `GET /api/portfolio`. The first four read from
   `src/dataStore.js`'s scheduled-refresh store; the portfolio endpoint reads
   its CSV off disk on each call, since it changes only when the file is
   edited. Every one of them is called by the frontend — an endpoint nothing
-  consumes is dead weight, and two (`/api/meta`, then `/api/ratings`) have
-  been removed on that rule.
+  consumes is dead weight, and three (`/api/meta`, `/api/ratings`, then
+  `/api/correlations` when the correlation flag moved fully client-side)
+  have been removed on that rule.
   History endpoints only serve symbols in the current leaderboard universe —
   this is a leaderboard companion, not an open proxy for arbitrary FMP
   queries.
-- `src/correlation.js` — `correlationsAgainst`: every universe name against
-  the held set, keeping only each name's strongest positive match, which is
-  what colours a row into a correlation group on the board. Signed rather
-  than absolute: a strongly negative correlation is a good diversifier, so
-  taking `|r|` would flag exactly the names worth adding.
 - `public/app.js`'s `drawLineChart` is the one line-chart renderer, shared by
   the per-ticker price chart and the portfolio balance chart: same geometry,
   same axis landmarks, same scrub crosshair, differing only in three

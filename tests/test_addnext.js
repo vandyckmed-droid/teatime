@@ -21,12 +21,11 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-  // Known starting point: 12M window, filter on, nothing saved.
+  // Known starting point: 12M window, nothing saved.
   await page.addInitScript(() => {
     localStorage.removeItem('teatime.watchlist');
     localStorage.setItem('teatime.settings', JSON.stringify({
       volAdjusted: false,
-      correlationThreshold: 0.7,
       rankDateRange: { startDaysAgo: 250, endDaysAgo: 20 },
     }));
   });
@@ -104,26 +103,11 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
     lastPickIdx > 0 && stragglers.length === 0);
   await page.screenshot({ path: `${S}-board.png` });
 
-  // ── group tightness informs the orbs but never gates what "next" means ──
-  await page.click('[data-tab="settings"]');
-  await page.waitForTimeout(700);
-  // Push it to 1.00 (grouping off): picks must be unaffected.
-  for (let i = 0; i < 6; i++) {
-    const plus = page.locator('#settings-list .stepper-btn[data-dir="1"]').first();
-    if (await plus.isDisabled()) break;
-    await plus.click();
-    await page.waitForTimeout(400);
-  }
-  const threshold = await page.evaluate(() =>
-    document.getElementById('threshold-value').textContent.trim());
-  check(`group tightness can be switched off (${threshold})`, threshold === 'Off');
-
+  // ── the correlation flag informs but never gates what "next" means ──
+  // The echo flag has no Settings knob any more (hardwired bar), so the check
+  // is simpler: flagged names must be picked exactly like unflagged ones.
   await page.click('[data-tab="investing"]');
-  await page.waitForTimeout(1200);
-  const keptAfterThreshold = await saved();
-  check(`changing it keeps every saved name (${keptAfterThreshold.length})`,
-    keptAfterThreshold.length === 4 && four.every((s) => keptAfterThreshold.includes(s)));
-
+  await page.waitForTimeout(700);
   await page.click('#add-next');
   await page.waitForTimeout(2500);
   const five = await saved();
@@ -131,7 +115,7 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   await page.waitForTimeout(1000);
   const unfiltered = await boardOrder();
   const firstFree = unfiltered.find((r) => !r.held);
-  check(`the next tap still adds the next unheld name (${five[4]})`,
+  check(`the next tap adds the next unheld name regardless of flags (${five[4]})`,
     five.length === 5 && !four.includes(five[4]));
   check(`and nothing above it is left unheld (next free is now ${firstFree && firstFree.symbol})`,
     unfiltered.slice(0, unfiltered.findIndex((r) => r.symbol === five[4])).every((r) => r.held));
