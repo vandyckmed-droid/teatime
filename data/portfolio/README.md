@@ -130,6 +130,30 @@ date,symbol,dollars
 ```
 
 Maintained the same way as the balances: the owner sends the brokerage's
-positions screen, rows get transcribed, nothing is ever rewritten. Until a
-first batch lands the file is just this header, and the app's "held vs plan"
-card explains itself instead of showing a comparison.
+positions screen, rows get transcribed, nothing is ever rewritten.
+
+### What's in here now
+
+One batch dated 2026-07-31: 23 equity positions transcribed from four
+screenshots taken Sunday 2026-08-02 (so values are Friday 07-31's close).
+Two of the screenshots were sorted descending by value and two provided
+checks: an alphabetical view re-showed ten of the tickers (all matched to
+the cent, FTNT overlapped between the two list views as well), and a
+"Balance Details" screen gave exact reconciliation targets.
+
+The reconciliation: broker Long positions $27,668.40 + cash $3,568.51 =
+account value $31,236.91, and SPAXX ($6,357.17, the money-market core —
+deliberately *not* recorded here as a holding) + Long = the list's own
+$34,025.57 total. Both identities check out. The 23 transcribed equities
+sum to **$27,369.00, which is $299.40 short of Long** — the descending
+list was cut off just below CSX ($301.64) and the alphabetical capture
+started at MU, so at least one small position (ticker alphabetically
+before MU, value ≤ ~$299) appears in no screenshot. Owner has been asked
+for the bottom of the list; append it to the same 2026-07-31 batch when it
+arrives (latest-date-wins means adding a row with the same date extends
+the batch, it doesn't replace it).
+
+Note the account value here ($31,236.91, captured Sunday) differs from
+`balances.csv`'s 07-31 row ($31,210.88, captured Friday after close) by
++$26.03 — weekend interest/dividend accrual posting, not a transcription
+conflict. The balances file keeps Friday's figure.
