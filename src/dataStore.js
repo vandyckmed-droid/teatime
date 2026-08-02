@@ -39,9 +39,10 @@ async function refreshAll() {
 
   // Realized trailing-1Y volatility rides on each company, computed here from
   // the history this refresh just fetched anyway — zero extra API calls. It
-  // once fed a high-volatility row flag (since replaced by the biotech dimmer);
-  // it stays because the daily archive files it, and a later question about
-  // volatility regimes shouldn't need the raw history re-fetched.
+  // once fed a high-volatility row flag (rolled back, like the biotech dimmer
+  // that briefly replaced it); it stays because the daily archive files it, and
+  // a later question about volatility regimes shouldn't need the raw history
+  // re-fetched.
   const companiesWithVol = mergedCompanies.map((c, i) => ({
     ...c,
     annVolPct: trailingAnnualizedVolPct(historyResults[i] && historyResults[i].series),

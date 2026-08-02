@@ -12,9 +12,11 @@ the date it was seen. Append-only: one row per (date, symbol), so a company
 rated again later gains a row rather than overwriting the old one. That's the
 whole point — the file is a record *through time*, not a current snapshot.
 
-Surfaced by `src/ratings.js` behind `GET /api/ratings`, and shown as the
-"Analyst rating" card in the app's full-screen per-ticker view. Nothing here
-feeds the board's ranking; the boards score price return and only that.
+While live, this was surfaced by `src/ratings.js` behind `GET /api/ratings`
+and shown as the "Analyst rating" card in the per-ticker view; both were
+removed at retirement (the card now renders FMP's grade counts instead).
+Nothing here ever fed the board's ranking; the boards score price return and
+only that.
 
 ## Format
 
@@ -30,8 +32,7 @@ date,symbol,rating,score
 - `symbol` — ticker as the source shows it. It doesn't have to be a company on
   the board; unmatched symbols simply never surface in the app.
 - `rating` — the label, spelled out: `Very Bullish`, `Bullish`, `Neutral`,
-  `Bearish`, `Very Bearish`. Extend `RATING_SCALE` in `src/ratings.js` (and
-  `RATING_TONE` in `public/app.js`) if a new one appears.
+  `Bearish`, `Very Bearish`.
 - `score` — 0–10, one decimal. **Empty when the source showed `--`.** An empty
   pair is a real observation: it says the source had nothing to publish that
   day, which is different from the company never having been looked at.
@@ -55,11 +56,6 @@ kept anyway: the record is of what was published, not of what this app ranks.
 
 ## Adding a batch
 
-Append rows with a new `date` and the app picks them up on the next request
-(`src/ratings.js` re-reads the file each call; the published snapshot needs a
-rebuild, as always).
-
-Re-recording the same symbols on a later date is the useful thing to do —
-with two or more readings the app starts showing what a rating *was* and how
-far it moved, and the file becomes chartable. One reading per symbol can only
-ever show a current value.
+Still possible — append rows with a new `date`, keeping the format above —
+but nothing will display them; this is an archive now. The live time series
+accrues in `data/snapshots/` instead, one day of FMP grade counts per file.

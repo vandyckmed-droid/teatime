@@ -6,11 +6,11 @@
 // scoring math changes, update both.
 //
 // The formulas live in the *Between functions, which take explicit date strings
-// and a "prepared" series. src/rankHistory.js scores the same window at many
-// past dates, so it needs both of those things: date-addressed windows, and a
-// form of the series it can score thousands of times without re-filtering an
-// array per call. customRangeReturn/volAdjustedScore are the days-ago-addressed
-// wrappers /api/rank uses.
+// and a "prepared" series — a form cheap enough to score many times without
+// re-filtering an array per call. customRangeReturn/volAdjustedScore are the
+// days-ago-addressed wrappers /api/rank uses. (A rank-history module once sat
+// on the date-addressed layer; it's gone, but the split stays because it is
+// what makes the math testable against explicit dates.)
 
 const TRADING_DAYS_PER_YEAR = 252;
 
@@ -114,12 +114,13 @@ function volAdjustedBetween(prepared, startStr, endStr) {
 }
 
 // Realized annualized volatility over the trailing ~12 months of closes, in
-// percent. Feeds the leaderboard's per-company annVolPct (see dataStore), whose
-// one consumer is the high-volatility row flag — which is why the window is a
-// fixed trailing year rather than the ranking window: a flag is a fact about
-// the company, and shouldn't quietly change meaning when the ranking window
-// moves. Sample stdev of simple daily returns, same convention as
-// volAdjustedBetween above and src/portfolio.js.
+// percent. Feeds the leaderboard's per-company annVolPct (see dataStore). Its
+// one consumer today is the daily archive — the high-volatility row flag that
+// prompted it was rolled back — but the window rule it was built under still
+// governs: a fixed trailing year, not the ranking window, because a fact about
+// the company shouldn't quietly change meaning when the ranking window moves.
+// Sample stdev of simple daily returns, same convention as volAdjustedBetween
+// above and src/portfolio.js.
 const TRAILING_VOL_SESSIONS = 250;
 const TRAILING_VOL_MIN_RETURNS = 60; // under ~3 months of history is noise, not a fact
 
