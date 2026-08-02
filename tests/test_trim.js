@@ -27,6 +27,15 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   await page.waitForSelector('#ranks-rows .row', { timeout: 30000 });
   await page.waitForTimeout(2500);
 
+  // Bundle-only: the trimming this asserts exists only in the assembled file.
+  // Against a live server it used to die on a raw ReferenceError, which in a
+  // sweep is indistinguishable from a suite that ran and found nothing.
+  if (!await page.evaluate(() => typeof EMBEDDED_LEADERBOARD !== 'undefined')) {
+    console.log(`SKIP - ${BASE} is not a snapshot bundle; this suite needs docs/index.html`);
+    await browser.close();
+    process.exit(0);
+  }
+
   // ── the stale wide window is clamped, and the board still scores ──
   const clamped = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.settings')).rankDateRange);
   const live = await page.evaluate(() => state.settings.rankDateRange);

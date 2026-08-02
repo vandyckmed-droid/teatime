@@ -1,14 +1,24 @@
 // Beta vs SPY row on the portfolio card.
 const { chromium, devices } = require('/opt/node22/lib/node_modules/playwright');
 
-const BASE = process.env.BASE || 'http://localhost:3210';
+const BASE = process.argv[2] || process.env.BASE || 'http://localhost:3210';
 const SHOT = require('os').tmpdir();
 
 let pass = 0;
 const fails = [];
 function check(name, cond, extra = '') {
-  if (cond) { pass += 1; console.log(`  ok  ${name}`); }
-  else { fails.push(`${name}${extra ? ` — ${extra}` : ''}`); console.log(`FAIL  ${name}${extra ? ` — ${extra}` : ''}`); }
+  if (cond) { pass += 1; console.log(`PASS - ${name}`); }
+  else { fails.push(`${name}${extra ? ` — ${extra}` : ''}`); console.log(`FAIL - ${name}${extra ? ` — ${extra}` : ''}`); }
+}
+
+// Live-only: every assertion below checks the UI against what GET
+// /api/portfolio says, which the published bundle has no way to answer. Say so
+// and skip, rather than dying on a connection error — in a sweep a crashed
+// suite and a clean one both print no FAIL, and that is how coverage goes
+// missing unnoticed. (The mirror of the bundle-only skip in test_snap/test_trim.)
+if (BASE.startsWith('file:')) {
+  console.log(`SKIP - ${BASE} has no backend; this suite checks the UI against /api/portfolio`);
+  process.exit(0);
 }
 
 (async () => {

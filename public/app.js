@@ -1139,6 +1139,11 @@ async function loadPortfolio() {
 function fmtMoney(v) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+// Whole dollars, for places where cents are noise — the held-vs-plan gaps are
+// hundreds of dollars wide and three figures share one row there.
+function fmtMoney0(v) {
+  return `$${Math.round(v).toLocaleString('en-US')}`;
+}
 function fmtMoneySigned(v) {
   return `${v >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v))}`;
 }
@@ -1529,7 +1534,7 @@ function renderSectorCard(companies) {
     const v = SECTOR_VAR[sector] || '--sector-default';
     return `
       <div class="sector-bar-row">
-        <span class="sector-bar-label"><span class="dot" style="background: var(${v})"></span>${sector}</span>
+        <span class="sector-bar-label"><span class="dot" style="background: var(${v})"></span>${SECTOR_SHORT[sector] || sector}</span>
         <span class="sector-bar-track"><span class="sector-bar-fill" style="width: ${(n / max) * 100}%; background: var(${v})"></span></span>
         <span class="sector-bar-count">${n}</span>
       </div>`;
@@ -1632,10 +1637,22 @@ function renderPlanCard(plan) {
 
 // Held vs plan: only as good as the holdings record (see
 // data/portfolio/holdings.csv) — until one exists, the card says how to start
-// rather than pretending. Weights compare against the HRP plan above; "on
-// target" is within 3 points, which is about the noise floor of eyeballing a
-// brokerage screen.
-const HELD_TOLERANCE_PP = 3;
+// rather than pretending.
+//
+// The comparison is in *dollars*, deliberately, and the obvious alternative is
+// a trap worth naming. Comparing a held share of the account against a plan
+// weight puts two different denominators either side of the "vs": a plan weight
+// is a share of the plan's own names, a held share is of everything in the
+// account. With 23 positions against a 10-name plan those aren't comparable,
+// and the mismatch reads as agreement exactly when it shouldn't — UNH at 3.2%
+// of the account against a 4.1% plan weight scored "on target" while sitting
+// $346 below its actual target. Plan dollars are what the card above already
+// shows, so the two now agree by construction.
+//
+// "On track" is within 10% of a name's target rather than a fixed dollar band,
+// so the tolerance scales with the position instead of swallowing the small
+// ones whole.
+const HELD_TOLERANCE_FRAC = 0.1;
 
 function renderHeldCard(plan) {
   const el = document.getElementById('watchlist-held');
@@ -1652,34 +1669,70 @@ function renderHeldCard(plan) {
     return;
   }
 
-  const total = holdings.positions.reduce((a, h) => a + h.dollars, 0);
-  if (!(total > 0) || !plan || plan.symbols.length === 0) { el.hidden = true; return; }
-  const planBySym = new Map(plan.symbols.map((sym, i) => [sym, plan.weights[i]]));
-  const heldBySym = new Map(holdings.positions.map((h) => [h.symbol, h.dollars / total]));
+  const accountTotal = holdings.positions.reduce((a, h) => a + h.dollars, 0);
+  if (!(accountTotal > 0) || !plan || plan.symbols.length === 0) { el.hidden = true; return; }
 
-  const rows = [];
-  for (const [sym, planW] of planBySym) {
-    const heldW = heldBySym.get(sym) ?? 0;
-    const diff = (heldW - planW) * 100;
+  const balance = portfolioSummary.endBalance;
+  const canDollars = balance !== null && plan.scale !== null;
+  const heldBySym = new Map(holdings.positions.map((h) => [h.symbol, h.dollars]));
+  const planSet = new Set(plan.symbols);
+  const heldInPlan = plan.symbols.reduce((a, s) => a + (heldBySym.get(s) || 0), 0);
+
+  // Targets in the same dollars the plan card shows. Without a balance or a vol
+  // scaling there is nothing to price against, so the card prices the same
+  // weights off what's already in those names — a narrower denominator, but
+  // still one denominator on both sides of the comparison.
+  const pool = canDollars ? balance * plan.scale : heldInPlan;
+  const ranked = plan.symbols
+    .map((sym, i) => ({ sym, target: pool * plan.weights[i], held: heldBySym.get(sym) || 0 }))
+    .sort((a, b) => b.target - a.target);
+
+  // Sorted by target, biggest first: the largest gap is the most actionable row
+  // and belongs at the top. It's also why a "not held" row is at full strength
+  // rather than muted — a name missing against an $8,543 target is the loudest
+  // fact on the card, not a footnote.
+  //
+  // Colour marks the *good* state, not the gap. Painting every gap red made the
+  // card a wall of red the moment the account drifted from the plan, which is
+  // its normal condition — ten identical red rows discriminate nothing. It also
+  // spent the loss colour on something that isn't a loss (same reasoning as the
+  // flag palette: a gap is a fact, not a verdict). Being on track is the rare
+  // state worth catching the eye, and the words carry the rest.
+  const rows = ranked.map(({ sym, target, held }) => {
+    const gap = held - target;
     let verdict;
     let cls = '';
-    if (!heldBySym.has(sym)) { verdict = 'not held'; cls = 'muted'; }
-    else if (Math.abs(diff) <= HELD_TOLERANCE_PP) { verdict = 'on target'; }
-    else if (diff > 0) { verdict = `${diff.toFixed(0)}pt overweight`; cls = 'loss'; }
-    else { verdict = `${(-diff).toFixed(0)}pt underweight`; cls = 'loss'; }
-    rows.push(statRow(sym, `${(heldW * 100).toFixed(1)}% vs ${(planW * 100).toFixed(1)}% — ${verdict}`, cls));
+    if (held === 0) verdict = 'not held';
+    else if (Math.abs(gap) <= target * HELD_TOLERANCE_FRAC) { verdict = 'on track'; cls = 'gain'; }
+    else verdict = `${fmtMoney0(Math.abs(gap))} ${gap > 0 ? 'over' : 'light'}`;
+    return statRow(sym, `${fmtMoney0(held)} vs ${fmtMoney0(target)} — ${verdict}`, cls);
+  });
+
+  const dropped = new Set(plan.dropped || []);
+  const extras = holdings.positions
+    .filter((h) => !planSet.has(h.symbol))
+    .sort((a, b) => b.dollars - a.dollars);
+  for (const h of extras) {
+    // A saved name the plan couldn't score is not the same as one that was
+    // never saved, and saying so beats implying the watchlist forgot it.
+    const why = dropped.has(h.symbol) ? 'not enough history to score' : 'not on the watchlist';
+    rows.push(statRow(h.symbol, `${fmtMoney0(h.dollars)} held — ${why}`, 'muted'));
   }
-  for (const [sym, heldW] of heldBySym) {
-    if (!planBySym.has(sym)) {
-      rows.push(statRow(sym, `${(heldW * 100).toFixed(1)}% held — not on the watchlist`, 'muted'));
-    }
-  }
+
+  const planTotal = ranked.reduce((a, r) => a + r.target, 0);
+  const elsewhere = accountTotal - heldInPlan;
+  const context = canDollars
+    ? `The plan covers ${plan.symbols.length} name${plan.symbols.length === 1 ? '' : 's'} worth
+       ${fmtMoney0(planTotal)} at the ${PLAN_TARGET_VOL_PCT}% target; you hold ${fmtMoney0(heldInPlan)} of those,
+       with ${fmtMoney0(elsewhere)} in ${extras.length} other name${extras.length === 1 ? '' : 's'}.`
+    : `No balance to price the plan against, so targets here split the ${fmtMoney0(heldInPlan)} already in these
+       names by the suggested weights.`;
 
   el.innerHTML = `
     <div class="portfolio-label">Held vs plan</div>
     ${rows.join('')}
-    <p class="portfolio-note">Holdings as recorded ${fmtLongDate(holdings.asOf)}, compared with the suggested
-    weights above. Within ${HELD_TOLERANCE_PP} points counts as on target.</p>`;
+    <p class="portfolio-note">Holdings as recorded ${fmtLongDate(holdings.asOf)}, against the dollar targets
+    above. ${context} Within ${Math.round(HELD_TOLERANCE_FRAC * 100)}% of a target counts as on track.</p>`;
   el.hidden = false;
 }
 

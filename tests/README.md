@@ -8,9 +8,11 @@ between sessions and accrue like everything else.
 
 ## Running them
 
-Each suite is a plain Node script. Most take the target as their first
-argument; without one they default to `http://localhost:3210` (or, for the
-bundle-oriented suites `test_trim`, the committed `docs/index.html`).
+Each suite is a plain Node script taking the target as its first argument;
+without one they default to `http://localhost:3210` or, for the bundle-oriented
+suites (`test_trim`, `test_snap`), the committed `docs/index.html`. Run them
+from the repo root — several resolve paths relative to it, and from elsewhere
+the failure is a swallowed module-not-found rather than an error.
 
 ```
 PORT=3210 API_KEY=... node server.js &        # wait for "Leaderboard running"
@@ -23,10 +25,9 @@ The whole sweep is just a shell loop:
 for t in tests/test_*.js; do node "$t" http://localhost:3210; done
 ```
 
-Two suites are exceptions to the argv convention: `test_beta.js` reads `BASE`
-from the environment (arg-less it targets localhost:3210), and
-`test_beta_join.js` needs no server at all — it copies `src/` and the data
-CSVs into a temp dir and exercises the beta join rules directly.
+One suite needs no server at all: `test_beta_join.js` copies `src/` and the
+data CSVs into a temp dir and exercises the beta join rules directly. It takes
+the argument anyway and ignores it, so the sweep above stays uniform.
 
 ## The two modes
 
@@ -40,7 +41,15 @@ That mode is what proves the static snapshot truly has no network dependency
 — several suites count off-origin requests and expect zero. Suites that need
 a live backend (`/api/rank`, `/api/correlations`) are live-only; the
 bundle-capable ones detect the mode themselves via `BASE.startsWith('file:')`
-or `typeof EMBEDDED_LEADERBOARD`.
+or `typeof EMBEDDED_LEADERBOARD`. Suites that only make sense in one mode —
+`test_snap`/`test_trim` need the bundle, `test_beta` needs a backend to compare
+the UI against — check for the wrong target up front and print a `SKIP - …`
+line rather than dying on a `ReferenceError` or a refused connection. In a
+sweep, a crashed suite and a suite that ran clean both print no `FAIL`, and
+that is precisely how missing coverage hides: `test_beta`'s 25 assertions sat
+dead for weeks because it read its target from `BASE` in the environment while
+every other suite took `argv[2]`, so the documented command aimed it at a port
+with nothing on it.
 
 ## Conventions the suites rely on
 

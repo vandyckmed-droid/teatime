@@ -1077,7 +1077,9 @@ button { font: inherit; color: inherit; }
   padding: 5px 0;
 }
 .sector-bar-label {
-  flex: 0 0 122px; display: flex; align-items: center; gap: 6px;
+  /* Sized to the longest short sector label ("Real Estate"); the card used to
+     carry FMP's full strings and needed 122px for "Financial Services". */
+  flex: 0 0 96px; display: flex; align-items: center; gap: 6px;
   font-size: var(--fs-cap); color: var(--text-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

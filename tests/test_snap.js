@@ -18,6 +18,15 @@ const BASE = process.argv[2] || 'http://localhost:3423';
   await page.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#ranks-rows .row', { timeout: 25000 });
 
+  // Bundle-only: every assertion below reads EMBEDDED_LEADERBOARD. Pointed at a
+  // live server it used to die on a raw ReferenceError, which in a sweep looks
+  // the same as a suite that ran and found nothing.
+  if (!await page.evaluate(() => typeof EMBEDDED_LEADERBOARD !== 'undefined')) {
+    console.log(`SKIP - ${BASE} is not a snapshot bundle; this suite needs docs/index.html`);
+    await browser.close();
+    process.exit(0);
+  }
+
   // Assert against the bundle's own universe rather than a hard-coded count —
   // universeSize is a dial that moves in both directions (see src/config.js).
   const expectedRows = await page.evaluate(() => EMBEDDED_LEADERBOARD.companies.length);

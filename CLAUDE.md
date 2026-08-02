@@ -344,7 +344,13 @@ Concretely:
   `drawProjectionChart`, the portfolio's log-regression channel, because a
   channel (two shaded bands + dashed centre + today divider + history line)
   isn't a line chart, and bolting four overlay options onto the shared
-  renderer would cost every other chart clarity to save one function.
+  renderer would cost every other chart clarity to save one function. Two
+  things that renderer has to keep doing: the element ids the detail chart
+  carries (`#chart-line-path` and friends) are emitted for that chart only,
+  since ids must be unique and both charts can be on screen at once, and every
+  internal lookup is scoped to the wrapper and keyed on classes. The same
+  applies to tests — a bare `.chart-axis-y` or `.chart-tick` selector matches
+  both charts.
 - The watchlist insights strip (sectors / HRP plan / held-vs-plan, rendered by
   `renderWatchlistInsights`) computes everything client-side from
   `historyCache` — covariance, average-linkage clustering, recursive
@@ -357,12 +363,21 @@ Concretely:
   target scaling, and says plainly when that implies leverage.
 - `data/portfolio/holdings.csv` is the held-vs-plan card's input: append-only
   by date like the balances, latest date wins, dollars per symbol. Until the
-  owner records a first batch it's a header and the card explains itself. Two things it has to keep doing:
-  the element ids the detail chart carries (`#chart-line-path` and friends)
-  are emitted for that chart only, since ids must be unique and both charts
-  can be on screen at once, and every internal lookup is scoped to the
-  wrapper and keyed on classes. The same applies to tests — a bare
-  `.chart-axis-y` or `.chart-tick` selector now matches both charts.
+  owner records a first batch it's a header and the card explains itself.
+  `renderHeldCard` compares **dollars**, and that is not a presentation
+  choice — comparing a held share of the account against a plan weight puts two
+  different denominators either side of the "vs", because a plan weight is a
+  share of the plan's own names while a held share is of everything in the
+  account. With 23 positions against a 10-name plan the two aren't comparable,
+  and the failure is silent in the worst way: UNH read "on target" at 3.2% of
+  the account against a 4.1% plan weight while actually sitting $346 below its
+  target. Targets are priced the same way the plan card's `$` mode prices them,
+  so the two cards agree by construction; the fallback when there's no balance
+  to price against splits what's already held in those names by the same
+  weights, which is narrower but still one denominator on both sides. Colour on
+  that card marks *being on track*, never the gap — every-row-red was the first
+  attempt and it both discriminated nothing (the account is normally off-plan)
+  and spent the loss colour on something that isn't a loss.
 - `PORTFOLIO_WINDOWS` / `RANGE_WINDOWS` in `public/app.js` are the same
   shape again, for the portfolio chart's and the price range card's own
   toggles. The range card's high/low come from the symbol's daily closes over

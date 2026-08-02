@@ -13,8 +13,8 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'beta-'));
 let pass = 0;
 const fails = [];
 function check(name, cond, extra = '') {
-  if (cond) { pass += 1; console.log(`  ok  ${name}`); }
-  else { fails.push(`${name}${extra ? ` — ${extra}` : ''}`); console.log(`FAIL  ${name}${extra ? ` — ${extra}` : ''}`); }
+  if (cond) { pass += 1; console.log(`PASS - ${name}`); }
+  else { fails.push(`${name}${extra ? ` — ${extra}` : ''}`); console.log(`FAIL - ${name}${extra ? ` — ${extra}` : ''}`); }
 }
 
 for (const d of ['src', 'data/portfolio', 'data/market']) fs.mkdirSync(path.join(TMP, d), { recursive: true });
