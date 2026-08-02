@@ -371,21 +371,24 @@ button { font: inherit; color: inherit; }
   pointer-events: none;
 }
 
-/* ── row flags: an orb behind the logo ────────────────────────────────
-   Driven by ROW_FLAGS in app.js, which writes matching keys into data-flags.
-   The machinery is the one --flag-orb line on .logo below; everything after it
-   is per-flag, so adding another costs a single selector.
+/* ── row flags: a colour ring + bloom on the logo disc ────────────────
+   Driven by ROW_FLAGS in app.js, which writes matching tokens into
+   data-flags. The machinery is the one --flag-orb line on .logo below;
+   everything after it is per-flag, so adding another costs a single selector.
 
    Deliberately a *different kind of object* from the saved-row treatment, not
-   just a different colour of the same one. Saved is a green ring on the card's
-   outer edge; a flag is a warm bloom radiating from the logo disc. Even at a
-   glance, and even on a row that is both, the two never read as versions of
-   each other — which is the whole point of a flag being separate from a
-   selection.
+   just a different colour of the same one. Saved is a green ring on the
+   card's outer edge; a flag lives on the logo disc. Even at a glance, and
+   even on a row that is both, the two never read as versions of each other —
+   which is the whole point of a flag being separate from a selection.
 
-   No hard ring on the orb: an outlined disc reads as a badge or a warning,
-   which is a louder claim than "this company is large". Two blurred blooms,
-   no spread ring, so it stays a glow. */
+   The crisp 2.5px ring is the legibility fix the owner asked for: the
+   original treatment was two soft blooms with no hard edge (chosen when the
+   flag meant "this company is large" and whispering was right), and the
+   owner reported it too subtle to see or use. A blur is also the worst shape
+   for the groups' real job — matching colours between rows — where a hard
+   edge reads instantly. The bloom stays underneath for warmth, but the ring
+   carries the signal. */
 .logo { box-shadow: var(--flag-orb, none); }
 .row { --flag-orb: none; }
 
@@ -399,8 +402,8 @@ button { font: inherit; color: inherit; }
 .row[data-flags~="corr-g5"] { --flag-color: var(--corr-g5); }
 .row[data-flags~="corr"] {
   --flag-orb:
-    0 0 9px 2px color-mix(in oklab, var(--flag-color) 42%, transparent),
-    0 0 20px 5px color-mix(in oklab, var(--flag-color) 16%, transparent);
+    0 0 0 2.5px color-mix(in oklab, var(--flag-color) 92%, transparent),
+    0 0 12px 4px color-mix(in oklab, var(--flag-color) 38%, transparent);
 }
 
 /* The Settings row previews its own flag, so the switch is labelled by the
@@ -417,8 +420,8 @@ button { font: inherit; color: inherit; }
 /* The sample can only wear one hue; the first group colour stands for all. */
 .flag-sample-orb[data-flag-sample="corr"] {
   box-shadow:
-    0 0 9px 2px color-mix(in oklab, var(--corr-g0) 42%, transparent),
-    0 0 20px 5px color-mix(in oklab, var(--corr-g0) 16%, transparent);
+    0 0 0 2.5px color-mix(in oklab, var(--corr-g0) 92%, transparent),
+    0 0 12px 4px color-mix(in oklab, var(--corr-g0) 38%, transparent);
 }
 
 .flag-sample-count {

@@ -57,6 +57,12 @@ function parseOklab(str) {
   check(`several distinct group colours are in play (${tokens.join(', ')})`, tokens.length >= 2);
   check('every grouped row draws its orb on the logo disc',
     board.every((r) => r.orb && r.orb !== 'none'));
+  // The legibility contract: the first shadow is a crisp ring (zero blur,
+  // real spread), not a blur — the blur-only orb was reported unusable.
+  // Serialised box-shadow puts the lengths after the colour:
+  // "oklab(...) 0px 0px 0px 2.5px, ...".
+  check('the orb leads with a hard ring, not a blur',
+    board.every((r) => /\)\s*0px 0px 0px [1-9]/.test(r.orb)));
   check('every grouped row speaks its flag in the accessible name',
     board.every((r) => /correlation group/.test(r.aria)));
 

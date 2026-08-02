@@ -298,8 +298,13 @@ Concretely:
   flag draws as a bloom around the *logo disc*, while a saved row draws as a
   green ring on the *card's edge* — different kind of object, not just
   different colour, which is what keeps a flag from reading as a selection; a
-  row that is both wears both. The orb has blur and almost no spread (an
-  outlined disc reads as a badge or a warning). Flag colours avoid the two
+  row that is both wears both. The orb is a crisp 2.5px ring plus a soft
+  bloom — the ring was added at the owner's direction after the original
+  blur-only treatment proved "too subtle to see or use"; a hard edge is also
+  what makes colour-matching between rows (the groups' whole job) instant.
+  The old no-ring rule ("an outlined disc reads as a badge") applied to the
+  mega-cap era, when the flag whispered a mild fact; it's retired, not
+  violated. Flag colours avoid the two
   protected bands — green is gain and action, red is loss, and a flag is a
   fact rather than a verdict; assert on that in oklab (`a` is the green/red
   axis, `b` the blue/yellow one) rather than by matching hex — the first cyan
