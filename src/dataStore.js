@@ -7,13 +7,13 @@
 const config = require('./config');
 const { getLeaderboard, metricAvailability } = require('./leaderboard');
 const { getHistoryBatch } = require('./history');
-const { trailingAnnualizedVolPct } = require('./ranking');
+const { refreshSpyCsv } = require('./market');
 
 const store = {
   leaderboard: null,
   historyBySymbol: null, // Map(symbol -> { symbol, asOf, series })
   historyAsOf: null,
-  slowFactsBySymbol: new Map(), // symbol -> { sector, industry, beta, ipoDate }
+  slowFactsBySymbol: new Map(), // symbol -> { sector, beta, ipoDate }
   slowFactsAsOf: null,
 };
 
@@ -28,40 +28,39 @@ async function refreshAll() {
     const previous = store.slowFactsBySymbol.get(fresh.symbol);
     const useRetained = previous && !shouldCommitSlowFacts;
     const sector = useRetained ? previous.sector : fresh.sector;
-    const industry = useRetained ? previous.industry : fresh.industry;
     const beta = useRetained ? previous.beta : fresh.beta;
     const ipoDate = useRetained ? previous.ipoDate : fresh.ipoDate;
-    return { ...fresh, sector, industry, beta, ipoDate, availability: metricAvailability(ipoDate, asOf) };
+    return { ...fresh, sector, beta, ipoDate, availability: metricAvailability(ipoDate, asOf) };
   });
 
   const symbols = mergedCompanies.map((c) => c.symbol);
   const historyResults = await getHistoryBatch(symbols);
 
-  // Realized trailing-1Y volatility rides on each company, computed here from
-  // the history this refresh just fetched anyway — zero extra API calls. It
-  // once fed a high-volatility row flag (rolled back, like the biotech dimmer
-  // that briefly replaced it); it stays because the daily archive files it, and
-  // a later question about volatility regimes shouldn't need the raw history
-  // re-fetched.
-  const companiesWithVol = mergedCompanies.map((c, i) => ({
-    ...c,
-    annVolPct: trailingAnnualizedVolPct(historyResults[i] && historyResults[i].series),
-  }));
-
   // Everything needed has succeeded — commit atomically.
   if (shouldCommitSlowFacts) store.slowFactsAsOf = Date.now();
   const newSlowFactsBySymbol = new Map();
-  for (const c of companiesWithVol) {
-    newSlowFactsBySymbol.set(c.symbol, { sector: c.sector, industry: c.industry, beta: c.beta, ipoDate: c.ipoDate });
+  for (const c of mergedCompanies) {
+    newSlowFactsBySymbol.set(c.symbol, { sector: c.sector, beta: c.beta, ipoDate: c.ipoDate });
   }
   store.slowFactsBySymbol = newSlowFactsBySymbol;
 
-  store.leaderboard = { ...data, companies: companiesWithVol, asOf: asOf.toISOString() };
+  store.leaderboard = { ...data, companies: mergedCompanies, asOf: asOf.toISOString() };
 
   const newHistoryBySymbol = new Map();
   historyResults.forEach((h, i) => newHistoryBySymbol.set(symbols[i], h));
   store.historyBySymbol = newHistoryBySymbol;
   store.historyAsOf = asOf.toISOString();
+
+  // The SPY benchmark file (feeds the portfolio card's beta) refreshes with
+  // the same daily cycle now that the scheduled GitHub workflow is gone.
+  // Deliberately after the atomic commit above and non-fatal: the CSV is
+  // last-known-good on disk the same way the store is in memory, and a SPY
+  // hiccup shouldn't discard a whole universe fetch that already succeeded.
+  try {
+    await refreshSpyCsv();
+  } catch (err) {
+    console.error('SPY benchmark refresh failed, keeping the existing CSV:', err.message);
+  }
 }
 
 async function init() {

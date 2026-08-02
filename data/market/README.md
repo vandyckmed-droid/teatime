@@ -2,8 +2,12 @@
 
 `spy.csv` — SPY's daily closes and cash dividends, the market side of the
 portfolio card's **Beta vs SPY** figure. Read by `src/market.js`, used by
-`src/portfolio.js`, refreshed by the daily GitHub Actions run
-(`.github/workflows/daily-snapshot.yml`, via `scripts/snapshot.js`).
+`src/portfolio.js`, refreshed by the server's own once-daily data cycle
+(`src/dataStore.js`) whenever `server.js` is running. (A daily GitHub
+Actions run used to do this; it was removed with the board archive in the
+2026-08-02 simplification pass, so the file now advances when the app is
+worked on — which is also exactly when a fresh copy matters, since the
+published bundle bakes beta in at assembly time.)
 
 ## Format
 
@@ -62,5 +66,4 @@ sessions that pair with a recorded balance, so this is a wide margin.
 API_KEY=... node -e "require('./src/market').refreshSpyCsv().then(console.log)"
 ```
 
-Or just run `API_KEY=... node scripts/snapshot.js`, which refreshes this file
-before it does anything else.
+Booting `server.js` also refreshes it as part of the first data cycle.

@@ -74,20 +74,14 @@ Then open http://localhost:3000.
   excluded here too, and below 60 paired sessions the figure is reported as
   null and the card simply omits the row.
 - `src/market.js` — SPY's daily closes and dividends, kept in
-  `data/market/spy.csv` and refreshed by the daily Actions run. It's a file
+  `data/market/spy.csv` and refreshed inside the server's once-daily data
+  cycle. It's a file
   rather than another `dataStore` field because the published snapshot has to
   be able to compute beta at build time: the static site has no backend and
   makes no network calls, so anything it shows must already be a number by
   the time the bundle is assembled. Daily returns are total returns — the
   dividend is added back on its ex-date, because FMP's "dividend-adjusted"
   price endpoint returns closes identical to the plain ones.
-- Analyst ratings — FMP's grade counts and consensus label per company,
-  fetched in the same daily per-company pass as price and profile and carried
-  as `grades` on the leaderboard payload, so the static snapshot shows them
-  with no backend and the daily archive files them (that filing is the time
-  series). Nothing here feeds the ranking; the boards score price return and
-  only that. An earlier hand-kept version lives on, retired, in
-  `data/ratings/`.
 - `server.js` — serves the frontend plus `GET /api/leaderboard`,
   `GET /api/history?symbol=X`, `GET /api/history/batch?symbols=A,B,C`,
   `GET /api/rank?startDaysAgo=&endDaysAgo=&volAdjusted=`,
@@ -96,16 +90,16 @@ Then open http://localhost:3000.
   `src/dataStore.js`'s scheduled-refresh store; the portfolio endpoint reads
   its CSV off disk on each call, since it changes only when the file is
   edited. Every one of them is called by the frontend — an endpoint nothing
-  consumes is dead weight, and two (`/api/meta`, then `/api/ratings` when
-  the hand-kept ratings gave way to FMP's) have been removed on that rule.
+  consumes is dead weight, and two (`/api/meta`, then `/api/ratings`) have
+  been removed on that rule.
   History endpoints only serve symbols in the current leaderboard universe —
   this is a leaderboard companion, not an open proxy for arbitrary FMP
   queries.
 - `src/correlation.js` — `correlationsAgainst`: every universe name against
   the held set, keeping only each name's strongest positive match, which is
-  what fades a row on the board. Signed rather than absolute: a strongly
-  negative correlation is a good diversifier, so taking `|r|` would flag
-  exactly the names worth adding.
+  what colours a row into a correlation group on the board. Signed rather
+  than absolute: a strongly negative correlation is a good diversifier, so
+  taking `|r|` would flag exactly the names worth adding.
 - `public/app.js`'s `drawLineChart` is the one line-chart renderer, shared by
   the per-ticker price chart and the portfolio balance chart: same geometry,
   same axis landmarks, same scrub crosshair, differing only in three
@@ -123,12 +117,11 @@ Then open http://localhost:3000.
   ln(balance), ±1σ/±2σ bands, extended 63 sessions) with its own renderer,
   deliberately not a `drawLineChart` call since a channel chart isn't a line
   chart; and Watchlist,
-  the saved names with an insights strip beneath them: sector mix, suggested
-  weights (hierarchical risk parity, average linkage, over the trailing year
-  of daily returns, scaled to a 15% vol target, with a %/$ toggle priced off
-  the last recorded balance), and held-vs-plan (compares
-  `data/portfolio/holdings.csv` against those weights once holdings are
-  recorded). All of it computes client-side from history the app already has,
+  the saved names with an insights strip beneath them: sector mix and
+  suggested weights (hierarchical risk parity, average linkage, over the
+  trailing year of daily returns, scaled to a 15% vol target, with a %/$
+  toggle priced off the last recorded balance). All of it computes
+  client-side from history the app already has,
   which is what lets the static snapshot show it with no backend. They
   were one scroll until the portfolio card grew tall enough to push the names
   off the bottom of the screen. Which view you were last on is remembered, and
@@ -136,9 +129,8 @@ Then open http://localhost:3000.
   The Watchlist view
   carries an "add next ranked" control — the plus in the empty state, a button
   beside Clear watchlist once there are names — that saves the highest-ranked
-  company not already held and not blocked by the diversification filter. The
-  watchlist itself is a plain stored set of symbols: the ranking window and
-  the correlation threshold decide what a tap adds, but changing them
+  company not already held. The watchlist itself is a plain stored set of
+  symbols: the ranking window decides what a tap adds, but changing it
   afterwards never adds or removes anything. Ranks and
   Watchlist rank by a custom date range (set in Settings, adjustable via
   +/− steppers, or in one tap from the 12M/6M pills that sit with the Ranks
@@ -152,8 +144,8 @@ Then open http://localhost:3000.
   in the snapshot bundle), unrelated to the ranking date range. The arrow in
   its top-left grows the same sheet to a full-screen scrolling page: same
   chart, same pills, same swipe, plus a stack of data cards built from
-  `DETAIL_BLOCKS` — analyst rating, price range (with its own 12M/6M/3M/1M
-  toggle), return by window, standing on the board, company facts.
+  `DETAIL_BLOCKS` — price range (with its own 12M/6M/3M/1M toggle), return
+  by window, standing on the board, company facts.
   That list is deliberately a scratch space for
   per-company data and experiments: add an entry to try something, delete it
   to take it away, and a block with nothing to say for a given company drops
@@ -165,29 +157,6 @@ Then open http://localhost:3000.
 the bar every change has to clear before it ships. `tests/README.md` covers
 how to point them at a live server or at the published bundle, and the
 conventions they share.
-
-## The daily archive
-
-`scripts/snapshot.js` writes one file per day to `data/snapshots/`, run by
-`.github/workflows/daily-snapshot.yml` at 09:00 UTC. It's the only workflow in
-the repo — publishing the Pages bundle is still a plain commit.
-
-The same run also refreshes `data/market/spy.csv` (see `src/market.js`), and
-does it first, so the benchmark keeps advancing even on a day whose board was
-already filed. The two are committed together but fail apart: a missed archive
-day is gone for good, whereas the SPY file is rewritten in full every run, so a
-failed refresh just logs and the next run picks it up.
-
-The app keeps no history of itself: `src/dataStore.js` holds the current day
-in memory and each refresh overwrites it, so yesterday's board is otherwise
-gone. Each file stores the day's ranked list plus the per-company facts and
-full returns map behind it, so a later question can be answered without
-assuming today what it will be. Schema and caveats:
-`data/snapshots/README.md`.
-
-Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
-`API_KEY=... node scripts/snapshot.js` (it no-ops if the day's file exists;
-`--force` overwrites).
 
 ## Extending it
 
@@ -204,16 +173,17 @@ Needs an `FMP_API_KEY` repository secret to run in Actions. Locally:
   history JSON to the browser just to rank it.
 - New row flag: add an entry to `ROW_FLAGS` in `public/app.js` — a `key`, a
   short `label`, a `title` and `description` for its Settings row, a
-  `test(company)`, optionally a `note(count)` for the board callout, and an
-  `effect` (only `'orb'` exists today). An orb flag draws a coloured bloom
-  around the logo disc — one CSS rule setting `--flag-orb` on
-  `.row[data-flags~="yourkey"]` plus a `.flag-sample-orb` rule for the
-  Settings preview; a different kind of object from the saved-row ring on the
-  card's edge, so a row that is both wears both. The one entry yields the
-  board mark, the Settings switch, the live count and the callout line.
-  Current entry: mega caps at $200B and up (amber orb). A high-volatility orb
-  and a biotech dimmer were each built here and rolled back at the owner's
-  request; their shapes are in the history.
+  `test(company)`, optionally a `token(company)` when the flag needs per-row
+  variants, and optionally a `note(count)` for the board callout. An orb flag
+  draws a coloured bloom around the logo disc — one CSS rule setting
+  `--flag-orb` on `.row[data-flags~="yourkey"]` plus a `.flag-sample-orb`
+  rule for the Settings preview; a different kind of object from the
+  saved-row ring on the card's edge, so a row that is both wears both. The
+  one entry yields the board mark, the Settings switch, the live count and
+  the callout line. Current entry: the correlation groups (colour per group
+  of co-moving names, anchored on the watchlist). A mega-cap orb, a
+  high-volatility orb and a biotech dimmer were each built here and rolled
+  back at the owner's request; their shapes are in the history.
 - New per-company data panel: add an entry to `DETAIL_BLOCKS` in
   `public/app.js` — a title and a `render(company)` returning HTML (use
   `statRow()` for anything list-shaped). It appears as a card in the

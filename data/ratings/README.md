@@ -1,9 +1,10 @@
-> **Retired as the app's live source, 2026-08-01.** The rating card now
-> shows analyst grade counts fetched daily from FMP (they ride the board's
-> own data, and the daily archive in `data/snapshots/` files them, which is
-> where the time series accrues). This file stays as the hand-kept record it
-> always was — append-only, never overwritten — but nothing reads it at
-> runtime any more.
+> **Retired twice, and now fully inert.** First (2026-08-01) as the app's
+> live source, replaced by analyst grade counts fetched daily from FMP;
+> then (2026-08-02) the FMP feed and the rating card were themselves cut in
+> the owner's simplification pass, along with the daily archive that filed
+> the counts. No ratings of any kind are fetched or displayed any more.
+> This file stays as the hand-kept record it always was — append-only,
+> never overwritten — but nothing reads it at runtime.
 
 # Analyst ratings
 
@@ -57,5 +58,5 @@ kept anyway: the record is of what was published, not of what this app ranks.
 ## Adding a batch
 
 Still possible — append rows with a new `date`, keeping the format above —
-but nothing will display them; this is an archive now. The live time series
-accrues in `data/snapshots/` instead, one day of FMP grade counts per file.
+but nothing will display them; this is an archive now, and since the
+2026-08-02 pass there is no live ratings series anywhere in the app.

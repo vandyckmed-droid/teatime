@@ -1,3 +1,9 @@
+// The correlation guide: coloured group orbs, not the old fade-and-block
+// filter. Names whose daily moves track a saved name (r >= the tightness
+// setting) share that name's group colour; nothing is faded and nothing is
+// blocked from being added — the orb informs, the choice stays yours. This
+// suite is also the regression net for the removed filter: a disabled add
+// button or a dimmed row here means it crept back.
 const { chromium, devices } = require('/opt/node22/lib/node_modules/playwright');
 const S = require('os').tmpdir();
 const BASE = process.argv[2] || 'http://localhost:3425';
@@ -10,9 +16,9 @@ const BASE = process.argv[2] || 'http://localhost:3425';
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-  // Seed NVDA on the watchlist, and a threshold low enough to bite on this
+  // Seed NVDA on the watchlist, and a tightness low enough to bite on this
   // dataset (nothing here reaches 0.70 against NVDA).
   await page.addInitScript(() => {
     localStorage.setItem('teatime.watchlist', JSON.stringify(['NVDA']));
@@ -20,95 +26,99 @@ const BASE = process.argv[2] || 'http://localhost:3425';
   });
   await page.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#ranks-rows .row', { timeout: 25000 });
-  await page.waitForTimeout(1800);
+  // Groups land asynchronously after correlations do.
+  await page.waitForFunction(
+    () => document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length > 0,
+    null, { timeout: 30000 },
+  ).catch(() => null);
 
   const state = () => page.evaluate(() => {
     const rows = [...document.querySelectorAll('#ranks-rows .row')];
-    const faded = rows.filter((r) => r.classList.contains('correlated'));
+    const flagged = rows.filter((r) => (r.dataset.flags || '').includes('corr'));
+    const token = (r) => ((r.dataset.flags || '').match(/corr-g\d/) || [null])[0];
+    const nvda = rows.find((r) => r.dataset.symbol === 'NVDA');
+    const sample = flagged[0];
     return {
       total: rows.length,
-      faded: faded.length,
-      fadedSymbols: faded.slice(0, 5).map((r) => r.dataset.symbol),
-      fadedOpacity: faded.length ? getComputedStyle(faded[0]).opacity : null,
-      fadedDisabled: faded.length ? faded[0].querySelector('.add-btn').disabled : null,
-      fadedLabel: faded.length ? faded[0].querySelector('.add-btn').getAttribute('aria-label') : '',
-      heldFaded: rows.filter((r) => r.dataset.symbol === 'NVDA')[0].classList.contains('correlated'),
+      flagged: flagged.length,
+      flaggedSymbols: flagged.slice(0, 6).map((r) => r.dataset.symbol),
+      tokens: [...new Set(flagged.map(token))],
+      nvdaToken: nvda ? token(nvda) : null,
+      sampleOpacity: sample ? getComputedStyle(sample).opacity : null,
+      sampleDisabled: sample ? sample.querySelector('.add-btn').disabled : null,
+      sampleOrb: sample ? getComputedStyle(sample.querySelector('.logo')).boxShadow : '',
+      plainOrb: (() => {
+        const plain = rows.find((r) => !r.dataset.flags);
+        return plain ? getComputedStyle(plain.querySelector('.logo')).boxShadow : '';
+      })(),
+      sampleAria: sample ? sample.getAttribute('aria-label') : '',
       callout: document.getElementById('ranks-callout').hidden
         ? '' : document.getElementById('ranks-callout-text').textContent,
     };
   });
 
   const s1 = await state();
-  check(`some rows fade at r >= 0.45 (${s1.faded}/${s1.total}: ${s1.fadedSymbols.join(', ')})`, s1.faded > 0);
-  check(`faded rows are dimmed (opacity ${s1.fadedOpacity})`, parseFloat(s1.fadedOpacity) < 0.6);
-  check('faded row\'s add control is disabled', s1.fadedDisabled === true);
-  check(`disabled control explains itself ("${(s1.fadedLabel || '').slice(0, 62)}…")`,
-    /Too correlated/.test(s1.fadedLabel) && /NVDA/.test(s1.fadedLabel));
-  check('the held name itself is never faded', s1.heldFaded === false);
-  check(`callout states the count ("${s1.callout.slice(0, 70)}…")`,
-    /faded/.test(s1.callout) && /0\.45/.test(s1.callout));
+  check(`names group with NVDA at r >= 0.45 (${s1.flagged}/${s1.total}: ${s1.flaggedSymbols.join(', ')})`,
+    s1.flagged >= 2);
+  check(`the held anchor wears the same colour as its group (${s1.nvdaToken})`,
+    s1.nvdaToken !== null && s1.tokens.includes(s1.nvdaToken));
+  check('grouped rows draw an orb where plain rows draw none',
+    s1.sampleOrb !== 'none' && s1.sampleOrb !== '' && s1.plainOrb === 'none');
+  check(`grouped rows are not faded (opacity ${s1.sampleOpacity})`,
+    parseFloat(s1.sampleOpacity) === 1);
+  check('a grouped row\'s add control stays enabled', s1.sampleDisabled === false);
+  check('the accessible name speaks the group', /correlation group/.test(s1.sampleAria));
+  check(`the callout explains the colours ("${s1.callout.slice(-90)}")`,
+    /glow/.test(s1.callout) && /0\.45/.test(s1.callout));
 
-  await page.screenshot({ path: `${S}-faded.png` });
+  await page.screenshot({ path: `${S}-groups.png` });
 
-  // ── a blocked name genuinely cannot be added ──
-  const target = s1.fadedSymbols[0];
+  // ── the orb is a guide, not a gate: a grouped name can be added ──
+  const target = s1.flaggedSymbols.find((sym) => sym !== 'NVDA');
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist')).length);
-  await page.locator(`#ranks-rows .row[data-symbol="${target}"] .add-btn`).click({ force: true }).catch(() => {});
-  await page.waitForTimeout(400);
-  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist')).length);
-  check(`clicking a blocked control does not add it (${before} -> ${after})`, before === after);
+  await page.locator(`#ranks-rows .row[data-symbol="${target}"] .add-btn`).click();
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist')));
+  check(`adding a grouped name works (${before} -> ${after.length}, added ${target})`,
+    after.length === before + 1 && after.includes(target));
 
-  // ── a non-faded name still adds, and re-fades its own correlates ──
-  const freshBefore = await state();
-  const addable = await page.evaluate(() => {
-    const r = [...document.querySelectorAll('#ranks-rows .row')]
-      .find((x) => !x.classList.contains('correlated') && x.dataset.symbol !== 'NVDA');
-    return r ? r.dataset.symbol : null;
+  // Both saved names now anchor the group; the row keeps its colour and gains
+  // the saved ring — the two treatments compose rather than replace.
+  const addedRow = await page.evaluate((sym) => {
+    const r = document.querySelector(`#ranks-rows .row[data-symbol="${sym}"]`);
+    return { flags: r.dataset.flags || '', selected: r.classList.contains('is-selected') };
+  }, target);
+  check('the added name keeps its group colour and gains the saved ring',
+    addedRow.flags.includes('corr') && addedRow.selected);
+
+  // Undo, so the stored list is back to the seed for the checks below.
+  await page.locator(`#ranks-rows .row[data-symbol="${target}"] .add-btn`).click();
+  await page.waitForTimeout(1500);
+
+  // ── tightness at 1.00 switches grouping off ──
+  const ctx2 = await browser.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
+  const p2 = await ctx2.newPage();
+  p2.on('pageerror', (e) => errors.push(String(e)));
+  await p2.addInitScript(() => {
+    localStorage.setItem('teatime.watchlist', JSON.stringify(['NVDA']));
+    localStorage.setItem('teatime.settings', JSON.stringify({ correlationThreshold: 1 }));
   });
-  await page.locator(`#ranks-rows .row[data-symbol="${addable}"] .add-btn`).click();
-  await page.waitForTimeout(1600);
-  const s2 = await state();
-  check(`an addable name still adds (${addable})`,
-    await page.evaluate((sym) => JSON.parse(localStorage.getItem('teatime.watchlist')).includes(sym), addable));
-  check(`adding recomputes the filter (${freshBefore.faded} -> ${s2.faded} faded)`, s2.faded !== freshBefore.faded);
+  await p2.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
+  await p2.waitForSelector('#ranks-rows .row', { timeout: 25000 });
+  await p2.waitForTimeout(3500);
+  const offState = await p2.evaluate(() => ({
+    flagged: document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length,
+    thresholdShown: (() => {
+      const el = document.getElementById('threshold-value');
+      return el ? el.textContent.trim() : '(no settings open)';
+    })(),
+  }));
+  check(`at 1.00 no group orbs draw (${offState.flagged})`, offState.flagged === 0);
+  await ctx2.close();
 
-  // ── threshold stepper ──
-  await page.click('[data-tab="settings"]');
-  await page.waitForTimeout(300);
-  const shown = () => page.locator('#threshold-value').textContent();
-  check(`stepper shows the current threshold ("${await shown()}")`, (await shown()).trim() === '0.45');
-  await page.screenshot({ path: `${S}-settings.png` });
+  check(`no page errors (${errors.length})`, errors.length === 0);
+  if (errors.length) console.log('ERRORS:', JSON.stringify(errors.slice(0, 4)));
 
-  // raise to 1.00 => "Off", nothing faded
-  for (let i = 0; i < 11; i++) {
-    const plus = page.locator('.stepper-btn[data-key="correlationThreshold"][data-dir="1"]');
-    if (await plus.isDisabled()) break;
-    await plus.click();
-    await page.waitForTimeout(60);
-  }
-  check(`stepper reads "Off" at the top of its range ("${await shown()}")`, (await shown()).trim() === 'Off');
-  await page.click('[data-tab="ranks"]');
-  await page.waitForTimeout(500);
-  const s3 = await state();
-  check(`"Off" fades nothing (${s3.faded} faded)`, s3.faded === 0);
-  check('"Off" also clears the callout note', !/faded/.test(s3.callout));
-
-  // and back down clamps at the floor
-  await page.click('[data-tab="settings"]');
-  await page.waitForTimeout(300);
-  for (let i = 0; i < 25; i++) {
-    const minus = page.locator('.stepper-btn[data-key="correlationThreshold"][data-dir="-1"]');
-    if (await minus.isDisabled()) break;
-    await minus.click();
-    await page.waitForTimeout(50);
-  }
-  const floor = (await shown()).trim();
-  check(`stepper clamps at its floor ("${floor}") with no float drift`, floor === '0.30');
-
-  check('no console/page errors', errors.length === 0);
-  if (errors.length) console.log('ERRORS:', errors.slice(0, 5));
-
-  await context.close();
   console.log('=== RESULTS ===');
   results.forEach((r) => console.log(r));
   await browser.close();

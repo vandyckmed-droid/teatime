@@ -116,44 +116,13 @@ what would make a true year-to-date figure possible.
   both count, and the four gap-spanning steps above are excluded there too, so
   a filled-in gap doesn't just add a row — it adds a pair to the beta window.
 
-## Holdings (`holdings.csv`)
+## Holdings — removed 2026-08-02
 
-Optional companion to the balances: what the account actually holds, in
-dollars, so the app can compare real positions against its suggested plan.
-Append-only by date, like the balances — each batch of rows shares a date,
-and the latest date is treated as the current picture:
-
-```csv
-date,symbol,dollars
-2026-08-02,NVDA,4200.00
-2026-08-02,SNDK,3100.50
-```
-
-Maintained the same way as the balances: the owner sends the brokerage's
-positions screen, rows get transcribed, nothing is ever rewritten.
-
-### What's in here now
-
-One batch dated 2026-07-31: 23 equity positions transcribed from four
-screenshots taken Sunday 2026-08-02 (so values are Friday 07-31's close).
-Two of the screenshots were sorted descending by value and two provided
-checks: an alphabetical view re-showed ten of the tickers (all matched to
-the cent, FTNT overlapped between the two list views as well), and a
-"Balance Details" screen gave exact reconciliation targets.
-
-The reconciliation: broker Long positions $27,668.40 + cash $3,568.51 =
-account value $31,236.91, and SPAXX ($6,357.17, the money-market core —
-deliberately *not* recorded here as a holding) + Long = the list's own
-$34,025.57 total. Both identities check out. The 23 transcribed equities
-sum to **$27,369.00, which is $299.40 short of Long** — the descending
-list was cut off just below CSX ($301.64) and the alphabetical capture
-started at MU, so at least one small position (ticker alphabetically
-before MU, value ≤ ~$299) appears in no screenshot. Owner has been asked
-for the bottom of the list; append it to the same 2026-07-31 batch when it
-arrives (latest-date-wins means adding a row with the same date extends
-the batch, it doesn't replace it).
-
-Note the account value here ($31,236.91, captured Sunday) differs from
-`balances.csv`'s 07-31 row ($31,210.88, captured Friday after close) by
-+$26.03 — weekend interest/dividend accrual posting, not a transcription
-conflict. The balances file keeps Friday's figure.
+A `holdings.csv` companion (per-position dollars, feeding a held-vs-plan
+card in the app) lived here for two days and was removed at the owner's
+request: transcribing positions from brokerage screenshots was more upkeep
+than the card was worth. The one batch ever recorded — 23 positions as of
+2026-07-31, transcribed and reconciled against the broker's own totals to
+the cent — is in git history along with the card, should either be wanted
+back. The balances above are the piece the owner chose to keep, and nothing
+about their format or rules changed.

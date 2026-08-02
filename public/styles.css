@@ -81,16 +81,22 @@
     0 12px 32px -8px rgba(0, 0, 0, 0.75),
     0 2px 8px rgba(0, 0, 0, 0.40);
 
-  /* ── row-flag colour (see ROW_FLAGS in app.js) ──
-     Amber, oklch ≈ 0.83 0.145 75. A flag has to be legible as *not* a verdict,
-     which rules out the two protected bands: green is gain and action, red is
-     loss. It also has to survive next to the sector dots, and this sits between
-     Energy's orange (52°) and Financial's citron (108°) — close in hue to both,
-     but it is never drawn as a flat 8px dot the way a sector is. It is a soft
-     bloom around the 30px logo disc, and it is the only warm glow anywhere in
-     the app, so the two read as different kinds of object rather than as two
-     entries in one palette. */
-  --flag-mega: #FFBC48;
+  /* ── correlation-group colours (see ROW_FLAGS / computeCorrGroups in app.js) ──
+     One hue per group, cycled if there are ever more groups than entries
+     (CORR_GROUP_COLORS in app.js must match this count). A flag has to be
+     legible as *not* a verdict, which rules out the two protected bands: green
+     is gain and action, red is loss — so these live in amber, blue, violet,
+     cyan, and two neutrals-with-a-tint. They survive next to the sector dots
+     because a group is never drawn as a flat 8px dot the way a sector is: it
+     is a soft bloom around the 30px logo disc, a different kind of object. */
+  --corr-g0: #FFBC48; /* amber   — oklch ≈ 0.83 0.145 75  */
+  --corr-g1: #58A6FF; /* azure   — oklch ≈ 0.72 0.145 255 */
+  --corr-g2: #B48CFF; /* violet  — oklch ≈ 0.72 0.150 300 */
+  --corr-g3: #55C3F2; /* sky     — cyan pulled toward blue; #35D2E5 measured
+                         oklab a = -0.11, close enough to gain green that the
+                         suite (rightly) rejected it */
+  --corr-g4: #F49AC8; /* orchid  — pink held above the red band's chroma line */
+  --corr-g5: #C9C27A; /* citron  — kept duller than gain green, hue well off it */
 
   --tabbar-bg: rgba(0, 0, 0, 0.72);
   --sheet-scrim: rgba(0, 0, 0, 0.38);
@@ -331,12 +337,6 @@ button { font: inherit; color: inherit; }
   transition: background 180ms ease;
 }
 .row.unavailable { opacity: 0.45; }
-/* Too correlated with something already saved to be worth adding (see
-   correlationBlock in app.js). Faded rather than hidden — it's still a real
-   company you may want to open the chart for, it just can't be added. The row
-   itself stays tappable; only its add control is disabled. */
-.row.correlated { opacity: 0.4; }
-.row.correlated .add-btn { cursor: not-allowed; }
 .row:active { background-color: var(--surface-2); transition: none; }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
@@ -389,16 +389,23 @@ button { font: inherit; color: inherit; }
 .logo { box-shadow: var(--flag-orb, none); }
 .row { --flag-orb: none; }
 
-.row[data-flags~="mega"] {
+/* One rule per group colour; the two-bloom recipe is identical, only the hue
+   moves. Tokens come from the corr flag's token() in app.js. */
+.row[data-flags~="corr-g0"] { --flag-color: var(--corr-g0); }
+.row[data-flags~="corr-g1"] { --flag-color: var(--corr-g1); }
+.row[data-flags~="corr-g2"] { --flag-color: var(--corr-g2); }
+.row[data-flags~="corr-g3"] { --flag-color: var(--corr-g3); }
+.row[data-flags~="corr-g4"] { --flag-color: var(--corr-g4); }
+.row[data-flags~="corr-g5"] { --flag-color: var(--corr-g5); }
+.row[data-flags~="corr"] {
   --flag-orb:
-    0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
-    0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
+    0 0 9px 2px color-mix(in oklab, var(--flag-color) 42%, transparent),
+    0 0 20px 5px color-mix(in oklab, var(--flag-color) 16%, transparent);
 }
-  --flag-mega: #FFBC48;
 
 /* The Settings row previews its own flag, so the switch is labelled by the
    thing it turns on rather than by a description of it. Same disc size and
-   the same --flag-orb value the board uses, keyed off the flag's own name. */
+   the same bloom recipe the board uses, keyed off the flag's own name. */
 .flag-sample {
   display: flex; align-items: center; gap: var(--s3);
   margin-top: var(--s2);
@@ -407,10 +414,11 @@ button { font: inherit; color: inherit; }
   width: 30px; height: 30px; border-radius: 50%;
   background: #fff; flex-shrink: 0;
 }
-.flag-sample-orb[data-flag-sample="mega"] {
+/* The sample can only wear one hue; the first group colour stands for all. */
+.flag-sample-orb[data-flag-sample="corr"] {
   box-shadow:
-    0 0 9px 2px color-mix(in oklab, var(--flag-mega) 42%, transparent),
-    0 0 20px 5px color-mix(in oklab, var(--flag-mega) 16%, transparent);
+    0 0 9px 2px color-mix(in oklab, var(--corr-g0) 42%, transparent),
+    0 0 20px 5px color-mix(in oklab, var(--corr-g0) 16%, transparent);
 }
 
 .flag-sample-count {
@@ -497,22 +505,6 @@ button { font: inherit; color: inherit; }
 }
 .sector-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-/* ── analyst rating meter ─────────────────────────────────────────────
-   A 0-10 score as a bar, coloured by the sentiment label rather than by the
-   number, so the bar and the words can't disagree. */
-.rating-meter {
-  height: 8px; border-radius: var(--r-full);
-  background: var(--surface-3);
-  overflow: hidden;
-  margin: var(--s1) 0 var(--s3);
-}
-.rating-meter-fill {
-  display: block; height: 100%; border-radius: var(--r-full);
-  background: var(--text-3);
-  transition: width 320ms var(--ease-out);
-}
-.rating-meter-fill.gain { background: var(--gain); }
-.rating-meter-fill.loss { background: var(--loss); }
 
 /* ── 52-week range bar ────────────────────────────────────────────────
    Lives in the full-screen ticker view (DETAIL_BLOCKS' range block). It was

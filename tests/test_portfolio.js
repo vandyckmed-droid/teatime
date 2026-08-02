@@ -90,7 +90,7 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   await page.waitForSelector('#ranks-rows .row', { timeout: 30000 });
   await page.waitForTimeout(2000);
   // aria-pressed="false" as well as enabled: the diversification filter
-  // disables anything too correlated with what's saved, and clicking an
+  // used to disable correlated names; now nothing is disabled, and clicking an
   // already-saved row's button removes it again.
   let saved = 0;
   for (let n = 0; n < 3; n++) {

@@ -80,21 +80,6 @@ function metricAvailability(ipoDate, asOf) {
   return availability;
 }
 
-// FMP's profile carries the 52-week range as a "low-high" string, parsed
-// defensively because it's a free-text field. Nothing on screen reads these
-// any more — the app's price-range card works its own high/low out of daily
-// closes over whichever window is selected — but scripts/snapshot.js files
-// them into the daily archive, which is the only reason they're still
-// collected. A company whose profile omits the range simply records null;
-// dataStore used to recompute it from the full history of every company on
-// every refresh, which was a lot of work for a figure nothing displayed.
-function parse52WeekRange(range) {
-  if (typeof range !== 'string') return null;
-  const [low, high] = range.split('-').map((part) => Number(part.trim()));
-  if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high <= low) return null;
-  return { low52: low, high52: high };
-}
-
 function extractReturns(priceChange) {
   const out = {};
   for (const metric of config.metrics) {
@@ -117,47 +102,27 @@ async function getLeaderboard() {
     .sort((a, b) => b.marketCap - a.marketCap)
     .slice(0, config.universeSize);
 
+  // Two calls per company (price change + profile). A third — analyst grade
+  // counts — rode here for a couple of days in August 2026 and was cut with
+  // the rating card in the big simplification pass; the daily archive that
+  // filed those counts went with it, so re-adding the card means re-adding
+  // the call, nothing more.
   const companies = await mapWithConcurrency(universe, config.fmpConcurrency, async (c) => {
-    const [priceChange, profile, grades] = await Promise.all([
+    const [priceChange, profile] = await Promise.all([
       fmp.getPriceChange(c.symbol).catch(() => null),
       fmp.getProfile(c.symbol).catch(() => null),
-      // Analyst consensus rides the same per-company fetch — a third call in
-      // the same concurrency-capped pass, refreshed once daily with the rest.
-      fmp.getGradesConsensus(c.symbol).catch(() => null),
     ]);
     const ipoDate = profile ? profile.ipoDate : null;
-    // The logo and the 52-week range ride along on the profile call we already
-    // make for ipoDate — both cost zero extra requests.
-    const range = parse52WeekRange(profile ? profile.range : null);
     return {
       symbol: c.symbol,
       name: c.companyName,
       sector: c.sector,
-      // FMP's finer classification under sector ("Biotechnology", "Drug
-      // Manufacturers - General", ...). Already on the screener row, so it
-      // costs nothing. A biotech dimmer consumed it briefly (built and rolled
-      // back at the owner's request); it stays because the daily archive files
-      // it, same footing as annVolPct.
-      industry: c.industry || null,
       price: c.price,
       marketCap: c.marketCap,
       beta: typeof c.beta === 'number' ? c.beta : null,
+      // Rides along on the profile call we already make for ipoDate.
       logo: profile && profile.image ? profile.image : null,
-      low52: range ? range.low52 : null,
-      high52: range ? range.high52 : null,
       ipoDate,
-      // Analyst grade counts and FMP's consensus label. On the payload rather
-      // than behind an endpoint of their own, so the static snapshot (which
-      // embeds this response and can fetch nothing) shows them too, and the
-      // daily archive files them — that filing is the time series.
-      grades: grades ? {
-        strongBuy: grades.strongBuy ?? 0,
-        buy: grades.buy ?? 0,
-        hold: grades.hold ?? 0,
-        sell: grades.sell ?? 0,
-        strongSell: grades.strongSell ?? 0,
-        consensus: grades.consensus || null,
-      } : null,
       returns: extractReturns(priceChange),
       availability: metricAvailability(ipoDate, asOf),
     };

@@ -98,7 +98,7 @@ experience: full screen, no Safari chrome, tinted status bar.
 5. Copy the assembled file to `docs/index.html` and commit it straight to
    `main` (that's the whole deploy — no build step, no Actions workflow).
 
-One cost worth knowing about: each redeploy commits a new ~7MB HTML file (the
+One cost worth knowing about: each redeploy commits a new ~5MB HTML file (the
 embedded data is what makes it self-contained), so `docs/index.html`'s history
 adds up in repo size over many iterations. Not a problem at this scale; flag
 it if it ever becomes one.
@@ -280,64 +280,73 @@ Concretely:
   cleanly: anyone whose phone remembers it lands on the first view instead of
   a blank panel.
 - `ROW_FLAGS` in `public/app.js` is the row-highlight registry — same
-  config-array shape as `SETTINGS` and `DETAIL_BLOCKS`, and built as a skeleton
-  before it had a second user. An entry is `{ key, label, test, note? }`;
-  matching rows get the key in `data-flags`, and one CSS rule per key sets
-  `--flag-orb`. It has its own Settings section (`#flag-settings`, rendered by
-  `renderFlagSettings()`) rather than rows inside Scoring, because a flag marks
-  a company and never touches the ranking — one registry entry yields the board
-  mark, the switch, the live match count and the callout line together. Flag
-  state lives under `settings.flags` as a *sparse* map of overrides: absent
-  means on, so a flag added later lights up with no migration, and
-  `loadSettings` drops any stored key no longer in `ROW_FLAGS`. Which is
-  exactly why `ROW_FLAGS` has to be declared above `state` — `loadSettings()`
-  runs while `state` is being built, and its try/catch (there for private-mode
-  localStorage) swallows the ReferenceError and silently discards every saved
-  override. Fourth time that trap has bitten in this file. Four more things are
-  deliberate. A flag draws as a bloom
-  around the *logo disc*, while a saved row draws as a green ring on the
-  *card's edge* — different kind of object, not just different colour, which
-  is what keeps a flag from reading as a selection; a row that is both wears
-  both, and the first attempt (a white glow on the row itself) failed exactly
-  this test. The orb has blur and almost no spread, because an outlined disc
-  reads as a badge or a warning, a louder claim than "this company is large".
-  Flag colours avoid the two protected bands — green is gain and action, red
-  is loss, and a flag is a fact rather than a verdict — which is why
-  `--flag-mega` is amber; assert on that in oklab (`a` is the green/red axis,
-  `b` the blue/yellow one) rather than by matching hex. And each flag can
-  contribute one line to the Ranks callout, because a row that is quietly
-  brighter than its neighbours with nothing explaining why is just a rendering
-  bug as far as the reader can tell. The mega-cap cutoff is an absolute $200B
-  rather than "top 50" so it doesn't silently change meaning every time
-  `universeSize` moves; it happened to catch 53 of 300 when set. Two second
-  flags have been built here and rolled back at the owner's request — a
-  high-volatility orb (60%+ trailing-1Y annualized, violet) and a biotech
-  dimmer (an `effect: 'dim'` variant that reused the diversification filter's
-  faded-and-unaddable treatment) — so the registry is orb-only again, with
-  one entry; both shapes are in the history if wanted back. Two leftovers
-  from those experiments are kept deliberately: `annVolPct` and `industry`
-  ride the leaderboard payload because the daily archive files them (an
-  archive stores inputs), and they remain the worked example of the pattern
-  any data-needing flag requires — a flag `test` runs client-side against
-  the company object and the static snapshot can fetch nothing, so inputs
-  must be server-computed and payload-carried.
-- `src/correlation.js` answers one question — `correlationsAgainst`, the
-  universe against the held set, which is what fades a board row. Signed,
-  never `|r|`: a strong negative is diversification, and taking the absolute
-  value would block exactly the names worth adding. An all-pairs matrix and an
-  Overlap view that drew it as a heat grid were built and then removed at the
-  owner's request; the shape is in the history if it's ever wanted again.
+  config-array shape as `SETTINGS` and `DETAIL_BLOCKS`. An entry is
+  `{ key, label, test, token?, note? }`; matching rows get the key (or the
+  `token(c)` string, for flags that need per-row variants) in `data-flags`,
+  and CSS rules per token set `--flag-orb`. It has its own Settings section
+  (`#flag-settings`, rendered by `renderFlagSettings()`) rather than rows
+  inside Scoring, because a flag marks a company and never touches the
+  ranking — one registry entry yields the board mark, the switch, the live
+  match count and the callout line together. Flag state lives under
+  `settings.flags` as a *sparse* map of overrides: absent means on, so a flag
+  added later lights up with no migration, and `loadSettings` drops any stored
+  key no longer in `ROW_FLAGS`. Which is exactly why `ROW_FLAGS` has to be
+  declared above `state` — `loadSettings()` runs while `state` is being built,
+  and its try/catch (there for private-mode localStorage) swallows the
+  ReferenceError and silently discards every saved override. Fourth time that
+  trap has bitten in this file. Design rules that hold for any occupant: a
+  flag draws as a bloom around the *logo disc*, while a saved row draws as a
+  green ring on the *card's edge* — different kind of object, not just
+  different colour, which is what keeps a flag from reading as a selection; a
+  row that is both wears both. The orb has blur and almost no spread (an
+  outlined disc reads as a badge or a warning). Flag colours avoid the two
+  protected bands — green is gain and action, red is loss, and a flag is a
+  fact rather than a verdict; assert on that in oklab (`a` is the green/red
+  axis, `b` the blue/yellow one) rather than by matching hex — the first cyan
+  chosen for a group colour failed exactly that assertion and moved to sky.
+  And each flag can contribute one line to the Ranks callout, because a row
+  that is quietly brighter than its neighbours with nothing explaining why is
+  just a rendering bug as far as the reader can tell. Occupancy history: a
+  mega-cap orb (the prototype), a high-volatility orb, and a biotech dimmer
+  were each built and later cut at the owner's request; all are in history if
+  wanted back. The one flag now is the correlation groups (below). The
+  payload lesson from the rolled-back flags still governs: a flag `test` runs
+  client-side against the company object and the static snapshot can fetch
+  nothing, so any data a flag needs must be server-computed and
+  payload-carried.
+- The correlation guide is **groups as flags**, not a filter. History: the
+  original "diversification filter" faded any row correlating ≥ threshold
+  with a held name and disabled its add button; the owner replaced it in the
+  big simplification pass — a flag informs, a block decides for you.
+  `computeCorrGroups()` in `public/app.js` builds connected components of the
+  *held* names under "pairwise r ≥ threshold" (union-find over
+  client-computed correlations — deliberately simpler than the HRP
+  clustering; it's a guide for the eye), then every board name whose
+  strongest correlation against a held name clears the same bar joins that
+  name's group. Each group ≥2 members gets a colour (`--corr-g0…g5`, count
+  mirrored by `CORR_GROUP_COLORS`); singleton groups stay dark — an orb on a
+  name nothing moves with guides nothing. Groups recompute off the render
+  path (after `refreshCorrelations`, and synchronously on threshold change)
+  and restyle rows in place via `applyRowFlagsInPlace`. The "Group tightness"
+  stepper is the old filter threshold re-purposed; 1.00 still means off.
+  `src/correlation.js` still answers the one server-side question —
+  `correlationsAgainst`, the universe against the held set. Signed, never
+  `|r|`: a strong negative is diversification, and treating it as duplication
+  would mark exactly the names worth adding. An all-pairs matrix and an
+  Overlap heat-grid view were built and removed earlier; shapes in history.
 - Anything the `state` object or the `detail` object reads while being built
   must be declared above it. Both have now caused the same
   temporal-dead-zone bug: the error surfaces as a blank board or a silently
   wrong default (`loadInvestingView`'s try/catch swallowed the ReferenceError
   and returned the fallback), not as an obvious crash.
 - The watchlist is a stored set of symbols and nothing else, deliberately.
-  Settings decide what "add next ranked" (`addNextRanked` / the empty-state
-  plus) picks at the moment of the tap; they never retroactively change what's
-  held. A saved name leaves only by its own check or Clear watchlist — keep
-  it that way, and don't add anything that prunes the set when the window or
-  the correlation threshold moves.
+  The ranking window decides what "add next ranked" (`addNextRanked` / the
+  empty-state plus) picks at the moment of the tap — since the filter's
+  removal it is simply the best-ranked unheld name, never gated by
+  correlation. Settings never retroactively change what's held: a saved name
+  leaves only by its own check or Clear watchlist — keep it that way, and
+  don't add anything that prunes the set when the window or the tightness
+  setting moves.
 - `drawLineChart` in `public/app.js` draws every line chart in the app — the
   per-ticker price line and the portfolio balance line. A third chart should
   be a fourth call, not a second renderer. One deliberate exception exists:
@@ -351,7 +360,7 @@ Concretely:
   internal lookup is scoped to the wrapper and keyed on classes. The same
   applies to tests — a bare `.chart-axis-y` or `.chart-tick` selector matches
   both charts.
-- The watchlist insights strip (sectors / HRP plan / held-vs-plan, rendered by
+- The watchlist insights strip (sectors / HRP plan, rendered by
   `renderWatchlistInsights`) computes everything client-side from
   `historyCache` — covariance, average-linkage clustering, recursive
   bisection — precisely so the static snapshot can show it with no backend.
@@ -360,24 +369,18 @@ Concretely:
   and a plan cache keyed by the held set, same shape as `refreshCorrelations`.
   Vol targeting is 15% (`PLAN_TARGET_VOL_PCT`), matching the portfolio card;
   the dollar mode prices weights off the last recorded balance times the
-  target scaling, and says plainly when that implies leverage.
-- `data/portfolio/holdings.csv` is the held-vs-plan card's input: append-only
-  by date like the balances, latest date wins, dollars per symbol. Until the
-  owner records a first batch it's a header and the card explains itself.
-  `renderHeldCard` compares **dollars**, and that is not a presentation
-  choice — comparing a held share of the account against a plan weight puts two
-  different denominators either side of the "vs", because a plan weight is a
-  share of the plan's own names while a held share is of everything in the
-  account. With 23 positions against a 10-name plan the two aren't comparable,
-  and the failure is silent in the worst way: UNH read "on target" at 3.2% of
-  the account against a 4.1% plan weight while actually sitting $346 below its
-  target. Targets are priced the same way the plan card's `$` mode prices them,
-  so the two cards agree by construction; the fallback when there's no balance
-  to price against splits what's already held in those names by the same
-  weights, which is narrower but still one denominator on both sides. Colour on
-  that card marks *being on track*, never the gap — every-row-red was the first
-  attempt and it both discriminated nothing (the account is normally off-plan)
-  and spent the loss colour on something that isn't a loss.
+  target scaling, and says plainly when that implies leverage. The strip only
+  renders while the Investing tab's watchlist view is actually on screen
+  (`renderWatchlistBoard` skips it otherwise, and `goToTab`/`setInvestingView`
+  catch it up on entry) — it's the expensive part of a watchlist render, and
+  most saves happen from Ranks with the panel hidden; the plan cache's
+  held-set key is what makes the deferral safe. A held-vs-plan card
+  (per-position dollars from a hand-kept `data/portfolio/holdings.csv`) lived
+  below the plan for two days in August 2026 and was removed at the owner's
+  request — transcribing brokerage positions was more upkeep than the card
+  was worth. Its dollars-not-shares comparison rule and its
+  colour-marks-on-track-never-the-gap rule are both in history (commit
+  a11e515) and worth re-reading before any successor is built.
 - `PORTFOLIO_WINDOWS` / `RANGE_WINDOWS` in `public/app.js` are the same
   shape again, for the portfolio chart's and the price range card's own
   toggles. The range card's high/low come from the symbol's daily closes over
@@ -406,10 +409,13 @@ Concretely:
   the screener only had 234 US names to give, so `universeSize: 250` silently
   delivered 234. It bounds the candidate pool only (the top N by market cap
   is still taken from whatever comes back), so lowering it doesn't make the
-  board less selective. Check the headroom before bumping — at $15B (the
-  floor set for `universeSize: 400` on 2026-08-01) the screener returns ~560
-  names, ~530 after the junk-listing filter and dedupe below; $22B had
-  drifted to 437 by then, which is why the floor moved.
+  board less selective. Check the headroom before bumping — at $12B (the
+  floor set for `universeSize: 500` on 2026-08-01, kept for the cut back to
+  300 on 2026-08-02 since spare headroom costs nothing) the screener returns
+  ~660 names, ~625 after the junk-listing filter and dedupe below. History
+  of the dial this far: 250 → 300 → 400 → 500 in growth passes, then 500 →
+  300 in the big simplification pass — the owner felt the taps lag, and the
+  board rebuild cost scales with this number.
 - That filter is the other thing to know when growing the universe. FMP's
   screener returns bond and preferred lines alongside operating companies,
   and they carry their *parent's* market cap, so they sort in as a second
@@ -439,26 +445,30 @@ Concretely:
   as one very volatile day. Its holiday set is 2026-only — extend it when
   the series runs into 2027. New rows are appended and everything downstream
   picks them up on the next request.
-- Analyst ratings are FMP's grade counts (strong buy / buy / hold / sell /
-  strong sell plus a consensus label), fetched per company in the same
-  concurrency-capped daily pass as price and profile and carried as `grades`
-  on the leaderboard payload — no endpoint of their own, which is what lets
-  the static snapshot show the card with no backend. The time series accrues
-  in the daily archive (`data/snapshots/` files each day's counts); the card
-  (`blockRating` in `public/app.js`) only ever shows today's. These never
-  feed the ranking. The owner's earlier hand-kept readings remain in
-  `data/ratings/ratings.csv` as an append-only record with its README noting
-  the retirement — nothing reads it at runtime any more.
+- Analyst ratings: gone twice over, deliberately. The owner's hand-kept
+  readings (`data/ratings/ratings.csv`) were retired first, replaced by FMP
+  grade counts fetched daily and shown as a rating card — then the owner cut
+  those too in the big simplification pass ("no earnings/ratings pulls"), so
+  the card, the per-company `grades-consensus` call, and the payload field
+  are all gone. The CSV stays as an inert append-only record with its README
+  noting both retirements. Re-adding the card is one fetch in
+  `src/leaderboard.js` plus one `DETAIL_BLOCKS` entry — both shapes in
+  history (commit a801b06 built it; the simplification pass removed it).
 - `data/market/spy.csv` is the one data file here that is *not* append-only,
   and the distinction is the rule to keep: the portfolio and ratings files are
   hand-kept observations that refetching would destroy, while this one is a
   straight mirror of FMP and is rewritten in full on every refresh, which makes
   it self-correcting and costs almost nothing in the diff (stable dates, only
-  the tail moves). Read by `src/market.js`, consumed only by the portfolio
-  card's beta figure. Its returns are *total* returns — the dividend is added
-  back on its ex-date, because FMP's "dividend-adjusted" price endpoint hands
-  back closes identical to the plain ones and adjusts nothing. If a second
-  benchmark is ever wanted, add a column or a sibling file and keep the same
+  the tail moves). Since the daily-snapshot workflow was removed it refreshes
+  inside the server's own daily cycle (`src/dataStore.js`, after the atomic
+  commit, non-fatal) — so it's fresh whenever a bundle is assembled, and goes
+  stale only when nothing has run the server for a while, which the beta
+  figure tolerates (its join just stops gaining pairs). Read by
+  `src/market.js`, consumed only by the portfolio card's beta figure. Its
+  returns are *total* returns — the dividend is added back on its ex-date,
+  because FMP's "dividend-adjusted" price endpoint hands back closes
+  identical to the plain ones and adjusts nothing. If a second benchmark is
+  ever wanted, add a column or a sibling file and keep the same
   rewrite-in-full posture; don't start appending to this one.
 - Beta (`computeBeta` in `src/portfolio.js`) pairs the portfolio's daily
   returns with SPY's by date — an inner join, trailing 126 pairs, hidden below
@@ -469,18 +479,19 @@ Concretely:
   construction, because the join walks that same filtered list; and the figure
   has to be computed server-side, since the published bundle embeds
   `EMBEDDED_PORTFOLIO` and cannot fetch anything at page load.
-- Daily board snapshots accrue in `data/snapshots/` via `scripts/snapshot.js`
-  and the one workflow in the repo (`.github/workflows/daily-snapshot.yml`).
-  Append-only and deliberately stores inputs rather than one ranking — extend
-  what a file holds rather than adding a second archive, and don't rewrite
-  past files. That workflow also refreshes `data/market/spy.csv` first, and
-  its commit step stages both paths — a new data directory that isn't in that
-  `git add` line is written by the runner and then thrown away with it, which
-  is exactly how a month of snapshots was lost once already. Outbound FMP calls (per-company in `src/leaderboard.js`,
-  and history in `src/history.js`) go through `mapWithConcurrency`
-  (`src/concurrency.js`) capped at `config.fmpConcurrency`, not unbounded
-  `Promise.all` — this is what keeps a bigger `universeSize` from turning
-  into a burst of simultaneous FMP requests.
+- There is no scheduled automation left in the repo. The daily board archive
+  (`data/snapshots/` + `scripts/snapshot.js` + the daily-snapshot workflow)
+  was removed at the owner's request in the big simplification pass — the
+  whole apparatus is in history up to commit 72a9714 if an archive is ever
+  wanted again, including its hard-won lessons (stage new data paths in the
+  workflow's `git add` or the runner throws them away; that's how a month of
+  snapshots died once). The SPY benchmark refresh the workflow used to carry
+  moved into the server's daily cycle. Outbound FMP calls (per-company in
+  `src/leaderboard.js`, and history in `src/history.js`) go through
+  `mapWithConcurrency` (`src/concurrency.js`) capped at
+  `config.fmpConcurrency`, not unbounded `Promise.all` — this is what keeps a
+  bigger `universeSize` from turning into a burst of simultaneous FMP
+  requests.
 - The old "fetch-everything-on-load, past a few hundred companies this
   breaks" ceiling has been addressed: `src/dataStore.js` refreshes the whole
   universe (price/returns/market cap/history) on a once-daily timer instead

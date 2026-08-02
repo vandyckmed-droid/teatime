@@ -13,8 +13,8 @@ const SETTINGS = [
   {
     key: 'correlationThreshold',
     type: 'threshold',
-    label: 'Diversification filter',
-    description: 'Fade out (and block adding) any company whose daily-return correlation with something already on your watchlist is at or above this, measured over the ranking date range. Strong negative correlation never blocks — that is diversification, not duplication.',
+    label: 'Group tightness',
+    description: 'How tightly two names must move together (daily-return correlation over the ranking date range) to share a correlation group — the coloured orbs on the board. Lower groups more; 1.00 switches grouping off. Strong negative correlation never groups — that is diversification, not duplication.',
     default: 0.7,
   },
   {
@@ -59,8 +59,8 @@ const DATE_RANGE_MIN_GAP = 10;
 
 const TRADING_DAYS_PER_YEAR = 252;
 
-// Diversification-filter stepper. 1.00 means "off": a distinct name effectively
-// never reaches r = 1, so nothing gets blocked.
+// Group-tightness stepper. 1.00 means "off": a distinct name effectively
+// never reaches r = 1, so nothing groups.
 const CORRELATION_STEP = 0.05;
 const CORRELATION_MIN = 0.3;
 const CORRELATION_MAX = 1;
@@ -170,40 +170,142 @@ const PORTFOLIO_WINDOWS = [
 // ── row flags ────────────────────────────────────────────────────────
 // A registry for "mark this row as special" — the same shape as SETTINGS and
 // DETAIL_BLOCKS. One entry is one flag; matching rows get `data-flags` carrying
-// its key, and one CSS rule per key sets --flag-orb on that selector (see
-// .row[data-flags~=...] in styles.css). The orb machinery itself is written
-// once, so a second flag is an entry here plus a single line of CSS, not a new
-// rendering path.
+// its token(s), and one CSS rule per token sets --flag-orb on that selector
+// (see .row[data-flags~=...] in styles.css). The orb machinery itself is
+// written once, so another flag is an entry here plus CSS, not a new rendering
+// path. (A mega-cap flag was the prototype occupant; cut at the owner's
+// request in the big simplification pass — it's in history if wanted back.)
 //
 // Contract for an entry:
-//   key    stable identifier; becomes the data-flags token and the CSS hook
+//   key    stable identifier; the settings override key and default data-flags
+//          token
 //   label  spoken in the row's accessible name, so the glow isn't purely visual
 //   test   (company) => boolean, run on every row of both boards
+//   token  optional (company) => string of data-flags tokens, when the flag
+//          needs a per-row variant (the correlation groups colour by group)
 //   note   optional (count) => string, added to the board callout so a
 //          highlighted row is never unexplained
 //
 // Flags are additive: a row can carry several, and the glow composes with the
 // saved-row ring rather than replacing it.
-//
-// $200B is the mega-cap line. Chosen against the live board — it takes in 53 of
-// the 300 companies, so it lands on "roughly the top 50" while still being an
-// absolute threshold rather than a rank. That matters: a rank would silently
-// change meaning every time universeSize moves, whereas "above $200B" means the
-// same thing at 250 companies as at 500.
-const MEGA_CAP_MIN = 200e9;
+
+// How many distinct group colours exist in styles.css (--corr-g0 …); groups
+// past that cycle. Hues stay off the two protected bands — green is gain and
+// action, red is loss, and a group is a fact rather than a verdict.
+const CORR_GROUP_COLORS = 6;
 
 const ROW_FLAGS = [
   {
-    key: 'mega',
-    label: 'mega cap',
-    title: 'Mega caps',
-    description: 'Put a gold orb behind the logo of any company worth $200B or more. '
-      + 'A size marker, not a judgement — it says nothing about return.',
-    test: (c) => typeof c.marketCap === 'number' && c.marketCap >= MEGA_CAP_MIN,
-    note: (n) => `<b>${n}</b> ${n === 1 ? 'company carries' : 'companies carry'} a gold orb &mdash; `
-      + `mega caps, worth <b>$200B</b> or more.`,
+    key: 'corr',
+    label: 'correlation group',
+    title: 'Correlation groups',
+    description: 'Colour-code names whose daily moves track each other, anchored on your saved names: '
+      + 'each colour is one group, so a candidate glowing the same colour as something you hold '
+      + 'would add more of the same movement. Group tightness above sets the bar.',
+    test: (c) => corrGroupIndex(c.symbol) !== null,
+    token: (c) => `corr corr-g${corrGroupIndex(c.symbol) % CORR_GROUP_COLORS}`,
+    note: (n) => `<b>${n}</b> ${n === 1 ? 'name glows' : 'names glow'} with a colour &mdash; each colour is a `
+      + `group of names whose daily moves track each other (correlation of `
+      + `<b>${state.settings.correlationThreshold.toFixed(2)}</b>+ over the ranking range), anchored on your `
+      + `saved names. Same colour, same movement &mdash; adding it doubles down rather than diversifies.`,
   },
 ];
+
+// symbol -> group index, and the held anchors of each group. Rebuilt by
+// computeCorrGroups() whenever the watchlist, the threshold, or the ranking
+// window changes — never in a render path.
+let corrGroups = { bySymbol: new Map(), anchors: [] };
+
+function corrGroupIndex(symbol) {
+  if (!flagEnabled('corr')) return null;
+  const idx = corrGroups.bySymbol.get(symbol);
+  return idx === undefined ? null : idx;
+}
+
+// Groups are connected components of the held names under "correlates at or
+// above the threshold", plus every board name whose strongest correlation
+// against a held name (state.correlations) clears the same bar — it joins the
+// group of the name it tracks. A group with a single member stays dark: an orb
+// on a name nothing else moves with guides nothing. Component-building is
+// deliberately simple (a name bridges two groups, they merge) — this is a
+// guide for the eye, not the HRP clustering, and the honest reading of "these
+// all reached each other at r ≥ the bar" is one group.
+function computeCorrGroups() {
+  const bySymbol = new Map();
+  const threshold = state.settings.correlationThreshold;
+  if (!(threshold < CORRELATION_MAX) || !state.leaderboard) {
+    corrGroups = { bySymbol, anchors: [] };
+    return;
+  }
+  const held = [...state.watchlist];
+  if (held.length === 0) {
+    corrGroups = { bySymbol, anchors: [] };
+    return;
+  }
+
+  // Pairwise correlation among the held names themselves, over the same window
+  // the board's correlations use. Histories for held names are already in
+  // historyCache in every path that gets here (the insights strip loads them);
+  // a missing one just leaves that name a singleton.
+  const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
+  const startStr = daysAgoToDateStr(startDaysAgo);
+  const endStr = daysAgoToDateStr(endDaysAgo);
+  const parent = new Map(held.map((s) => [s, s]));
+  const find = (s) => {
+    while (parent.get(s) !== s) { parent.set(s, parent.get(parent.get(s))); s = parent.get(s); }
+    return s;
+  };
+  const union = (a, b) => { parent.set(find(a), find(b)); };
+  for (let i = 0; i < held.length; i++) {
+    for (let j = i + 1; j < held.length; j++) {
+      const a = historyCache.get(held[i]);
+      const b = historyCache.get(held[j]);
+      if (!a || !b) continue;
+      const r = correlationClientSide(a.series, b.series, startStr, endStr);
+      if (r !== null && r >= threshold) union(held[i], held[j]);
+    }
+  }
+
+  const groupOfRoot = new Map();
+  const members = []; // per group: [heldMembers]
+  for (const s of held) {
+    const root = find(s);
+    if (!groupOfRoot.has(root)) { groupOfRoot.set(root, members.length); members.push([]); }
+    members[groupOfRoot.get(root)].push(s);
+  }
+  const heldGroup = new Map();
+  members.forEach((ms, g) => ms.forEach((s) => heldGroup.set(s, g)));
+
+  // Board names join the group of the held name they track. Counted per group
+  // so singleton groups (one held name, no matches) can stay dark.
+  const outsiders = new Map(); // symbol -> group
+  const outsiderCount = new Array(members.length).fill(0);
+  for (const c of state.leaderboard.companies) {
+    if (state.watchlist.has(c.symbol)) continue;
+    const hit = state.correlations[c.symbol];
+    if (!hit || hit.value < threshold) continue;
+    const g = heldGroup.get(hit.against);
+    if (g === undefined) continue;
+    outsiders.set(c.symbol, g);
+    outsiderCount[g] += 1;
+  }
+
+  // Stable colour order: biggest groups first, ties by first member, so the
+  // same watchlist always wears the same colours.
+  const size = members.map((ms, g) => ms.length + outsiderCount[g]);
+  const order = members.map((_, g) => g)
+    .filter((g) => size[g] >= 2)
+    .sort((a, b) => size[b] - size[a] || (members[a][0] < members[b][0] ? -1 : 1));
+  const colorOf = new Map(order.map((g, i) => [g, i]));
+
+  for (const [s, g] of heldGroup) {
+    if (colorOf.has(g)) bySymbol.set(s, colorOf.get(g));
+  }
+  for (const [s, g] of outsiders) {
+    if (colorOf.has(g)) bySymbol.set(s, colorOf.get(g));
+  }
+  corrGroups = { bySymbol, anchors: order.map((g) => members[g]) };
+}
 
 // Absent from the stored overrides means "on": a flag added to the registry
 // later lights up for everyone without a migration, and switching one off is
@@ -608,18 +710,11 @@ function scoreFor(company) {
   return typeof v === 'number' ? v : null;
 }
 
-// ── diversification filter ───────────────────────────────────────────
-// Whether a name is blocked from being added: it correlates too tightly with
-// something already saved. Held names are never blocked (they're already in),
-// and a threshold of 1 turns the filter off.
-function correlationBlock(company) {
-  if (state.watchlist.has(company.symbol)) return null;
-  const threshold = state.settings.correlationThreshold;
-  if (!(threshold < CORRELATION_MAX)) return null;
-  const hit = state.correlations[company.symbol];
-  if (!hit || hit.value < threshold) return null;
-  return hit;
-}
+// ── correlation guide ────────────────────────────────────────────────
+// The board's correlation signal is the coloured group orbs (see ROW_FLAGS /
+// computeCorrGroups above). An earlier version faded correlated rows and
+// blocked their add button; replaced at the owner's request — a flag informs,
+// a block decides for you.
 
 // Signed, not absolute — see the header comment in src/correlation.js.
 function correlationClientSide(seriesA, seriesB, startStr, endStr) {
@@ -688,6 +783,7 @@ async function refreshCorrelations() {
   const held = [...state.watchlist];
   if (held.length === 0) {
     state.correlations = {};
+    computeCorrGroups();
     return;
   }
   const { startDaysAgo, endDaysAgo } = state.settings.rankDateRange;
@@ -701,6 +797,7 @@ async function refreshCorrelations() {
     await loadAllHistories(state.leaderboard.companies.map((c) => c.symbol));
     if (seq !== corrRequestSeq) return;
     state.correlations = computeCorrelationsClientSide(held);
+    computeCorrGroups();
     return;
   }
   try {
@@ -714,6 +811,11 @@ async function refreshCorrelations() {
     if (seq !== corrRequestSeq) return;
     state.correlations = computeCorrelationsClientSide(held);
   }
+  // Grouping the held names needs their own histories (one cheap batch call —
+  // the insights strip wants them anyway) and then no further requests.
+  await loadAllHistories(held);
+  if (seq !== corrRequestSeq) return;
+  computeCorrGroups();
 }
 
 function computeRankScoresClientSide() {
@@ -783,7 +885,14 @@ function goToTab(tab) {
   if (location.hash.slice(1) !== tab) history.replaceState(null, '', `#${tab}`);
   // The segmented thumb needs real layout numbers, which don't exist while
   // the panel is display:none.
-  if (tab === 'investing') requestAnimationFrame(() => positionSegmentedThumb('investing', true));
+  if (tab === 'investing') {
+    requestAnimationFrame(() => positionSegmentedThumb('investing', true));
+    // The insights strip skips rendering while this panel is hidden (see
+    // renderWatchlistBoard), so entering the tab is what catches it up.
+    if (state.investingView === 'watchlist' && state.leaderboard) {
+      renderWatchlistInsights(state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol)));
+    }
+  }
 }
 
 function initTabBar() {
@@ -813,8 +922,13 @@ function setInvestingView(view, { persist = true } = {}) {
   if (sub) sub.textContent = chosen.sub;
   positionSegmentedThumb('investing');
   // The chart measures its wrapper in pixels, which reads 0 while the view is
-  // hidden — so it has to be drawn after the view is shown, not before.
+  // hidden — so it has to be drawn after the view is shown, not before. The
+  // watchlist's insights strip re-renders on the way in for the same reason
+  // renderWatchlistBoard skips it while hidden: it's the expensive part.
   if (chosen.key === 'portfolio') { renderPortfolioChart(); renderProjectionCard(); }
+  if (chosen.key === 'watchlist' && state.leaderboard) {
+    renderWatchlistInsights(state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol)));
+  }
 }
 
 function initInvestingViews() {
@@ -942,17 +1056,11 @@ const CHECK_PATH = 'M5 12.6l4.7 4.6L19 7.8';
 function addButton(c) {
   const checked = state.watchlist.has(c.symbol);
   const justChecked = checked && c.symbol === lastToggledSymbol;
-  const blocked = correlationBlock(c);
-  // The reason rides on the label rather than the row: at 393pt there is no
-  // room for a per-row note, and the count is explained in the callout instead.
-  const label = blocked
-    ? `Too correlated to add: ${c.name} moves with ${blocked.against} (r ${blocked.value.toFixed(2)})`
-    : `${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}`;
+  const label = `${checked ? 'Remove from' : 'Add to'} watchlist: ${c.name}`;
   return `
     <span class="select-cell">
       <button type="button" class="add-btn${checked ? ' checked' : ''}${justChecked ? ' just-checked' : ''}"
-        data-symbol="${c.symbol}" aria-pressed="${checked}"${blocked ? ' disabled' : ''}
-        title="${blocked ? label : ''}" aria-label="${label}">
+        data-symbol="${c.symbol}" aria-pressed="${checked}" aria-label="${label}">
         <svg class="icon-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="${PLUS_PATH}"/></svg>
         <svg class="icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="${CHECK_PATH}"/></svg>
       </button>
@@ -966,15 +1074,14 @@ function addButton(c) {
 // the width to be readable.
 function baseRow(c, extraClass) {
   const row = document.createElement('div');
-  const blocked = correlationBlock(c) ? ' correlated' : '';
-  row.className = `row${extraClass}${blocked}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
+  row.className = `row${extraClass}${state.watchlist.has(c.symbol) ? ' is-selected' : ''}`;
   row.dataset.symbol = c.symbol;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
   // The flags are a visual signal, so they also go in the accessible name —
   // a glow nobody can hear is a glow half the point of.
   const flags = rowFlags(c);
-  if (flags.length) row.dataset.flags = flags.map((f) => f.key).join(' ');
+  if (flags.length) row.dataset.flags = flags.map((f) => (f.token ? f.token(c) : f.key)).join(' ');
   const suffix = flags.length ? ` (${flags.map((f) => f.label).join(', ')})` : '';
   row.setAttribute('aria-label', `${c.name}${suffix}: view chart`);
   return row;
@@ -1027,38 +1134,84 @@ function pruneBrokenLogos(container) {
   });
 }
 
-function attachSelectHandlers(container) {
-  container.querySelectorAll('.add-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const symbol = btn.dataset.symbol;
-      if (state.watchlist.has(symbol)) state.watchlist.delete(symbol);
-      else state.watchlist.add(symbol);
-      lastToggledSymbol = symbol;
-      saveWatchlist();
-      updateWatchlistBadge(true);
-      renderAll();
-      lastToggledSymbol = null;
-      // The held set just changed, so every other name's correlation against it
-      // did too. Re-render once it lands.
-      refreshCorrelations().then(() => renderAll());
-    });
+// ── board interaction: one delegated listener per board, bound once ──
+// The boards used to attach two listeners to every row on every render — at
+// hundreds of rows, rebuilt on each tap, that was a real share of why taps
+// felt slow on the phone. Delegation makes a render pure DOM construction.
+
+// Toggling a save no longer rebuilds the boards. The tapped row is updated in
+// place, the (small) watchlist panel re-renders, and the correlation groups —
+// which genuinely did change — recompute in the background and restyle rows in
+// place when they land. The full rebuild path still exists for settings
+// changes, where the ordering itself changes.
+function toggleWatchlist(symbol) {
+  if (state.watchlist.has(symbol)) state.watchlist.delete(symbol);
+  else state.watchlist.add(symbol);
+  saveWatchlist();
+  updateWatchlistBadge(true);
+  updateRowSelection(symbol);
+  renderWatchlistBoard();
+  refreshCorrelations().then(() => {
+    applyRowFlagsInPlace();
+    renderRanksCallout();
+    renderFlagSettings();
   });
 }
 
-function attachRowHandlers(container) {
-  // Read the order at click time, not now: the board re-sorts on every settings
-  // change, and the sheet's swipe order has to match what's actually on screen.
-  const boardOrder = () =>
-    [...container.querySelectorAll('.row[data-symbol]')].map((r) => r.dataset.symbol);
-  container.querySelectorAll('.row[data-symbol]').forEach((row) => {
-    row.addEventListener('click', () => openDetail(row.dataset.symbol, boardOrder()));
-    row.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        openDetail(row.dataset.symbol, boardOrder());
-      }
-    });
+// Restyle the tapped row (both boards may carry it) without rebuilding it.
+function updateRowSelection(symbol) {
+  const checked = state.watchlist.has(symbol);
+  document.querySelectorAll(`.row[data-symbol="${symbol}"]`).forEach((row) => {
+    row.classList.toggle('is-selected', checked);
+    const btn = row.querySelector('.add-btn');
+    if (!btn) return;
+    btn.classList.toggle('checked', checked);
+    btn.classList.toggle('just-checked', checked);
+    btn.setAttribute('aria-pressed', String(checked));
+    const name = (findCompany(symbol) || { name: symbol }).name;
+    btn.setAttribute('aria-label', `${checked ? 'Remove from' : 'Add to'} watchlist: ${name}`);
+  });
+}
+
+// Re-derive each visible row's flag tokens and accessible suffix in place —
+// the group orbs move when the held set or the threshold does, and swapping a
+// data attribute on existing rows is invisible-fast where a rebuild is not.
+function applyRowFlagsInPlace() {
+  document.querySelectorAll('#ranks-rows .row[data-symbol], #watchlist-rows .row[data-symbol]').forEach((row) => {
+    const c = findCompany(row.dataset.symbol);
+    if (!c) return;
+    const flags = rowFlags(c);
+    if (flags.length) row.dataset.flags = flags.map((f) => (f.token ? f.token(c) : f.key)).join(' ');
+    else row.removeAttribute('data-flags');
+    const suffix = flags.length ? ` (${flags.map((f) => f.label).join(', ')})` : '';
+    row.setAttribute('aria-label', `${c.name}${suffix}: view chart`);
+  });
+}
+
+function bindBoard(container) {
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('.add-btn');
+    if (btn && container.contains(btn)) {
+      lastToggledSymbol = btn.dataset.symbol;
+      toggleWatchlist(btn.dataset.symbol);
+      lastToggledSymbol = null;
+      return;
+    }
+    const row = e.target.closest('.row[data-symbol]');
+    if (row && container.contains(row)) {
+      // Read the order at click time: the board re-sorts on settings changes,
+      // and the sheet's swipe order has to match what's actually on screen.
+      const order = [...container.querySelectorAll('.row[data-symbol]')].map((r) => r.dataset.symbol);
+      openDetail(row.dataset.symbol, order);
+    }
+  });
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.row[data-symbol]');
+    if (!row || !container.contains(row)) return;
+    e.preventDefault();
+    const order = [...container.querySelectorAll('.row[data-symbol]')].map((r) => r.dataset.symbol);
+    openDetail(row.dataset.symbol, order);
   });
 }
 
@@ -1073,36 +1226,29 @@ function fillBoard(rowsEl, scored) {
   available.forEach(({ c, value }, i) => rowsEl.appendChild(rowEl(c, i + 1, value)));
   unavailable.forEach((c) => rowsEl.appendChild(buildUnavailableRow(c)));
 
-  attachSelectHandlers(rowsEl);
-  attachRowHandlers(rowsEl);
   pruneBrokenLogos(rowsEl);
   return unavailable;
 }
 
 function renderRanksBoard() {
   const scored = state.leaderboard.companies.map((c) => ({ c, value: scoreFor(c) }));
-  const unavailable = fillBoard(document.getElementById('ranks-rows'), scored);
-  renderRanksCallout(unavailable);
+  fillBoard(document.getElementById('ranks-rows'), scored);
+  renderRanksCallout();
 }
 
-function renderRanksCallout(unavailable) {
+// Derives its own inputs from state (cheap — no DOM) so the in-place update
+// paths can refresh the callout without re-running a board render.
+function renderRanksCallout() {
   const box = document.getElementById('ranks-callout');
   const text = document.getElementById('ranks-callout-text');
   const notes = [];
+  const unavailable = state.leaderboard.companies.filter((c) => scoreFor(c) === null);
 
   if (unavailable.length > 0) {
     const names = unavailable
       .map((c) => `<b>${c.name} (${c.symbol})</b>${c.ipoDate ? `, IPO'd ${c.ipoDate}` : ''}`)
       .join('; ');
     notes.push(`Not ranked over ${rankDateRangeLabel()}: ${names} &mdash; not enough trading history for a like-for-like score.`);
-  }
-
-  // A faded row with no stated reason is just a mysterious dim row, and there is
-  // no space for a per-row note at this width — so the count is explained once,
-  // here.
-  const faded = state.leaderboard.companies.filter((c) => correlationBlock(c)).length;
-  if (faded > 0) {
-    notes.push(`<b>${faded}</b> ${faded === 1 ? 'name is' : 'names are'} faded and can't be added &mdash; daily-return correlation of <b>${state.settings.correlationThreshold.toFixed(2)}</b> or more with something already on your watchlist. Adjust or switch this off in Settings.`);
   }
 
   // One line per flag that has something to say, so a highlighted row is never
@@ -1138,11 +1284,6 @@ async function loadPortfolio() {
 
 function fmtMoney(v) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-// Whole dollars, for places where cents are noise — the held-vs-plan gaps are
-// hundreds of dollars wide and three figures share one row there.
-function fmtMoney0(v) {
-  return `$${Math.round(v).toLocaleString('en-US')}`;
 }
 function fmtMoneySigned(v) {
   return `${v >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v))}`;
@@ -1630,110 +1771,8 @@ function renderPlanCard(plan) {
       if (wantDollars === planShowDollars) return;
       planShowDollars = wantDollars;
       renderPlanCard(planCache);
-      renderHeldCard(planCache);
     });
   });
-}
-
-// Held vs plan: only as good as the holdings record (see
-// data/portfolio/holdings.csv) — until one exists, the card says how to start
-// rather than pretending.
-//
-// The comparison is in *dollars*, deliberately, and the obvious alternative is
-// a trap worth naming. Comparing a held share of the account against a plan
-// weight puts two different denominators either side of the "vs": a plan weight
-// is a share of the plan's own names, a held share is of everything in the
-// account. With 23 positions against a 10-name plan those aren't comparable,
-// and the mismatch reads as agreement exactly when it shouldn't — UNH at 3.2%
-// of the account against a 4.1% plan weight scored "on target" while sitting
-// $346 below its actual target. Plan dollars are what the card above already
-// shows, so the two now agree by construction.
-//
-// "On track" is within 10% of a name's target rather than a fixed dollar band,
-// so the tolerance scales with the position instead of swallowing the small
-// ones whole.
-const HELD_TOLERANCE_FRAC = 0.1;
-
-function renderHeldCard(plan) {
-  const el = document.getElementById('watchlist-held');
-  if (!el) return;
-  const holdings = portfolioSummary && portfolioSummary.holdings;
-  if (!holdings || !holdings.positions || holdings.positions.length === 0) {
-    if (!plan || plan.symbols.length === 0) { el.hidden = true; return; }
-    el.innerHTML = `
-      <div class="portfolio-label">Held vs plan</div>
-      <p class="portfolio-note">Nothing recorded yet. Send the brokerage's positions screen (each holding and
-      its dollar value) and this card will show where the account sits against the plan above — overweight,
-      underweight, missing, or extra.</p>`;
-    el.hidden = false;
-    return;
-  }
-
-  const accountTotal = holdings.positions.reduce((a, h) => a + h.dollars, 0);
-  if (!(accountTotal > 0) || !plan || plan.symbols.length === 0) { el.hidden = true; return; }
-
-  const balance = portfolioSummary.endBalance;
-  const canDollars = balance !== null && plan.scale !== null;
-  const heldBySym = new Map(holdings.positions.map((h) => [h.symbol, h.dollars]));
-  const planSet = new Set(plan.symbols);
-  const heldInPlan = plan.symbols.reduce((a, s) => a + (heldBySym.get(s) || 0), 0);
-
-  // Targets in the same dollars the plan card shows. Without a balance or a vol
-  // scaling there is nothing to price against, so the card prices the same
-  // weights off what's already in those names — a narrower denominator, but
-  // still one denominator on both sides of the comparison.
-  const pool = canDollars ? balance * plan.scale : heldInPlan;
-  const ranked = plan.symbols
-    .map((sym, i) => ({ sym, target: pool * plan.weights[i], held: heldBySym.get(sym) || 0 }))
-    .sort((a, b) => b.target - a.target);
-
-  // Sorted by target, biggest first: the largest gap is the most actionable row
-  // and belongs at the top. It's also why a "not held" row is at full strength
-  // rather than muted — a name missing against an $8,543 target is the loudest
-  // fact on the card, not a footnote.
-  //
-  // Colour marks the *good* state, not the gap. Painting every gap red made the
-  // card a wall of red the moment the account drifted from the plan, which is
-  // its normal condition — ten identical red rows discriminate nothing. It also
-  // spent the loss colour on something that isn't a loss (same reasoning as the
-  // flag palette: a gap is a fact, not a verdict). Being on track is the rare
-  // state worth catching the eye, and the words carry the rest.
-  const rows = ranked.map(({ sym, target, held }) => {
-    const gap = held - target;
-    let verdict;
-    let cls = '';
-    if (held === 0) verdict = 'not held';
-    else if (Math.abs(gap) <= target * HELD_TOLERANCE_FRAC) { verdict = 'on track'; cls = 'gain'; }
-    else verdict = `${fmtMoney0(Math.abs(gap))} ${gap > 0 ? 'over' : 'light'}`;
-    return statRow(sym, `${fmtMoney0(held)} vs ${fmtMoney0(target)} — ${verdict}`, cls);
-  });
-
-  const dropped = new Set(plan.dropped || []);
-  const extras = holdings.positions
-    .filter((h) => !planSet.has(h.symbol))
-    .sort((a, b) => b.dollars - a.dollars);
-  for (const h of extras) {
-    // A saved name the plan couldn't score is not the same as one that was
-    // never saved, and saying so beats implying the watchlist forgot it.
-    const why = dropped.has(h.symbol) ? 'not enough history to score' : 'not on the watchlist';
-    rows.push(statRow(h.symbol, `${fmtMoney0(h.dollars)} held — ${why}`, 'muted'));
-  }
-
-  const planTotal = ranked.reduce((a, r) => a + r.target, 0);
-  const elsewhere = accountTotal - heldInPlan;
-  const context = canDollars
-    ? `The plan covers ${plan.symbols.length} name${plan.symbols.length === 1 ? '' : 's'} worth
-       ${fmtMoney0(planTotal)} at the ${PLAN_TARGET_VOL_PCT}% target; you hold ${fmtMoney0(heldInPlan)} of those,
-       with ${fmtMoney0(elsewhere)} in ${extras.length} other name${extras.length === 1 ? '' : 's'}.`
-    : `No balance to price the plan against, so targets here split the ${fmtMoney0(heldInPlan)} already in these
-       names by the suggested weights.`;
-
-  el.innerHTML = `
-    <div class="portfolio-label">Held vs plan</div>
-    ${rows.join('')}
-    <p class="portfolio-note">Holdings as recorded ${fmtLongDate(holdings.asOf)}, against the dollar targets
-    above. ${context} Within ${Math.round(HELD_TOLERANCE_FRAC * 100)}% of a target counts as on track.</p>`;
-  el.hidden = false;
 }
 
 // One request-sequence guard for the whole insights strip, same pattern as
@@ -1743,17 +1782,14 @@ let planRequestSeq = 0;
 async function renderWatchlistInsights(companies) {
   renderSectorCard(companies);
   const planEl = document.getElementById('watchlist-plan');
-  const heldEl = document.getElementById('watchlist-held');
   if (companies.length === 0) {
     if (planEl) planEl.hidden = true;
-    if (heldEl) heldEl.hidden = true;
     planCache = null;
     return;
   }
   const key = companies.map((c) => c.symbol).join(',');
   if (planCache && planCache.key === key) {
     renderPlanCard(planCache);
-    renderHeldCard(planCache);
     return;
   }
   if (planEl && planEl.hidden) {
@@ -1766,7 +1802,6 @@ async function renderWatchlistInsights(companies) {
     if (seq !== planRequestSeq) return;
     planCache = plan;
     renderPlanCard(plan);
-    renderHeldCard(plan);
   } catch {
     if (seq !== planRequestSeq) return;
     if (planEl) {
@@ -1778,13 +1813,14 @@ async function renderWatchlistInsights(companies) {
 
 // ── add the next ranked name ─────────────────────────────────────────
 // "Next" means the highest-scoring company on the Ranks board that isn't
-// already held and isn't blocked by the diversification filter — so the
-// ranking window and the correlation threshold in Settings both decide what
-// gets added, exactly as they decide what the board shows.
+// already held — the ranking window in Settings decides what gets added,
+// exactly as it decides what the board shows. (The old diversification filter
+// also skipped correlated names here; with the filter replaced by the group
+// orbs, the guide is visible but the choice is yours.)
 //
-// They decide it once, at the moment of the tap. Changing either setting
-// afterwards re-sorts and re-fades the board but never touches the watchlist:
-// a saved name leaves only by its own check or by Clear watchlist.
+// It decides once, at the moment of the tap. Changing the window afterwards
+// re-sorts the board but never touches the watchlist: a saved name leaves
+// only by its own check or by Clear watchlist.
 function nextRankedCandidate() {
   if (!state.leaderboard || !state.rankingsLoaded) return null;
   const scored = state.leaderboard.companies
@@ -1794,9 +1830,7 @@ function nextRankedCandidate() {
     .filter((x) => x.value !== null)
     .sort((a, b) => b.value - a.value);
   for (const { c } of scored) {
-    if (state.watchlist.has(c.symbol)) continue;
-    if (correlationBlock(c)) continue;
-    return c;
+    if (!state.watchlist.has(c.symbol)) return c;
   }
   return null;
 }
@@ -1815,25 +1849,17 @@ function flashAddNext(text) {
   }, 2200);
 }
 
-async function addNextRanked() {
+function addNextRanked() {
   const company = nextRankedCandidate();
   if (!company) {
-    // Everything above the correlation threshold is either held already or
-    // too close to something held — worth saying, since the alternative is a
-    // tap that appears to do nothing.
+    // Every ranked name is held already — worth saying, since the alternative
+    // is a tap that appears to do nothing.
     flashAddNext('Nothing left to add');
     return;
   }
-  state.watchlist.add(company.symbol);
   lastToggledSymbol = company.symbol;
-  saveWatchlist();
-  updateWatchlistBadge(true);
-  renderAll();
+  toggleWatchlist(company.symbol);
   lastToggledSymbol = null;
-  // The held set changed, so every other name's correlation against it did
-  // too — including what the *next* tap would be allowed to add.
-  await refreshCorrelations();
-  renderAll();
 }
 
 function initWatchlistActions() {
@@ -1848,7 +1874,15 @@ function renderWatchlistBoard() {
   const rowsEl = document.getElementById('watchlist-rows');
   const companies = state.leaderboard.companies.filter((c) => state.watchlist.has(c.symbol));
 
-  renderWatchlistInsights(companies);
+  // The insights strip is the expensive part of this render (the weights math
+  // re-runs when the held set changes), and most saves happen from the Ranks
+  // board with this panel hidden — so it only computes when it's actually on
+  // screen. setInvestingView re-renders on the way in, so nothing goes stale.
+  // (The plan cache is keyed by the held set, so a skipped render here never
+  // shows stale weights later — the key mismatch forces the recompute then.)
+  if (state.activeTab === 'investing' && state.investingView === 'watchlist') {
+    renderWatchlistInsights(companies);
+  }
   if (companies.length === 0) {
     label.hidden = true;
     head.hidden = true;
@@ -2072,8 +2106,7 @@ function initClearWatchlist() {
     state.watchlist.clear();
     saveWatchlist();
     updateWatchlistBadge();
-    // Nothing is held any more, so nothing should still be faded as a
-    // correlate of it.
+    // Nothing is held any more, so no group orbs should survive it.
     await refreshCorrelations();
     renderAll();
     // Stays on this tab rather than bouncing to Ranks — the empty state already
@@ -2435,7 +2468,6 @@ function renderDetailFacts(company) {
 // spacing and hairlines instead of inventing a layout; a block that needs its
 // own shape can return whatever markup it likes.
 const DETAIL_BLOCKS = [
-  { key: 'rating', title: 'Analyst rating', render: blockRating },
   // Not "52-week range" any more — the window is a toggle now, and a card
   // headed 52-week while showing a 1M span would be lying.
   { key: 'range', title: 'Price range', render: blockRange },
@@ -2451,57 +2483,6 @@ function statRow(label, value, cls = '') {
 function signClass(v) {
   if (!(typeof v === 'number') || v === 0) return '';
   return v > 0 ? 'gain' : 'loss';
-}
-
-// ── analyst consensus ────────────────────────────────────────────────
-// Grade counts and FMP's consensus label ride the company object itself
-// (`grades` on the leaderboard payload, fetched once daily server-side with
-// everything else) — which is what lets the static snapshot show this card
-// with no backend and no endpoint of its own. The time series accrues in the
-// daily archive (data/snapshots/), which files each day's counts; the card
-// only ever shows today's. The owner's earlier hand-kept readings remain in
-// data/ratings/ratings.csv as a record, no longer displayed.
-const CONSENSUS_TONE = {
-  'strong buy': 'gain',
-  buy: 'gain',
-  hold: '',
-  sell: 'loss',
-  'strong sell': 'loss',
-};
-
-function blockRating(company) {
-  const g = company.grades;
-  if (!g || typeof g !== 'object') return null;
-  const counts = [g.strongBuy, g.buy, g.hold, g.sell, g.strongSell]
-    .map((v) => (typeof v === 'number' && v > 0 ? v : 0));
-  const total = counts.reduce((a, b) => a + b, 0);
-  // No card for a company nobody covers — an empty "Analyst rating" panel
-  // would be noise, same reasoning as the hand-kept version before it.
-  if (total === 0) return null;
-
-  const positive = counts[0] + counts[1];
-  const pct = (positive / total) * 100;
-  const tone = CONSENSUS_TONE[String(g.consensus || '').toLowerCase()] ?? '';
-  const meter = `
-    <div class="rating-meter">
-      <span class="rating-meter-fill ${tone}" style="width: ${pct.toFixed(1)}%"></span>
-    </div>`;
-
-  const parts = [];
-  if (counts[0]) parts.push(`${counts[0]} strong buy`);
-  if (counts[1]) parts.push(`${counts[1]} buy`);
-  if (counts[2]) parts.push(`${counts[2]} hold`);
-  if (counts[3]) parts.push(`${counts[3]} sell`);
-  if (counts[4]) parts.push(`${counts[4]} strong sell`);
-
-  const rows = [
-    statRow('Consensus', g.consensus || 'Mixed', tone),
-    statRow('Analysts', `${total}`),
-    statRow('Leaning', `${pct.toFixed(0)}% positive`, tone),
-  ];
-  rows.push(`<p class="detail-block-note">${parts.join(' &middot; ')}. Analyst grade counts, refreshed daily. Nothing here feeds the board's ranking.</p>`);
-
-  return meter + rows.join('');
 }
 
 // High and low over a window, from the symbol's own daily closes. Every
@@ -3149,8 +3130,8 @@ function renderSettings() {
     }
     // Threshold stepper: 0.30–1.00 in 0.05 steps, 1.00 shown as "Off". Changing
     // it needs no refetch — the correlations themselves don't depend on the
-    // threshold, only on the watchlist and the date range — so this just
-    // re-renders.
+    // threshold, only on the watchlist and the date range — but the groups cut
+    // from them do, so they recompute (locally, no requests) before rendering.
     if (setting.type === 'threshold') {
       const value = state.settings[setting.key];
       const off = !(value < CORRELATION_MAX);
@@ -3176,7 +3157,10 @@ function renderSettings() {
           );
           saveSettings();
           renderSettings();
-          if (state.leaderboard && state.rankingsLoaded) renderAll();
+          if (state.leaderboard && state.rankingsLoaded) {
+            computeCorrGroups();
+            renderAll();
+          }
         });
       });
     }
@@ -3348,6 +3332,8 @@ async function init() {
   updateWatchlistBadge();
 
   document.getElementById('ranks-rows').innerHTML = skeletonRowsHTML(8);
+  bindBoard(document.getElementById('ranks-rows'));
+  bindBoard(document.getElementById('watchlist-rows'));
 
   // Independent of the market data: it comes off disk, not from FMP, so it
   // neither waits for the board nor fails with it.
@@ -3360,9 +3346,6 @@ async function init() {
       if (state.investingView === 'portfolio') renderPortfolioChart();
     })
     .catch(() => { /* nothing recorded yet — the card stays hidden */ });
-
-  // Same: off disk, not FMP. Nothing waits on it — the rating block simply
-  // isn't drawn until it lands, and drops itself if it never does.
 
   try {
     const data = await loadLeaderboard();

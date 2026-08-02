@@ -12,8 +12,8 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-  // Seed a watchlist plus a threshold that actually fades things, so we can
-  // check the fade lifts once nothing is held.
+  // Seed a watchlist plus a tightness that actually groups things, so we can
+  // check the group orbs lift once nothing is held.
   // Seed once only: addInitScript re-runs on every navigation, so seeding
   // unconditionally would silently re-fill the watchlist on the reload check.
   await page.addInitScript(() => {
@@ -34,15 +34,15 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
 
   const btn = page.locator('#clear-watchlist');
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist') || '[]').length);
-  const faded = () => page.evaluate(() =>
-    document.querySelectorAll('#ranks-rows .row.correlated').length);
+  const grouped = () => page.evaluate(() =>
+    document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length);
 
   check('button is visible when the watchlist has names', await btn.isVisible());
   check(`label starts unarmed ("${(await btn.textContent()).trim()}")`,
     (await btn.textContent()).trim() === 'Clear watchlist');
   check(`3 names saved (${await stored()})`, (await stored()) === 3);
-  const fadedBefore = await faded();
-  check(`some rows are faded as correlates (${fadedBefore})`, fadedBefore > 0);
+  const groupedBefore = await grouped();
+  check(`some rows wear group orbs (${groupedBefore})`, groupedBefore > 0);
   await page.screenshot({ path: `${S}-unarmed.png` });
 
   // ── first tap only arms; nothing is lost ──
@@ -76,7 +76,7 @@ const BASE = process.argv[2] || 'http://localhost:3428/';
   // ── the correlation fade lifts, since nothing is held ──
   await page.click('[data-tab="ranks"]');
   await page.waitForTimeout(700);
-  check(`fade lifts once nothing is held (${fadedBefore} -> ${await faded()})`, (await faded()) === 0);
+  check(`the orbs lift once nothing is held (${groupedBefore} -> ${await grouped()})`, (await grouped()) === 0);
 
   // ── it survives a reload, i.e. localStorage really was written ──
   await page.reload({ waitUntil: 'domcontentloaded' });

@@ -1,6 +1,8 @@
 // The plus on the Watchlist adds the next name down the ranked board, obeying
-// the ranking window and the correlation threshold — and once a name is saved,
-// changing either setting never takes it away again.
+// the ranking window — and once a name is saved, changing any setting never
+// takes it away again. (The old diversification filter also made this skip
+// correlated names; the group orbs that replaced it inform without gating, so
+// "next" is simply the best-ranked unheld name.)
 const { chromium, devices } = require('/opt/node22/lib/node_modules/playwright');
 const S = require('os').tmpdir();
 const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 'docs', 'index.html')}`;
@@ -39,7 +41,6 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   const boardOrder = () => page.evaluate(() =>
     [...document.querySelectorAll('#ranks-rows .row[data-symbol]')].map((r) => ({
       symbol: r.dataset.symbol,
-      blocked: !!r.querySelector('.add-btn[disabled]'),
       held: r.querySelector('.add-btn')?.getAttribute('aria-pressed') === 'true',
     })));
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('teatime.watchlist') || '[]'));
@@ -77,7 +78,7 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   check(`"${afterFirst.addLabel}" sits beside Clear watchlist`, afterFirst.addLabel === 'Add next ranked');
   await page.screenshot({ path: `${S}-one.png` });
 
-  // ── keep tapping: each adds the next *allowed* name, skipping correlates ──
+  // ── keep tapping: each adds the next unheld name straight down the board ──
   const order = [first[0]];
   for (let i = 0; i < 3; i++) {
     await page.click('#add-next');
@@ -89,25 +90,24 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   check(`four taps saved four distinct names (${four.join(', ')})`,
     four.length === 4 && new Set(four).size === 4);
 
-  // Each pick must have been the best-ranked name that wasn't blocked at the
-  // time — check the board agrees now: everything above the last pick is
-  // either held or faded.
+  // Each pick must have been the best-ranked unheld name at the time — check
+  // the board agrees now: everything above the last pick is held. This is also
+  // the regression net for the removed filter: if skipping ever came back,
+  // unheld names would sit above the last pick.
   await page.click('[data-tab="ranks"]');
   await page.waitForTimeout(1200);
   const nowBoard = await boardOrder();
   const lastPickIdx = nowBoard.findIndex((r) => r.symbol === four[four.length - 1]);
   const above = nowBoard.slice(0, lastPickIdx);
-  const stragglers = above.filter((r) => !r.held && !r.blocked);
-  check(`nothing addable was skipped over (${stragglers.length} above rank ${lastPickIdx + 1})`,
+  const stragglers = above.filter((r) => !r.held);
+  check(`nothing was skipped over (${stragglers.length} unheld above rank ${lastPickIdx + 1})`,
     lastPickIdx > 0 && stragglers.length === 0);
-  check(`the picks are faded/held on the board (${above.filter((r) => r.blocked).length} blocked above)`,
-    above.some((r) => r.blocked));
   await page.screenshot({ path: `${S}-board.png` });
 
-  // ── the correlation threshold changes what "next" means ──
+  // ── group tightness informs the orbs but never gates what "next" means ──
   await page.click('[data-tab="settings"]');
   await page.waitForTimeout(700);
-  // Loosen the filter to 1.00 (off): more names become addable.
+  // Push it to 1.00 (grouping off): picks must be unaffected.
   for (let i = 0; i < 6; i++) {
     const plus = page.locator('#settings-list .stepper-btn[data-dir="1"]').first();
     if (await plus.isDisabled()) break;
@@ -116,12 +116,12 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   }
   const threshold = await page.evaluate(() =>
     document.getElementById('threshold-value').textContent.trim());
-  check(`the diversification filter can be turned off (${threshold})`, threshold === 'Off');
+  check(`group tightness can be switched off (${threshold})`, threshold === 'Off');
 
   await page.click('[data-tab="investing"]');
   await page.waitForTimeout(1200);
   const keptAfterThreshold = await saved();
-  check(`changing the threshold keeps every saved name (${keptAfterThreshold.length})`,
+  check(`changing it keeps every saved name (${keptAfterThreshold.length})`,
     keptAfterThreshold.length === 4 && four.every((s) => keptAfterThreshold.includes(s)));
 
   await page.click('#add-next');
@@ -131,7 +131,7 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   await page.waitForTimeout(1000);
   const unfiltered = await boardOrder();
   const firstFree = unfiltered.find((r) => !r.held);
-  check(`with the filter off it adds the next unheld name (${five[4]})`,
+  check(`the next tap still adds the next unheld name (${five[4]})`,
     five.length === 5 && !four.includes(five[4]));
   check(`and nothing above it is left unheld (next free is now ${firstFree && firstFree.symbol})`,
     unfiltered.slice(0, unfiltered.findIndex((r) => r.symbol === five[4])).every((r) => r.held));
@@ -157,7 +157,7 @@ const BASE = process.argv[2] || `file://${require('path').join(__dirname, '..', 
   const board6 = await boardOrder();
   const pickIdx = board6.findIndex((r) => r.symbol === six[5]);
   check(`the next pick follows the new window (${six[5]} at rank ${pickIdx + 1})`,
-    six.length === 6 && board6.slice(0, pickIdx).every((r) => r.held || r.blocked));
+    six.length === 6 && board6.slice(0, pickIdx).every((r) => r.held));
 
   // ── still removable one at a time, and by Clear ──
   await page.click('[data-tab="investing"]');

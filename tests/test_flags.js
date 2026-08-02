@@ -1,247 +1,164 @@
-// ROW_FLAGS: the row-flag skeleton and its one flag — the mega-cap orb.
-// (A high-volatility orb and a biotech dimmer were each built and rolled
-// back at the owner's request; the skeleton stays orb-only until a second
-// flag earns its keep.)
+// The flags system, whose one occupant is now the correlation groups. What
+// this pins down: the registry renders its own Settings section (switch,
+// sample orb, live count), the switch genuinely disarms the orbs and
+// persists, the orb is drawn on the logo disc (never the card edge — that's
+// the saved ring's identity), and every group colour stays out of the two
+// protected bands: green is gain and action, red is loss. Colour assertions
+// read oklab (a = green/red axis, b = blue/yellow) rather than matching hex,
+// per CLAUDE.md.
 const { chromium, devices } = require('/opt/node22/lib/node_modules/playwright');
-
-const BASE = process.argv[2] || 'http://localhost:3210';
 const S = require('os').tmpdir();
-const LIVE = !BASE.startsWith('file://');
-const MEGA = 200e9;
+const BASE = process.argv[2] || 'http://localhost:3210';
 
-const results = [];
-const check = (n, c) => results.push(`${c ? 'PASS' : 'FAIL'} - ${n}`);
+// Chromium serialises color-mix results as "oklab(L a b / alpha)".
+function parseOklab(str) {
+  const m = str.match(/oklab\(([\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)/);
+  return m ? { L: +m[1], a: +m[2], b: +m[3] } : null;
+}
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const results = [];
+  const check = (n, c) => results.push(`${c ? 'PASS' : 'FAIL'} - ${n}`);
+  const context = await browser.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
+  const page = await context.newPage();
   const errors = [];
-  const ctx = await browser.newContext({
-    ...devices['iPhone 14 Pro'], viewport: { width: 393, height: 852 }, colorScheme: 'dark',
-  });
-  const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => {
     if (m.type() !== 'error') return;
     if (/Failed to load resource|ERR_ABORTED|ERR_CONNECTION_RESET/.test(m.text())) return;
     errors.push(m.text());
   });
-  // NVDA is a mega cap and saved; SNDK is saved but under the line.
+
+  // A watchlist with known co-movers so several groups form: two health
+  // insurers, a cybersecurity name, a steel name, a custodian bank.
   await page.addInitScript(() => {
-    localStorage.setItem('teatime.watchlist', JSON.stringify(['NVDA', 'SNDK']));
-    localStorage.setItem('teatime.settings', JSON.stringify({ volAdjusted: false, correlationThreshold: 1 }));
+    localStorage.setItem('teatime.watchlist', JSON.stringify(['UNH', 'HUM', 'PANW', 'NUE', 'STT']));
   });
   await page.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#panel-ranks .board .row', { timeout: 30000 });
-  await page.waitForTimeout(900);
+  await page.waitForSelector('#ranks-rows .row', { timeout: 30000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]').length > 0,
+    null, { timeout: 30000 },
+  ).catch(() => null);
 
-  // ── which rows carry the flag ─────────────────────────────────────
-  const rows = await page.evaluate(() => {
-    const board = typeof EMBEDDED_LEADERBOARD !== 'undefined' ? EMBEDDED_LEADERBOARD : null;
-    const byId = new Map((board ? board.companies : []).map((c) => [c.symbol, c]));
-    return [...document.querySelectorAll('#panel-ranks .board .row')].map((r) => ({
+  // ── the board wears group orbs ──
+  const board = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]')];
+    return rows.map((r) => ({
       sym: r.dataset.symbol,
-      flags: r.dataset.flags || '',
-      dimmedClass: r.classList.contains('dimmed'),
-      cap: byId.get(r.dataset.symbol)?.marketCap ?? null,
+      token: ((r.dataset.flags || '').match(/corr-g\d/) || [null])[0],
+      orb: getComputedStyle(r.querySelector('.logo')).boxShadow,
       aria: r.getAttribute('aria-label'),
     }));
   });
+  check(`grouped rows exist (${board.length})`, board.length >= 4);
+  const tokens = [...new Set(board.map((r) => r.token))];
+  check(`several distinct group colours are in play (${tokens.join(', ')})`, tokens.length >= 2);
+  check('every grouped row draws its orb on the logo disc',
+    board.every((r) => r.orb && r.orb !== 'none'));
+  check('every grouped row speaks its flag in the accessible name',
+    board.every((r) => /correlation group/.test(r.aria)));
 
-  let caps = new Map(rows.map((r) => [r.sym, r.cap]));
-  if (LIVE && [...caps.values()].every((v) => v === null)) {
-    const lb = await (await ctx.request.get(`${BASE}/api/leaderboard`)).json();
-    caps = new Map(lb.companies.map((c) => [c.symbol, c.marketCap]));
+  // ── each group colour stays off the protected bands ──
+  // The gain green sits far negative on oklab's a axis, the loss red far
+  // positive with b near zero. Flags must not read as either: reject anything
+  // strongly green (a < -0.08) and anything red-like (a > 0.08 with b below
+  // amber's yellow lift).
+  const orbColors = await page.evaluate(() => {
+    const out = {};
+    for (const r of document.querySelectorAll('#ranks-rows .row[data-flags~="corr"]')) {
+      const token = ((r.dataset.flags || '').match(/corr-g\d/) || [null])[0];
+      if (!token || out[token]) continue;
+      out[token] = getComputedStyle(r.querySelector('.logo')).boxShadow;
+    }
+    return out;
+  });
+  for (const [token, shadow] of Object.entries(orbColors)) {
+    const lab = parseOklab(shadow);
+    const offGreen = !lab || lab.a > -0.08;
+    const offRed = !lab || !(lab.a > 0.08 && lab.b < 0.05);
+    check(`${token} orb (a=${lab && lab.a}, b=${lab && lab.b}) avoids gain green and loss red`,
+      lab !== null && offGreen && offRed);
   }
 
-  const flagged = rows.filter((r) => r.flags.split(' ').includes('mega'));
-  const plain = rows.filter((r) => !r.flags.split(' ').includes('mega'));
-  const expected = rows.filter((r) => (caps.get(r.sym) ?? 0) >= MEGA);
-
-  console.log(`  ${rows.length} rows, ${flagged.length} mega, cutoff $${MEGA / 1e9}B`);
-  check(`some rows are flagged and most are not (${flagged.length}/${rows.length})`,
-    flagged.length > 20 && flagged.length < rows.length / 3);
-  check(`the flagged set is exactly the companies at or above the cutoff (${expected.length})`,
-    flagged.length === expected.length
-    && flagged.every((r) => (caps.get(r.sym) ?? 0) >= MEGA));
-  check('no company below the cutoff is flagged', plain.every((r) => (caps.get(r.sym) ?? 0) < MEGA));
-  check(`the flag is spoken, not only shown (${flagged[0] && flagged[0].aria})`,
-    /\(mega cap[,)]/.test(flagged[0].aria || ''));
-  check('an unflagged row says nothing extra', !/mega cap/.test(plain[0].aria || ''));
-  check('nothing on the board is dimmed — the rolled-back dimmer left no trace',
-    rows.every((r) => !r.dimmedClass));
-
-  // ── what the flag actually draws ──────────────────────────────────
-  const paint = await page.evaluate(() => {
-    const pick = (flags) => [...document.querySelectorAll('#panel-ranks .board .row')]
-      .find((r) => (r.dataset.flags || '') === flags && !r.classList.contains('is-selected'));
-    const read = (row) => {
-      if (!row) return null;
-      const cs = getComputedStyle(row);
-      const logo = getComputedStyle(row.querySelector('.logo'));
-      return { rowShadow: cs.boxShadow, rowBg: cs.backgroundColor,
-        orb: logo.boxShadow, orbVar: cs.getPropertyValue('--flag-orb').trim() };
-    };
-    return { on: read(pick('mega')), off: read(pick('')) };
-  });
-
-  check(`an unflagged logo carries no orb (${paint.off.orb})`,
-    paint.off.orb === 'none' && paint.off.orbVar === 'none');
-  check(`a flagged one does (${paint.on.orb.slice(0, 54)}…)`, /rgb|rgba|oklab|#/.test(paint.on.orb));
-  check('the orb has two blurred layers', paint.on.orb.split(/,(?![^(]*\))/).length === 2);
-  const geom = paint.on.orb.split(/,(?![^(]*\))/).map((layer) => {
-    const n = (layer.match(/-?\d+(?:\.\d+)?px/g) || []).map(parseFloat);
-    return { blur: n[2] ?? 0, spread: n[3] ?? 0 };
-  });
-  check(`and no hard ring — every layer is blurred (${geom.map((g) => `${g.blur}/${g.spread}`).join(' ')})`,
-    geom.every((g) => g.blur > 0 && g.blur > g.spread * 2));
-  check('the row itself is left alone — the orb is not a row treatment',
-    paint.on.rowShadow === paint.off.rowShadow && paint.on.rowBg === paint.off.rowBg);
-
-  const oklabOf = (str) => [...str.matchAll(/oklab\(([^)]+)\)/g)].map((m) => {
-    const [lab, alpha] = m[1].split('/');
-    const [L, a, b] = lab.trim().split(/\s+/).map(Number);
-    return { L, a, b, alpha: alpha === undefined ? 1 : Number(alpha) };
-  });
-  const orbColors = oklabOf(paint.on.orb);
-  check(`the orb parses as a colour (${orbColors.length} layers)`, orbColors.length === 2);
-  check(`it reads yellow (b ${orbColors[0].b})`, orbColors.every((c) => c.b > 0.08));
-  check(`and warm rather than green (a ${orbColors[0].a})`, orbColors.every((c) => c.a > 0));
-  check('so it can never be the gain/action green, which sits at a < 0',
-    orbColors.every((c) => c.a < 0.10));
-  check('nor the loss red, which is far redder than it is yellow',
-    orbColors.every((c) => c.b > c.a * 2));
-  const alphas = orbColors.map((c) => c.alpha);
-  check(`every layer stays translucent (max alpha ${Math.max(...alphas)})`, Math.max(...alphas) <= 0.5);
-
-  // ── it composes with the saved-row treatment ──────────────────────
-  const both = await page.evaluate(() => {
-    const r = [...document.querySelectorAll('#panel-ranks .board .row')]
-      .find((x) => x.dataset.flags && x.classList.contains('is-selected'));
+  // ── a saved grouped row wears orb AND ring — different objects, both ──
+  const savedGrouped = await page.evaluate(() => {
+    const r = [...document.querySelectorAll('#ranks-rows .row.is-selected[data-flags~="corr"]')][0];
     if (!r) return null;
-    const ring = getComputedStyle(r, '::before');
-    return { ring: ring.backgroundImage, orb: getComputedStyle(r.querySelector('.logo')).boxShadow };
-  });
-  check('a saved mega cap exists to test', !!both);
-  check(`it keeps the saved ring (${(both.ring || '').slice(0, 18)}…)`, /gradient/.test(both.ring || ''));
-  check('and wears the orb at the same time', both.orb !== 'none');
-
-  // ── the callout explains it, and only it ──────────────────────────
-  const note = await page.$eval('#ranks-callout-text', (e) => e.textContent.replace(/\s+/g, ' '));
-  check(`the board says how many carry the orb (${(note.match(/(\d+) companies carry[^.]*/) || [])[0] || 'missing'})`,
-    new RegExp(`\\b${flagged.length}\\b companies carry a gold orb`).test(note));
-  check('and names the cutoff in dollars', /\$200B/.test(note));
-  check('no line survives from the rolled-back flags', !/violet|biotechnology/.test(note));
-
-  // ── the Flags section in Settings ─────────────────────────────────
-  await page.goto(`${BASE}#settings`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#flag-settings .settings-row', { timeout: 30000 });
-  await page.waitForTimeout(900);
-
-  const section = await page.evaluate(() => {
-    const wrap = document.querySelector('#panel-settings .wrap');
-    const order = [...wrap.children].map((e) => e.id || e.className);
     return {
-      order,
-      headings: [...wrap.querySelectorAll('.section-label-key')].map((e) => e.textContent.trim()),
-      rows: [...document.querySelectorAll('#flag-settings .settings-row')].map((r) => ({
-        label: r.querySelector('.settings-row-label').textContent.trim(),
-        count: r.querySelector('.flag-sample-count').textContent.trim(),
-        orb: getComputedStyle(r.querySelector('.flag-sample-orb')).boxShadow,
-        on: r.querySelector('.ios-switch').getAttribute('aria-checked'),
-        key: r.querySelector('.ios-switch').dataset.flag,
-      })),
+      sym: r.dataset.symbol,
+      orb: getComputedStyle(r.querySelector('.logo')).boxShadow,
+      hasRing: getComputedStyle(r, '::before').content !== 'none',
+    };
+  });
+  check(`a saved anchor carries both treatments (${savedGrouped && savedGrouped.sym})`,
+    savedGrouped !== null && savedGrouped.orb !== 'none' && savedGrouped.hasRing);
+
+  // ── the Settings section: one switch, sample orb, live count ──
+  await page.click('[data-tab="settings"]');
+  await page.waitForTimeout(600);
+  const settings = await page.evaluate(() => {
+    const container = document.getElementById('flag-settings');
+    const rows = [...container.querySelectorAll('.settings-row')];
+    return {
+      rows: rows.length,
+      label: rows[0] ? rows[0].querySelector('.settings-row-label').textContent.trim() : '',
+      sampleShadow: rows[0]
+        ? getComputedStyle(rows[0].querySelector('.flag-sample-orb')).boxShadow : '',
+      countLine: rows[0] ? rows[0].querySelector('.flag-sample-count').textContent.trim() : '',
+      switchOn: rows[0]
+        ? rows[0].querySelector('.ios-switch').getAttribute('aria-checked') === 'true' : null,
       note: (document.getElementById('flags-note') || {}).textContent || '',
     };
   });
+  check(`the registry renders one row per flag (${settings.rows})`, settings.rows === 1);
+  check(`it is the correlation groups (${settings.label})`, settings.label === 'Correlation groups');
+  check('the sample previews a real orb', settings.sampleShadow !== 'none' && settings.sampleShadow !== '');
+  check(`the count line counts the board (${settings.countLine})`,
+    new RegExp(`^${board.length} of \\d+ on the board$`).test(settings.countLine));
+  check('the switch defaults on', settings.switchOn === true);
+  check('the section note explains flags never touch the ranking', /never\s+affects the ranking/.test(settings.note));
 
-  check(`Flags is its own section (${section.headings.join(' / ')})`,
-    section.headings.includes('Flags')
-    && section.headings.indexOf('Flags') === section.headings.length - 1);
-  check('the Scoring note stays under Scoring, not under Flags',
-    section.order.indexOf('settings-note') < section.order.indexOf('flag-settings'));
-  check(`one row per registered flag (${section.rows.map((r) => r.key).join(',')})`,
-    section.rows.length === 1 && section.rows[0].key === 'mega');
-  check(`titled for a reader (${section.rows[0].label})`, section.rows[0].label === 'Mega caps');
-  check(`it shows a live match count (${section.rows[0].count})`,
-    new RegExp(`^${flagged.length} of ${rows.length} on the board$`).test(section.rows[0].count));
-  check('and previews the flag with the board\'s own value', section.rows[0].orb === paint.on.orb);
-  check(`it defaults on (${section.rows[0].on})`, section.rows[0].on === 'true');
-  check('the note points at the registry', /ROW_FLAGS/.test(section.note));
-
-  // ── switching it off ──────────────────────────────────────────────
-  await page.click('#flag-settings .ios-switch[data-flag="mega"]');
-  await page.waitForTimeout(400);
-  const storedOff = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.settings') || '{}').flags);
-  check(`only the deviation is stored (${JSON.stringify(storedOff)})`,
-    storedOff && storedOff.mega === false && Object.keys(storedOff).length === 1);
-
-  await page.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#panel-ranks .board .row', { timeout: 30000 });
+  // ── switching it off disarms every orb, and survives a reload ──
+  await page.locator('#flag-settings .ios-switch').click();
   await page.waitForTimeout(800);
-  const dark = await page.evaluate(() => {
-    const all = [...document.querySelectorAll('#panel-ranks .board .row')];
-    return {
-      flagged: all.filter((r) => r.dataset.flags).length,
-      anyOrb: all.some((r) => getComputedStyle(r.querySelector('.logo')).boxShadow !== 'none'),
-      callout: (document.getElementById('ranks-callout-text') || {}).textContent || '',
-    };
-  });
-  check(`switched off, no row carries the flag (${dark.flagged})`, dark.flagged === 0);
-  check('and no logo draws an orb', !dark.anyOrb);
-  check('the callout drops its line too', !/gold orb/.test(dark.callout));
+  const offCount = await page.evaluate(() =>
+    document.querySelectorAll('.row[data-flags~="corr"]').length);
+  check(`off means no orbs anywhere (${offCount})`, offCount === 0);
 
-  // Back on, and the override clears rather than storing true.
-  await page.goto(`${BASE}#settings`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#flag-settings .ios-switch', { timeout: 30000 });
+  // Not reload(): the hash tracks the active tab, so a reload would come back
+  // on #settings with the board panel hidden and its rows never "visible".
+  await page.goto(`${BASE}#ranks`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#ranks-rows .row', { timeout: 30000 });
+  await page.waitForTimeout(3500);
+  const afterReload = await page.evaluate(() => ({
+    flagged: document.querySelectorAll('.row[data-flags~="corr"]').length,
+    stored: JSON.parse(localStorage.getItem('teatime.settings') || '{}').flags,
+  }));
+  check(`the off choice persists (${JSON.stringify(afterReload.stored)})`,
+    afterReload.flagged === 0 && afterReload.stored && afterReload.stored.corr === false);
+
+  // Back on: the override is removed rather than stored as true, keeping the
+  // sparse-map contract that lets a future flag default on without migration.
+  await page.click('[data-tab="settings"]');
   await page.waitForTimeout(600);
-  await page.click('#flag-settings .ios-switch[data-flag="mega"]');
-  await page.waitForTimeout(400);
-  const backOn = await page.evaluate(() => JSON.parse(localStorage.getItem('teatime.settings') || '{}').flags);
-  check(`switching back on clears the override (${JSON.stringify(backOn)})`,
-    backOn && Object.keys(backOn).length === 0);
+  await page.locator('#flag-settings .ios-switch').click();
+  await page.waitForTimeout(800);
+  const backOn = await page.evaluate(() => ({
+    stored: JSON.parse(localStorage.getItem('teatime.settings') || '{}').flags,
+    flagged: document.querySelectorAll('.row[data-flags~="corr"]').length,
+  }));
+  check('switching back on erases the override instead of storing true',
+    backOn.stored && !('corr' in backOn.stored));
+  check(`and the orbs return (${backOn.flagged})`, backOn.flagged > 0);
 
-  // ── the watchlist board shares it ─────────────────────────────────
-  await page.goto(`${BASE}#investing`, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => localStorage.setItem('teatime.investingView', 'watchlist'));
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#panel-investing .board .row', { timeout: 30000 });
-  await page.waitForTimeout(700);
-  const wl = await page.evaluate(() => [...document.querySelectorAll('#panel-investing .board .row')]
-    .map((r) => ({ sym: r.dataset.symbol, flags: r.dataset.flags || '' })));
-  check(`the watchlist board flags the same names (${wl.map((r) => `${r.sym}:${r.flags || '-'}`).join(' ')})`,
-    wl.find((r) => r.sym === 'NVDA').flags === 'mega' && wl.find((r) => r.sym === 'SNDK').flags === '');
+  await page.screenshot({ path: `${S}-flags.png` });
+  check(`no page errors (${errors.length})`, errors.length === 0);
+  if (errors.length) console.log('ERRORS:', JSON.stringify(errors.slice(0, 4)));
 
-  await page.screenshot({ path: `${S}/flags-board.png` });
-
-  // ── a retired flag's saved value is dropped ───────────────────────
-  // Its own context: this page's init script rewrites settings each navigation.
-  {
-    const c2 = await browser.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
-    const p2 = await c2.newPage();
-    p2.on('pageerror', (e) => errors.push(String(e)));
-    await p2.addInitScript(() => {
-      if (localStorage.getItem('teatime.settings')) return; // plant once, not on every reload
-      localStorage.setItem('teatime.settings', JSON.stringify({
-        flags: { mega: false, vol: false, biotech: false, bogus: 'yes' },
-      }));
-    });
-    await p2.goto(`${BASE}#settings`, { waitUntil: 'domcontentloaded' });
-    await p2.waitForSelector('#flag-settings .settings-row', { timeout: 30000 });
-    await p2.waitForTimeout(900);
-    const raw = await p2.evaluate(() => localStorage.getItem('teatime.settings'));
-    const cleaned = JSON.parse(raw || '{}').flags;
-    check(`overrides for the rolled-back flags are dropped (${JSON.stringify(cleaned)})`,
-      cleaned && cleaned.mega === false && !('vol' in cleaned) && !('biotech' in cleaned) && !('bogus' in cleaned));
-    check('and the surviving override is honoured',
-      await p2.$eval('#flag-settings .ios-switch[data-flag="mega"]', (b) => b.getAttribute('aria-checked')) === 'false');
-    await c2.close();
-  }
-
-  if (errors.length) console.log('ERRORS:', errors.slice(0, 6));
-  check('no page errors', errors.length === 0);
-
-  await browser.close();
   console.log('=== RESULTS ===');
   results.forEach((r) => console.log(r));
+  await browser.close();
   process.exit(results.some((r) => r.startsWith('FAIL')) ? 1 : 0);
 })();

@@ -38,7 +38,10 @@ module.exports = {
   // changes with no other code to touch up to a few hundred companies; past
   // that, the fetch-everything-on-load architecture itself needs to change
   // (see CLAUDE.md's Extensibility patterns section).
-  universeSize: 500,
+  // 500 for two days in August 2026; cut back to 300 at the owner's request in
+  // the big simplification pass — the board rebuild cost scaled with it and
+  // taps had gotten laggy on the phone.
+  universeSize: 300,
   screenerCandidatePool: 1000,
   // NOTE when resizing: screenerMinMarketCap below is the real ceiling on how
   // big the universe can get, and it binds long before screenerCandidatePool
@@ -71,13 +74,13 @@ module.exports = {
   // safety net — this just stops provoking it.
   fmpConcurrency: 6,
 
-  // $12B leaves ~660 candidates before dedupe — real headroom above
-  // universeSize: 500, with room for market caps to drift down without the
-  // board silently coming up short. The $4M dollar-volume floor was
-  // re-measured at this cap floor (see src/leaderboard.js): junk still tops
-  // out at $2.3M, and the one real casualty is Pershing Square's thin-float
-  // listing at $3.1M/day — accepted under the "board of what you could
-  // actually buy" rule, same as Formula One's class A before it.
+  // $12B leaves ~660 candidates before dedupe — set when the universe was 500,
+  // kept at 300 because extra headroom costs nothing (universeSize still takes
+  // the top N by cap) and the $4M dollar-volume floor in src/leaderboard.js was
+  // measured against this cap floor; raising the floor again would mean
+  // re-measuring that for no benefit. The one real casualty is Pershing
+  // Square's thin-float listing at $3.1M/day — accepted under the "board of
+  // what you could actually buy" rule, same as Formula One's class A before it.
   screenerMinMarketCap: 12e9,
   country: 'US',
   exchanges: 'NYSE,NASDAQ',

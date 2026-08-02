@@ -199,41 +199,12 @@ function summarize(series) {
   };
 }
 
-// ── current holdings, if recorded ────────────────────────────────────
-// data/portfolio/holdings.csv, append-only by date like the balances: each
-// batch of rows shares a date, and the latest date is the current picture.
-// Optional — everything else works without it; the "held vs plan" card just
-// shows how to start. Dollars, not shares, because that's what the owner's
-// brokerage screen shows and what the comparison needs.
-const HOLDINGS_PATH = path.join(__dirname, '..', 'data', 'portfolio', 'holdings.csv');
-
-function getHoldings() {
-  let text;
-  try {
-    text = fs.readFileSync(HOLDINGS_PATH, 'utf8');
-  } catch {
-    return null;
-  }
-  const rows = [];
-  const lines = text.split('\n');
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const [date, symbol, dollars] = line.split(',');
-    const value = Number(dollars);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !symbol || !Number.isFinite(value) || value < 0) continue;
-    rows.push({ date, symbol: symbol.trim().toUpperCase(), dollars: value });
-  }
-  if (rows.length === 0) return null;
-  const latest = rows.reduce((a, r) => (r.date > a ? r.date : a), rows[0].date);
-  return {
-    asOf: latest,
-    positions: rows.filter((r) => r.date === latest).map(({ symbol, dollars }) => ({ symbol, dollars })),
-  };
-}
-
 // Read fresh each call rather than caching: the file is edited by hand
-// between runs, and it's 124 short lines.
+// between runs, and it's a few hundred short lines. (A holdings.csv companion
+// — per-position dollars feeding a held-vs-plan card — lived here for two
+// days in August 2026 and was removed at the owner's request: transcribing
+// positions from brokerage screenshots was more upkeep than the card was
+// worth. The balances below are the piece the owner chose to keep.)
 function getPortfolio() {
   let text;
   try {
@@ -247,9 +218,6 @@ function getPortfolio() {
   return {
     ...summary,
     series: series.map((p) => [p.date, p.balance]),
-    // Rides the same payload (and so the same embedded bundle) as everything
-    // else portfolio-shaped; null until the owner records a first batch.
-    holdings: getHoldings(),
   };
 }
 
